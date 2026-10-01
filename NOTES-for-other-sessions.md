@@ -31,6 +31,24 @@ so I kept your version. Room indexes: Main 0, Home 1, Web 2, News 3, so new room
   $TMPDIR/asmmesh-build. One run installed fine. Please don't start an install while another is running.
 - Packet types 7, 8 and 9 are taken, and local room ids are 1–3. Please use other numbers.
 
+## 0.8, builds 9-13 (rewritten after the move: the original notes for these builds were lost)
+New files: `src/alerts.s` (ntfy, Pushover, location, SOS, weather alerts, webhook on port 8787),
+`src/files.s` (Files on Wi-Fi on port 8788, folder chooser, AirDrop, QR code),
+`src/fm_fec.s` + generated `src/fm_fec_tables.inc` (Reed-Solomon error correction for FM).
+Numbers now taken - please pick others:
+- Packet types: T_HELLO 2, T_INVITE 3, 7-9 (web/news), T_ROOMDEL 10.
+- Services: SVC_LOC 17, SVC_NTFY 18, SVC_PUSHOVER 19, SVC_NWS 20, SVC_HOOK 21, SVC_FILES 22, NSVC 23.
+  ST_LAN / ST_CLOUD moved to bits 40/41 so they don't collide with service bits.
+- Room struct: R_OWNER at 56 (creator's id); saved in defaults key "roomOwners".
+- Self-tests 78-93 (alerts, files, room delete) and 17b (re-key invite).
+Behaviour changes:
+- FM frames: 8-byte sync tag, length x3, RS(n, n-32) blocks, CRC-16; sent twice unless "fm repeat off".
+  The old HDLC path still receives. DPLL gain is 1/8. MODBUF is 480000.
+- Invites carry the room owner; an invite to a room you already have with a different key asks
+  "Use the New Key". Only the owner can delete a room for everyone (Mesh > Delete Room...).
+- ident.s: the identity is only regenerated when Keychain says "not found" (-25300), never on a refusal.
+- The welcome line shows the build number from Info.plist (CFBundleVersion).
+
 ## Moved to ~/Developer/asmmesh, now in git (after build 13)
 - The project lives in `~/Developer/asmmesh` (outside iCloud). `~/Desktop/asmmesh old` is the
   pre-git copy - don't edit it any more.
