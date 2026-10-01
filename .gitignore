@@ -1,0 +1,9 @@
+*.o
+/asmmesh
+asmmesh.app/
+install.log
+crash.log
+setup.log
+_to_delete/
+_incoming*
+.DS_Store
