@@ -1155,6 +1155,8 @@ _selftest:
     add  x19, x19, x0
     bl   _files_selftest              // the files page (files.s)
     add  x19, x19, x0
+    bl   _sens_selftest               // Bluetooth sensors and their rules (sensors.s)
+    add  x19, x19, x0
 
     // summary
     str  x19, [sp]

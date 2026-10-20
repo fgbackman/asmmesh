@@ -628,6 +628,8 @@ _list_wanted:
     ADRL x10, _g_kind_on              // its service switched off: not listed
     ldrb w10, [x10, x9]
     cbz  w10, Llw_no
+    cmp  x9, #K_BLES                  // sensors have their own list ("sensors")
+    b.eq Llw_no
     cmp  x9, #K_SHORTCUT              // runnables get their own lines
     b.eq Llw_no
     cmp  x9, #K_ST_SCENE
@@ -1403,6 +1405,7 @@ Ls_k_roku:           .asciz "Roku"
 Ls_k_wiz:            .asciz "WiZ"
 Ls_k_sonos:          .asciz "Sonos"
 Ls_k_kasa:           .asciz "TP-Link Kasa"
+Ls_k_bles:     .asciz "Bluetooth sensor"
 Ls_k_tv:             .asciz "TV"
 Ls_k_hue:            .asciz "Hue"
 Ls_k_sc_n:           .asciz "Shortcuts"
@@ -1468,11 +1471,11 @@ Lhelp:
 Lkinds:
     .quad Ls_k_unknown, Ls_k_huelight, Ls_k_huegroup, Ls_k_st, Ls_k_sc, Ls_k_ble
     .quad Ls_k_stscene, Ls_k_wled, Ls_k_elgato, Ls_k_shelly, Ls_k_nano, Ls_k_lifx
-    .quad Ls_k_govee, Ls_k_ha, Ls_k_roku, Ls_k_wiz, Ls_k_sonos, Ls_k_kasa
+    .quad Ls_k_govee, Ls_k_ha, Ls_k_roku, Ls_k_wiz, Ls_k_sonos, Ls_k_kasa, Ls_k_bles
 Lsumnames:
     .quad Ls_k_unknown, Ls_k_hue, Ls_k_hue, Ls_k_st, Ls_k_sc_n, Ls_k_ble, Ls_k_stscene_n
     .quad Ls_k_wled, Ls_k_elgato, Ls_k_shelly, Ls_k_nano, Ls_k_lifx
-    .quad Ls_k_govee, Ls_k_ha, Ls_k_roku, Ls_k_wiz, Ls_k_sonos, Ls_k_kasa
+    .quad Ls_k_govee, Ls_k_ha, Ls_k_roku, Ls_k_wiz, Ls_k_sonos, Ls_k_kasa, Ls_k_bles
 Lcapnames:
     .quad CAP_ON, Lc_on
     .quad CAP_LEVEL, Lc_lvl

@@ -60,6 +60,7 @@ Lsvc:
     .quad Lk_nws,   Lt_nws,   Ld_nws,   Lsy_nws,   0xFF9F0A, 0
     .quad Lk_hook,  Lt_hook,  Ld_hook,  Lsy_hook,  0xBF5AF2, 0
     .quad Lk_files, Lt_files, Ld_files, Lsy_files, 0x64D2FF, 0
+    .quad Lk_sens,  Lt_sens,  Ld_sens,  Lsy_sens,  0x30D158, 0x40000
 
 .section __TEXT,__const
 .p2align 3
@@ -104,6 +105,16 @@ _svc_title:
     mov  x9, #SV_SIZE
     madd x8, x0, x9, x8
     ldr  x0, [x8, #8]
+    ret
+
+// long _svc_field(long i, long k) — word k of service i's row: 0 key, 1 title, 2 subtitle,
+//   3 SF Symbol, 4 colour 0xRRGGBB, 5 device kinds (the iPhone app's Settings uses it)
+.globl _svc_field
+_svc_field:
+    ADRL x8, Lsvc
+    mov  x9, #SV_SIZE
+    madd x8, x0, x9, x8
+    ldr  x0, [x8, x1, lsl #3]
     ret
 
 // long _svc_gate(long i) -> 1 if on; otherwise says in Home how to turn it on
@@ -916,6 +927,7 @@ Lk_po:      .asciz "pushover"
 Lk_nws:     .asciz "alerts"
 Lk_hook:    .asciz "webhook"
 Lk_files:   .asciz "files"
+Lk_sens:    .asciz "sensors"
 Lt_hue:     .asciz "Philips Hue"
 Lt_st:      .asciz "SmartThings"
 Lt_home:    .asciz "Apple Home"
@@ -939,6 +951,7 @@ Lt_po:      .asciz "Pushover"
 Lt_nws:     .asciz "Weather alerts"
 Lt_hook:    .asciz "Webhook"
 Lt_files:   .asciz "Files on Wi-Fi"
+Lt_sens:    .asciz "Bluetooth Sensors"
 Ld_hue:     .asciz "Bridge and Bluetooth bulbs"
 Ld_st:      .asciz "Lutron, Samsung and more"
 Ld_home:    .asciz "Scenes and devices via Shortcuts"
@@ -962,6 +975,7 @@ Ld_po:      .asciz "Pushes and loud SOS alerts"
 Ld_nws:     .asciz "US National Weather Service"
 Ld_hook:    .asciz "Shortcuts and IFTTT post in"
 Ld_files:   .asciz "Your phone browses and uploads"
+Ld_sens:    .asciz "Thermometers, buttons, batteries"
 Lsy_hue:    .asciz "lightbulb.fill"
 Lsy_st:     .asciz "square.grid.2x2.fill"
 Lsy_home:   .asciz "house.fill"
@@ -985,6 +999,7 @@ Lsy_po:     .asciz "paperplane.fill"
 Lsy_nws:    .asciz "exclamationmark.triangle.fill"
 Lsy_hook:   .asciz "link"
 Lsy_files:  .asciz "folder.fill"
+Lsy_sens:   .asciz "thermometer"
 
 Lf_key:        .asciz "svc_%s"
 Ls_one:        .asciz "1"

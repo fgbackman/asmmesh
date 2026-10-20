@@ -97,6 +97,7 @@
 .set T_HELLO,       2
 .set T_INVITE,      3
 .set T_ROOMDEL,     10       // the room's owner deleted it (+12 room, +20 owner, +28 nlen, +29 nick)
+.set T_HP,          11       // headphones: +12 target (0 any) +20 sender +28 nlen +29 nick, op, hash[16]
 .set RX_BAD,        0
 .set RX_NEW,        1
 .set RX_DUP,        2
@@ -176,9 +177,13 @@
 .set K_WIZ,         15
 .set K_SONOS,       16
 .set K_KASA,        17
-.set K_LAST,        17
+.set K_BLES,        18       // a Bluetooth sensor heard on the air (sensors.s)
+.set K_LAST,        18
 .set D_OPEN,        (D_AUX + 8)   // SmartThings / Home Assistant: 1 open, 0 closed, -1 unknown
 .set D_LOCKED,      (D_AUX + 16)  //   1 locked, 0 unlocked, -1 unknown
+.set D_SIDX,        (D_AUX + 0)   // Bluetooth sensor: its index in the sensor table
+.set D_MOTION,      (D_AUX + 24)  //   1 motion, 0 clear, -1 unknown
+.set D_WET,         (D_AUX + 32)  //   1 water, 0 dry, -1 unknown
 .set CAP_ON,        0x1
 .set CAP_LEVEL,     0x2
 .set CAP_COLOR,     0x4
@@ -297,7 +302,7 @@
 // ---------------------------------------------------------------------------
 // Services (services.s): every integration has its own switch; all start off
 // ---------------------------------------------------------------------------
-.set NSVC,          23
+.set NSVC,          24
 .set SVC_HUE,       0
 .set SVC_ST,        1        // SmartThings (Lutron and friends ride on it)
 .set SVC_HOME,      2        // Apple Home via Shortcuts
@@ -321,3 +326,32 @@
 .set SVC_NWS,       20       // National Weather Service alerts
 .set SVC_HOOK,      21       // incoming webhook on port 8787
 .set SVC_FILES,     22       // the files page for your phone, port 8788 (files.s)
+.set SVC_SENSORS,   23       // Bluetooth sensors and the battery board (sensors.s)
+
+// one reading from a sensor's advertisement (sens_decode.s); values in hundredths
+.set RD_HAVE,       0        // H_* bits: which numbers came
+.set RD_TEMP,       8        // degrees C x 100
+.set RD_HUM,        16       // % x 100
+.set RD_BATT,       24       // %
+.set RD_LUX,        32       // lux x 100
+.set RD_MOIST,      40       // soil moisture % x 100
+.set RD_PRESS,      48       // hPa x 100
+.set RD_CO2,        56       // ppm
+.set RD_BIN,        64       // BTHome binary sensors: bit (object id - 0x0F) = on
+.set RD_BINHAVE,    72       //   and which of them came
+.set RD_PID,        80       // BTHome packet id, -1 none
+.set RD_NBTN,       88       // button events in this packet
+.set RD_BTN,        96       // 4 bytes: event per button (1 press, 2 double, 3 triple, 4 long)
+.set RD_KIND,       104      // SK_*
+.set RD_SIZE,       112
+.set H_TEMP,        1
+.set H_HUM,         2
+.set H_BATT,        4
+.set H_LUX,         8
+.set H_MOIST,       16
+.set H_PRESS,       32
+.set H_CO2,         64
+.set SK_BTHOME,     1
+.set SK_GOVEE,      2
+.set SK_SWITCHBOT,  3
+.set SK_XIAOMI,     4

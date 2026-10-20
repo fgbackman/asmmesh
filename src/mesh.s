@@ -864,6 +864,8 @@ _mesh_receive:
     b.eq Lrx_vcmd
     cmp  w22, #T_ROOMDEL
     b.eq Lrx_vcmd
+    cmp  w22, #T_HP
+    b.eq Lrx_vcmd
     b    Lrx_bad
 Lrx_vseen:
     cmp  x20, #22
@@ -966,6 +968,8 @@ Lrx_ok:
     b.eq Lrx_seen
     cmp  w22, #T_ROOMDEL
     b.eq Lrx_roomdel
+    cmp  w22, #T_HP
+    b.eq Lrx_hp
     cmp  w22, #T_NEWS
     b.hs Lrx_web
 
@@ -1288,6 +1292,18 @@ Lrx_roomdel:
     bl   _copy_nick
     mov  x0, x22
     bl   _room_deleted
+    b    Lrx_relay
+
+    // ---- HP: headphones, let go / take them (handoff.s); signed, passed on unless ours ----
+Lrx_hp:
+    add  x0, x19, #29
+    ldr  x1, [sp, #104]
+    bl   _copy_nick
+    mov  x0, x19
+    mov  x1, x20
+    ldr  x2, [sp, #104]
+    bl   _hp_rx
+    cbnz x0, Lrx_new
     b    Lrx_relay
 
     // ---- SEEN: what another Mac hears (for "where is my …"); passed on, not kept ----

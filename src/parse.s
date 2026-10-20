@@ -1704,6 +1704,8 @@ _backend_status:
     b.eq Lbt_st
     cmp  x9, #K_HA
     b.eq Lbt_ha
+    cmp  x9, #K_BLES
+    b.eq Lbt_bles
     mov  x0, x19
     bl   _dev_say_state
     LEAVE 0
@@ -1714,6 +1716,10 @@ Lbt_st:
 Lbt_ha:
     mov  x0, x19
     bl   _ha_status
+    LEAVE 0
+Lbt_bles:
+    mov  x0, x19
+    bl   _sens_status
     LEAVE 0
 
 // void _dev_say_state(long idx) — "Kitchen: on, 40%"

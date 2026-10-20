@@ -97,6 +97,7 @@ _weather_init:
     LEAVE 0
 
 // long _celsius(void) -> 1 if you asked for Celsius
+.globl _celsius
 _celsius:
     ENTER 16
     ADRL x0, Ls_pref_units

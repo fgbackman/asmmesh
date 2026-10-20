@@ -503,7 +503,7 @@ Lxr_done:
 .section __DATA,__const
 .p2align 3
 Lhelp_more:
-    .quad Ls_hm1, Ls_hm2, Ls_hm3, Ls_hm4, Ls_hm5, Ls_hm6, Ls_hm8, Ls_hm7, 0
+    .quad Ls_hm1, Ls_hm2, Ls_hm3, Ls_hm4, Ls_hm5, Ls_hm6, Ls_hm8, Ls_hm9, Ls_hm7, 0
 
 .section __TEXT,__cstring,cstring_literals
 Ls_pref_topic:   .asciz "ntfy_topic"
@@ -555,4 +555,5 @@ Ls_hm4:          .asciz "\302\267 Where: \342\200\234this Mac is in the office\3
 Ls_hm5:          .asciz "\302\267 Trackers: \342\200\234trackers\342\200\235 lists AirTags, SmartTags and Tiles nearby; one that isn't yours and stays 10+ minutes gets a warning. \342\200\234trust trackers\342\200\235 marks yours."
 Ls_hm6:          .asciz "\302\267 Out loud and to your phone: \342\200\234say hello\342\200\235, \342\200\234push dinner\342\200\231s ready\342\200\235 (switch on ntfy or Pushover), \342\200\234ifttt key <key>\342\200\235 then \342\200\234trigger movie_night\342\200\235. \342\200\234energy\342\200\235 reads power meters."
 Ls_hm8:          .asciz "\302\267 Help: \342\200\234sos\342\200\235 (or long-press the SPIN) tells the mesh and your phone, and where you are with Location on. \342\200\234alerts\342\200\235 checks weather warnings, \342\200\234webhook\342\200\235 shows the address Shortcuts or IFTTT can post to. \342\200\234files\342\200\235 shows a page your phone can browse and upload to; \342\200\234airdrop\342\200\235 sends a file."
+Ls_hm9:          .asciz "\302\267 Bluetooth: \342\200\234sensors\342\200\235 lists thermometers, buttons, door and motion sensors nearby (Govee, SwitchBot, Xiaomi, BTHome/Shelly BLU); \342\200\234name sensor 2 bedroom\342\200\235, then \342\200\234when bedroom gets above 78 turn on the fan\342\200\235 or \342\200\234when doorbell is pressed say hi\342\200\235. \342\200\234batteries\342\200\235 lists every battery; \342\200\234headphones here\342\200\235 / \342\200\234send my headphones to Mac\342\200\235 moves AirPods between your Macs."
 Ls_hm7:          .asciz "\302\267 Privacy: Mesh \342\206\222 Mesh Passphrase\342\200\246 encrypts room messages, remote commands and what Macs hear, between Macs that share it."

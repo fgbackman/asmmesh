@@ -7,3 +7,7 @@ setup.log
 _to_delete/
 _incoming*
 .DS_Store
+ios/build/
+ios/build.log
+ios/build-full.log
+xcuserdata/

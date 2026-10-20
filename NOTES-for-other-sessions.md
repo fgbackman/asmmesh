@@ -49,6 +49,17 @@ Behaviour changes:
 - ident.s: the identity is only regenerated when Keychain says "not found" (-25300), never on a refusal.
 - The welcome line shows the build number from Info.plist (CFBundleVersion).
 
+## Build 14 (Bluetooth sensors, batteries, headphones)
+New files: `src/sens_decode.s` (pure decoders, tested against bthome-ble / govee-ble / pySwitchbot
+references under qemu), `src/sens_bthome.inc` (generated), `src/sensors.s`, `src/handoff.s`.
+Numbers now taken:
+- Device kind K_BLES 18 (K_LAST 18). D_SIDX = D_AUX+0, D_MOTION = D_AUX+24, D_WET = D_AUX+32.
+- SVC_SENSORS 23, NSVC 24 — the Settings grid (3 x 8) is now full.
+- Packet type T_HP 11 (headphones; +12 target, +20 sender, +28 nlen, nick, op, fingerprint[16]).
+- Rule types R_THR 5 (RU_FIELD quantity, RU_DAYS above/below, RU_MIN limit in hundredths of °C)
+  and R_BTN 6 (RU_DAYS button, RU_WANT press). Self-tests 94-105.
+- Frameworks: IOKit (battery levels). sensors.s is called from ble.s for every non-mesh advert.
+
 ## Moved to ~/Developer/asmmesh, now in git (after build 13)
 - The project lives in `~/Developer/asmmesh` (outside iCloud). `~/Desktop/asmmesh old` is the
   pre-git copy - don't edit it any more.
@@ -59,3 +70,15 @@ Behaviour changes:
   and merge into main only when its self-tests pass.
 - Signing: once an "Apple Development" certificate exists (Xcode > Settings > Accounts), the Makefile
   uses it automatically and install.log says "signed: Apple Development: ...".
+
+## iPhone app (ios/, after build 14)
+- `ios/asm/ios_ui.s` replaces main.s, ui.s and scanner.s on iOS. It keeps the same globals and entry
+  points (`_room_line`, `_ui_select_room`, `_ui_*_changed`, `_ui_set_status`, `_alert_run`...), so the
+  core files build unchanged for both. New core helpers: `_svc_field` (services.s), `_sens_info` (sensors.s).
+- Swift registers ObjC classes named NSAlert, NSTextField, NSSecureTextField and NSComboBox
+  (Bridge.swift). The core's dialogs therefore work as they are: `runModal` shows a UIAlertController and
+  spins the run loop until answered, then returns 1000 + the button index.
+- Swift is called back through `ios_room_line`, `ios_select_room`, `ios_refresh`, `ios_status` (@_cdecl).
+- The project file is generated: `python3 ios/make_project.py` (lists every core .s file). Please keep
+  the list in step when you add a source file used on both.
+- iOS stubs: web/news rooms, files, AirDrop, FM, IOKit battery calls (return 0).

@@ -69,6 +69,25 @@ Offline messages were already there: every Mac keeps the last 32 messages and in
 
 Without a passphrase, messages are plaintext: anyone running a modified copy could read any room. Version 0.3 speaks protocol v2 and ignores 0.2 packets, so update every Mac.
 
+## 0.8 build 14: Bluetooth sensors, batteries, headphones
+
+Switch on **Bluetooth Sensors** in Settings, then:
+
+- **`sensors`** lists what broadcasts nearby: Govee, SwitchBot and Xiaomi (ATC/pvvx firmware) thermometers, and BTHome devices such as Shelly BLU buttons, door/window, motion and H&T sensors. No pairing; asmmesh only listens.
+- **`name sensor 2 bedroom`** makes one a Home device: `bedroom temperature`, and rules like `when bedroom gets above 78 turn on the fan`, `when the bathroom humidity goes above 70% turn on the fan`, `when the front door opens turn on the hall light`, `when hallway detects motion …`, `when doorbell is pressed say someone's here` (also double-pressed, long-pressed, `button 2 on the remote`).
+- **`batteries`** lists this Mac's battery, Magic keyboards/mice/trackpads, connected AirPods, AirPods nearby with the case open, and your named sensors. With ntfy or Pushover on, a low one (15% or less) is pushed once a day.
+- **`headphones here`** asks your other Macs to let go of your AirPods and connects them here; **`send my headphones to Mac`** does the opposite. Only a fingerprint of the headphones' address goes over the mesh, and only a Mac paired with the same headphones acts on it.
+
+Sensor readings can be faked by anyone with a radio nearby, so unlocking and opening a garage still ask on screen however they were triggered.
+
+## asmmesh for iPhone (ios/)
+
+The same assembly core (`src/*.s`) runs on iPhone. `ios/asm/ios_ui.s` takes the place of main.s, ui.s and scanner.s, and a thin SwiftUI front end (`ios/asmmesh/*.swift`) draws four tabs: **Rooms** (mesh chat, Home with the Talk mic), **People**, **Nearby** (radar, Bluetooth sensors, batteries, headphones) and **Settings** (Hue, SmartThings, Home Assistant, LIFX, Govee, the mesh passphrase and the service switches).
+
+To install: plug in the iPhone, then run `cd ~/Developer/asmmesh/ios && bash "Install on iPhone.command"`. It signs with your free Apple ID, installs and opens the app. The first time, turn on Settings > Privacy & Security > Developer Mode, and trust your certificate under Settings > General > VPN & Device Management. With a free Apple ID the app stops opening after 7 days; run the script again to renew it.
+
+Not on iPhone (yet): the Web and News rooms, FM radio, the files page, AirDrop and the web gateway. iOS only scans for Bluetooth while the app is open, and Hue/Sonos discovery by SSDP needs an entitlement free accounts can't get (Bonjour discovery still works). After adding a source file, run `python3 ios/make_project.py`.
+
 ## Build and run
 
 Needs the Xcode command line tools (`xcode-select --install`).
@@ -120,6 +139,10 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
     src/fm_util.s  clocks, random numbers, small string helpers
     src/fm_defs.inc constants and frame macros for the FM files
     src/web.s      web pages and headlines over the mesh: Web and News rooms, the gateway
+    src/sens_decode.s what Bluetooth sensors broadcast: BTHome v2, Govee, SwitchBot, Xiaomi ATC/pvvx, AirPods batteries
+    src/sens_bthome.inc BTHome object sizes (generated from bthome-ble)
+    src/sensors.s  Bluetooth sensors as Home devices, "sensors", "name sensor", "batteries", their self-tests
+    src/handoff.s  "headphones here" / "send my headphones to …": AirPods between your Macs over the mesh
     src/test.s     `asmmesh --selftest`
     src/util.s     objc_msgSend shortcuts, NSString helpers, chat formatting
     src/macros.inc frame and messaging macros

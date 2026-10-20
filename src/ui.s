@@ -236,6 +236,7 @@ Llc_scan:
     MSG0 Ls_reloadData
 Llc_status:
     bl   _ui_update_status
+    bl   _sui_devs_changed            // the SPIN window's device list
     LEAVE 0
 
 // ---------------------------------------------------------------------------

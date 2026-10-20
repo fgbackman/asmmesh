@@ -36,6 +36,7 @@ _g_sui_name:    .quad 0
 _g_sui_enable:  .quad 0
 _g_sui_devs:    .quad 0
 _g_sui_addpop:  .quad 0
+_g_sui_devn:    .quad -1
 _g_sui_lock:    .quad 0
 _g_sui_testsw:  .quad 0
 _g_sui_status:  .quad 0
@@ -1013,36 +1014,8 @@ Lsr2_slot:
     add  x21, x21, #1
     b    Lsr2_slot
 
-Lsr2_devpop:                          // "Add a device…" and every device you can use
-    ADRL x8, _g_sui_addpop
-    ldr  x21, [x8]
-    mov  x0, x21
-    MSG0 Ls_removeAllItems
-    ADRL x0, Ls_add_dev
-    bl   _nsstr
-    mov  x2, x0
-    mov  x0, x21
-    MSG1 Ls_addItemWithTitle
-    bl   _home_dev_count
-    mov  x22, x0
-    mov  x23, #0
-Lsr2_dev:
-    cmp  x23, x22
-    b.hs Lsr2_switches
-    mov  x0, x23
-    bl   _home_dev_nth
-    tbnz x0, #63, Lsr2_dnext
-    ADRL x8, _g_devs
-    add  x0, x8, x0, lsl #DEV_SHIFT
-    add  x0, x0, #D_NAME
-    bl   _nsstr
-    mov  x2, x0
-    mov  x0, x21
-    MSG1 Ls_addItemWithTitle
-Lsr2_dnext:
-    add  x23, x23, #1
-    b    Lsr2_dev
-
+Lsr2_devpop:
+    bl   _sui_devpop
 Lsr2_switches:
     ADRL x8, _g_spin_lock             // "Remote on" is the lock, the other way round
     ldr  x9, [x8]
@@ -1059,6 +1032,60 @@ Lsr2_switches:
     bl   _sui_status_now
 Lsr2_done:
     LEAVE 64
+
+// void _sui_devpop(void) — "Add a device…" and every device you can use
+_sui_devpop:
+    ENTER 0
+    ADRL x8, _g_sui_addpop
+    ldr  x21, [x8]
+    cbz  x21, Ldp_done
+    mov  x0, x21
+    MSG0 Ls_removeAllItems
+    ADRL x0, Ls_add_dev
+    bl   _nsstr
+    mov  x2, x0
+    mov  x0, x21
+    MSG1 Ls_addItemWithTitle
+    bl   _home_dev_count
+    mov  x22, x0
+    ADRL x8, _g_sui_devn
+    str  x22, [x8]
+    mov  x23, #0
+Ldp_dev:
+    cmp  x23, x22
+    b.hs Ldp_done
+    mov  x0, x23
+    bl   _home_dev_nth
+    tbnz x0, #63, Ldp_next
+    ADRL x8, _g_devs
+    add  x0, x8, x0, lsl #DEV_SHIFT
+    add  x0, x0, #D_NAME
+    bl   _nsstr
+    mov  x2, x0
+    mov  x0, x21
+    MSG1 Ls_addItemWithTitle
+Ldp_next:
+    add  x23, x23, #1
+    b    Ldp_dev
+Ldp_done:
+    LEAVE 0
+
+// void _sui_devs_changed(void) — devices came or went (SmartThings loaded, say):
+//   bring the "Add a device…" list up to date without waiting for a reopen
+.globl _sui_devs_changed
+_sui_devs_changed:
+    ENTER 0
+    ADRL x8, _g_sui_addpop
+    ldr  x9, [x8]
+    cbz  x9, Ldc_done
+    bl   _home_dev_count
+    ADRL x8, _g_sui_devn
+    ldr  x9, [x8]
+    cmp  x0, x9
+    b.eq Ldc_done
+    bl   _sui_devpop
+Ldc_done:
+    LEAVE 0
 
 // const char *_sui_title(long i) -> its name, or its colour (capitalised) in _g_sui_buf+400
 _sui_title:

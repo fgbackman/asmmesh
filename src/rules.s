@@ -39,6 +39,10 @@
 .set R_CLOCK,     2
 .set R_PRES,      3
 .set R_DEV,       4
+.set R_THR,       5           // a sensor reading crosses a number: RU_FIELD what (1 temperature,
+                              //   2 humidity, 4 moisture, 5 light), RU_DAYS 1 above / 0 below,
+                              //   RU_MIN the number (hundredths; degrees C)
+.set R_BTN,       6           // a Bluetooth button: RU_DAYS which (0 any), RU_WANT the press
 .set T_SUNRISE,   2000
 .set T_SUNSET,    2001
 .set TM_MIN,      4
@@ -152,6 +156,23 @@ Lsimple:
     .quad Lw_spin_unlock,    2, _h_spin_lock, 0
     .quad Lw_unlock_spin,    2, _h_spin_lock, 0
     .quad Lw_trackers,       2, _h_trackers, 0
+    .quad Lw_sensors,        2, _h_sensors, 0
+    .quad Lw_list_sensors,   2, _h_sensors, 0
+    .quad Lw_my_sensors,     2, _h_sensors, 0
+    .quad Lw_bt_sensors,     2, _h_sensors, 0
+    .quad Lw_batteries,      2, _h_batteries, 0
+    .quad Lw_battery,        2, _h_batteries, 0
+    .quad Lw_battery_levels, 2, _h_batteries, 0
+    .quad Lw_low_batteries,  2, _h_batteries, 0
+    .quad Lw_check_batteries, 2, _h_batteries, 0
+    .quad Lw_hp_here,        2, _h_hp_here, 0
+    .quad Lw_air_here,       2, _h_hp_here, 0
+    .quad Lw_hp_here2,       2, _h_hp_here, 0
+    .quad Lw_air_here2,      2, _h_hp_here, 0
+    .quad Lw_hp_take,        2, _h_hp_here, 0
+    .quad Lw_air_take,       2, _h_hp_here, 0
+    .quad Lw_hp_switch,      2, _h_hp_here, 0
+    .quad Lw_air_switch,     2, _h_hp_here, 0
     .quad Lw_list_trackers,  2, _h_trackers, 0
     .quad Lw_any_trackers,   2, _h_trackers, 0
     .quad Lw_trackers_near,  2, _h_trackers, 0
@@ -236,6 +257,11 @@ Lsimple:
     .quad Lw_set_loc_to,     1, _h_city, 0
     .quad Lw_set_loc,        1, _h_city, 0
     .quad Lw_http_get,       1, _h_http_get, 0
+    .quad Lw_name_sensor,    3, _h_sens_name, 0
+    .quad Lw_send_hp,        3, _h_hp_send, 0
+    .quad Lw_send_hp2,       3, _h_hp_send, 0
+    .quad Lw_send_air,       3, _h_hp_send, 0
+    .quad Lw_send_air2,      3, _h_hp_send, 0
     .quad 0, 0, 0, 0
 
 // what a rule (or "at 7 pm …") may do besides device commands: pattern, runner(text)
@@ -301,6 +327,48 @@ Levents:
     .quad Le_is_unlocked, R_DEV, D_LOCKED, 0, Lp_unlocked, Lq_unlocks
     .quad Le_locks,       R_DEV, D_LOCKED, 1, Lp_locked, Lq_locks
     .quad Le_is_locked,   R_DEV, D_LOCKED, 1, Lp_locked, Lq_locks
+    .quad Le_detects_motion, R_DEV, D_MOTION, 1, Lp_motion, Lq_motion
+    .quad Le_sees_motion, R_DEV, D_MOTION, 1, Lp_motion, Lq_motion
+    .quad Le_senses_motion, R_DEV, D_MOTION, 1, Lp_motion, Lq_motion
+    .quad Le_stops_motion, R_DEV, D_MOTION, 0, Lp_still, Lq_still
+    .quad Le_is_clear,    R_DEV, D_MOTION, 0, Lp_still, Lq_still
+    .quad Le_detects_water, R_DEV, D_WET, 1, Lp_wet, Lq_wet
+    .quad Le_detects_leak, R_DEV, D_WET, 1, Lp_wet, Lq_wet
+    .quad Le_gets_wet,    R_DEV, D_WET, 1, Lp_wet, Lq_wet
+    .quad Le_is_wet,      R_DEV, D_WET, 1, Lp_wet, Lq_wet
+    .quad Le_is_dry,      R_DEV, D_WET, 0, Lp_dry, Lq_dry
+    .quad Le_gets_above,  R_THR, 1, 1, Lp_above, Lq_above
+    .quad Le_goes_above,  R_THR, 1, 1, Lp_above, Lq_above
+    .quad Le_rises_above, R_THR, 1, 1, Lp_above, Lq_above
+    .quad Le_climbs_above, R_THR, 1, 1, Lp_above, Lq_above
+    .quad Le_is_above,    R_THR, 1, 1, Lp_above, Lq_above
+    .quad Le_gets_over,   R_THR, 1, 1, Lp_above, Lq_above
+    .quad Le_goes_over,   R_THR, 1, 1, Lp_above, Lq_above
+    .quad Le_is_over,     R_THR, 1, 1, Lp_above, Lq_above
+    .quad Le_drops_below, R_THR, 0, 1, Lp_below, Lq_below
+    .quad Le_falls_below, R_THR, 0, 1, Lp_below, Lq_below
+    .quad Le_goes_below,  R_THR, 0, 1, Lp_below, Lq_below
+    .quad Le_gets_below,  R_THR, 0, 1, Lp_below, Lq_below
+    .quad Le_dips_below,  R_THR, 0, 1, Lp_below, Lq_below
+    .quad Le_is_below,    R_THR, 0, 1, Lp_below, Lq_below
+    .quad Le_drops_under, R_THR, 0, 1, Lp_below, Lq_below
+    .quad Le_falls_under, R_THR, 0, 1, Lp_below, Lq_below
+    .quad Le_goes_under,  R_THR, 0, 1, Lp_below, Lq_below
+    .quad Le_gets_under,  R_THR, 0, 1, Lp_below, Lq_below
+    .quad Le_is_under,    R_THR, 0, 1, Lp_below, Lq_below
+    .quad Le_is_pressed,  R_BTN, 0, 1, Lp_pressed, Lq_pressed
+    .quad Le_gets_pressed, R_BTN, 0, 1, Lp_pressed, Lq_pressed
+    .quad Le_is_clicked,  R_BTN, 0, 1, Lp_pressed, Lq_pressed
+    .quad Le_is_double,   R_BTN, 0, 2, Lp_double, Lq_double
+    .quad Le_is_double2,  R_BTN, 0, 2, Lp_double, Lq_double
+    .quad Le_is_double3,  R_BTN, 0, 2, Lp_double, Lq_double
+    .quad Le_is_triple,   R_BTN, 0, 3, Lp_triple, Lq_triple
+    .quad Le_is_triple2,  R_BTN, 0, 3, Lp_triple, Lq_triple
+    .quad Le_is_long,     R_BTN, 0, 4, Lp_long, Lq_long
+    .quad Le_is_long2,    R_BTN, 0, 4, Lp_long, Lq_long
+    .quad Le_is_held,     R_BTN, 0, 4, Lp_long, Lq_long
+    .quad Le_is_held_down, R_BTN, 0, 4, Lp_long, Lq_long
+    .quad Le_pressed_held, R_BTN, 0, 4, Lp_long, Lq_long
     .quad 0, 0, 0, 0, 0, 0
 
 // day phrases (longest first where one ends another), mask of days (bit 0 Sunday)
@@ -1440,6 +1508,28 @@ Lrw_trim:
 Lrw_rest:
     ldr  x9, [sp, #112]
     add  x19, x23, x9                 // after the event words
+    str  xzr, [sp, #128]
+    ldr  x10, [sp, #104]
+    ldr  x10, [x10, #8]
+    cmp  x10, #R_BTN
+    b.eq Lrw_btn
+    cmp  x10, #R_THR
+    b.ne Lrw_rest2
+    ADRL x0, _g_subj                  // "the bedroom humidity" -> bedroom, humidity
+    bl   _sens_subj_q
+    str  x0, [sp, #128]
+    mov  x1, x0
+    mov  x0, x19
+    bl   _sens_parse_thr              // "78 turn on the fan" -> 78 (as degrees C)
+    cbz  x0, Lrw_thr_help
+    mov  x19, x0
+    str  x1, [sp, #136]
+    b    Lrw_rest2
+Lrw_btn:
+    ADRL x0, _g_subj                  // "button 2 on the remote" -> remote, 2
+    bl   _sens_subj_btn
+    str  x0, [sp, #128]
+Lrw_rest2:
     mov  x0, x19
     bl   _strlen
     add  x1, x19, x0
@@ -1457,11 +1547,15 @@ Lrw_rest:
 Lrw_type:
     ldr  x23, [sp, #104]
     ldr  x9, [x23, #8]
+    cmp  x9, #R_THR
+    b.eq Lrw_sens
+    cmp  x9, #R_BTN
+    b.eq Lrw_sens
     cmp  x9, #R_DEV
     b.ne Lrw_valid
     cbnz x22, Lrw_valid
     ADRL x0, _g_subj
-    bl   _dev_by_name
+    bl   _sens_dev_by_name
     tbnz x0, #63, Lrw_nodev
     ADRL x8, _g_devs
     add  x24, x8, x0, lsl #DEV_SHIFT
@@ -1469,10 +1563,17 @@ Lrw_type:
     cmp  x9, #D_ON
     b.eq Lrw_devname
     ldr  x10, [x24, #D_KIND]
+    cmp  x10, #K_BLES
+    b.eq Lrw_devname
+    cmp  x9, #D_MOTION                // motion and water: Bluetooth sensors only
+    b.eq Lrw_nostate
+    cmp  x9, #D_WET
+    b.eq Lrw_nostate
     cmp  x10, #K_ST
     b.eq Lrw_devname
     cmp  x10, #K_HA
     b.eq Lrw_devname
+Lrw_nostate:
     ADRL x0, Lf_rule_nostate
     add  x1, x24, #D_NAME
     bl   _home_say
@@ -1482,6 +1583,28 @@ Lrw_devname:
     add  x1, x24, #D_NAME
     mov  x2, #RU_SUBJ_MAX
     bl   _strlcpy
+    b    Lrw_valid
+Lrw_sens:                             // a reading or a button: a named Bluetooth sensor
+    cbnz x22, Lrw_valid
+    ADRL x0, _g_subj
+    bl   _sens_dev_by_name
+    tbnz x0, #63, Lrw_nosens
+    ADRL x8, _g_devs
+    add  x24, x8, x0, lsl #DEV_SHIFT
+    ldr  x10, [x24, #D_KIND]
+    cmp  x10, #K_BLES
+    b.ne Lrw_nosens
+    b    Lrw_devname
+Lrw_nosens:
+    ADRL x0, Lf_rule_nosens
+    ADRL x1, _g_subj
+    bl   _home_say
+    b    Lrw_handled
+Lrw_thr_help:
+    cbnz x22, Lrw_handled
+    ADRL x0, Ls_rule_thr_help
+    bl   _home_say0
+    b    Lrw_handled
 Lrw_valid:
     ldr  x9, [sp, #120]
     cbz  x9, Lrw_notify_cmd
@@ -1491,12 +1614,29 @@ Lrw_valid:
     cbz  x0, Lrw_handled
     b    Lrw_make
 Lrw_notify_cmd:
+    ldr  x9, [x23, #8]
+    cmp  x9, #R_THR
+    b.ne Lrw_notify_ev
+    ldr  x0, [sp, #128]               // "notify Bedroom is above 78.0°F"
+    ldr  x1, [x23, #16]
+    ldr  x2, [sp, #136]
+    ADRL x3, _g_wtxt
+    bl   _sens_thr_text
+    ADRL x0, _g_cmdtmp
+    mov  x1, #RU_CMD_MAX
+    ADRL x2, Lf_notify_thr
+    ADRL x3, _g_subj
+    ADRL x4, _g_wtxt
+    bl   _sfmt
+    b    Lrw_notify_cap
+Lrw_notify_ev:
     ADRL x0, _g_cmdtmp
     mov  x1, #RU_CMD_MAX
     ADRL x2, Lf_notify_ev
     ADRL x3, _g_subj
     ldr  x4, [x23, #32]
     bl   _sfmt
+Lrw_notify_cap:
     ADRL x8, _g_cmdtmp                // "notify Anna arrived"
     ldrb w9, [x8, #7]
     sub  w10, w9, #'a'
@@ -1518,6 +1658,22 @@ Lrw_make:
     str  x23, [x19, #RU_WHEN]
     mov  x9, #-1
     str  x9, [x19, #RU_PREV]
+    ldr  x9, [x23, #8]
+    cmp  x9, #R_BTN
+    b.eq Lrw_make_btn
+    cmp  x9, #R_THR
+    b.ne Lrw_make_subj
+    ldr  x9, [x23, #16]               // above / below
+    str  x9, [x19, #RU_DAYS]
+    ldr  x9, [sp, #128]               // temperature / humidity / ...
+    str  x9, [x19, #RU_FIELD]
+    ldr  x9, [sp, #136]
+    str  x9, [x19, #RU_MIN]
+    b    Lrw_make_subj
+Lrw_make_btn:
+    ldr  x9, [sp, #128]               // which button (0 any)
+    str  x9, [x19, #RU_DAYS]
+Lrw_make_subj:
     add  x0, x19, #RU_SUBJ
     ADRL x1, _g_subj
     mov  x2, #RU_SUBJ_MAX
@@ -1862,6 +2018,11 @@ _rule_announce:
     b.eq Lra_at
     cmp  x9, #R_CLOCK
     b.eq Lra_clock
+    ldr  x9, [x20, #RU_TYPE]
+    cmp  x9, #R_THR
+    b.eq Lra_thr
+    cmp  x9, #R_BTN
+    b.eq Lra_btn
     ldr  x9, [x20, #RU_WHEN]
     ldr  x3, [x9, #40]
     ADRL x0, Lf_ann_when
@@ -1872,8 +2033,62 @@ _rule_announce:
     ldr  x9, [x20, #RU_TYPE]
     cmp  x9, #R_PRES
     b.eq Lra_pres
+    add  x0, x20, #RU_SUBJ            // a Bluetooth sensor: no polling, it tells us
+    bl   _sens_dev_by_name
+    tbnz x0, #63, Lra_poll
+    ADRL x8, _g_devs
+    add  x8, x8, x0, lsl #DEV_SHIFT
+    ldr  x9, [x8, #D_KIND]
+    cmp  x9, #K_BLES
+    b.eq Lra_sens
+Lra_poll:
     ADRL x0, Ls_ann_dev
     bl   _home_say0
+    b    Lra_first
+Lra_sens:
+    ADRL x0, Ls_ann_sens
+    bl   _home_say0
+    b    Lra_first
+Lra_thr:
+    ldr  x0, [x20, #RU_FIELD]
+    ldr  x1, [x20, #RU_DAYS]
+    ldr  x2, [x20, #RU_MIN]
+    ADRL x3, _g_wtxt
+    bl   _sens_thr_text
+    ADRL x0, Lf_ann_thr
+    mov  x1, x21
+    add  x2, x20, #RU_SUBJ
+    ADRL x3, _g_wtxt
+    add  x4, x20, #RU_CMD
+    bl   _home_say4
+    ADRL x0, Ls_ann_sens
+    bl   _home_say0
+    b    Lra_first
+Lra_btn:
+    ldr  x9, [x20, #RU_WHEN]
+    ldr  x3, [x9, #40]
+    ldr  x9, [x20, #RU_DAYS]
+    cbnz x9, Lra_btn_n
+    ADRL x0, Lf_ann_when
+    mov  x1, x21
+    add  x2, x20, #RU_SUBJ
+    add  x4, x20, #RU_CMD
+    bl   _home_say4
+    b    Lra_first
+Lra_btn_n:
+    mov  x22, x3                      // the tense
+    ADRL x0, _g_wtxt                  // "Remote button 2"
+    mov  x1, #96
+    ADRL x2, Lf_btn_subj
+    add  x3, x20, #RU_SUBJ
+    mov  x4, x9
+    bl   _sfmt
+    ADRL x0, Lf_ann_when
+    mov  x1, x21
+    ADRL x2, _g_wtxt
+    mov  x3, x22
+    add  x4, x20, #RU_CMD
+    bl   _home_say4
     b    Lra_first
 Lra_pres:
     add  x0, x20, #RU_SUBJ
@@ -2291,6 +2506,57 @@ Lpe_next:
 Lpe_done:
     LEAVE 0
 
+// void _rules_sens_eval(void) — a Bluetooth sensor said something new (sensors.s)
+.globl _rules_sens_eval
+_rules_sens_eval:
+    ENTER 0
+    ADRL x8, _g_busy
+    ldr  x9, [x8]
+    cbnz x9, Lrse_done
+    bl   _rules_dev_eval
+Lrse_done:
+    LEAVE 0
+
+// long _rules_button(long dev, long button, long press) -> how many rules it set off
+.globl _rules_button
+_rules_button:
+    ENTER 16
+    mov  x21, x0
+    mov  x22, x1
+    mov  x23, x2
+    mov  x24, #0
+    mov  x19, #0
+Lrb_loop:
+    ADRL x8, _g_rule_count
+    ldr  x9, [x8]
+    cmp  x19, x9
+    b.hs Lrb_done
+    RULEA x20, x19
+    ldr  x9, [x20, #RU_TYPE]
+    cmp  x9, #R_BTN
+    b.ne Lrb_next
+    ldr  x9, [x20, #RU_WANT]
+    cmp  x9, x23
+    b.ne Lrb_next
+    ldr  x9, [x20, #RU_DAYS]
+    cbz  x9, Lrb_dev
+    cmp  x9, x22
+    b.ne Lrb_next
+Lrb_dev:
+    add  x0, x20, #RU_SUBJ
+    bl   _sens_dev_by_name
+    cmp  x0, x21
+    b.ne Lrb_next
+    mov  x9, #1
+    str  x9, [x20, #RU_PEND]
+    add  x24, x24, #1
+Lrb_next:
+    add  x19, x19, #1
+    b    Lrb_loop
+Lrb_done:
+    mov  x0, x24
+    LEAVE 16
+
 _rules_dev_eval:
     ENTER 0
     mov  x19, #0
@@ -2301,10 +2567,12 @@ Lde_loop:
     b.hs Lde_done
     RULEA x20, x19
     ldr  x9, [x20, #RU_TYPE]
+    cmp  x9, #R_THR
+    b.eq Lde_thr
     cmp  x9, #R_DEV
     b.ne Lde_next
     add  x0, x20, #RU_SUBJ
-    bl   _dev_by_name
+    bl   _sens_dev_by_name
     tbnz x0, #63, Lde_next
     ADRL x8, _g_devs
     add  x21, x8, x0, lsl #DEV_SHIFT
@@ -2312,6 +2580,8 @@ Lde_loop:
     cmp  x9, #D_ON
     b.eq Lde_read
     ldr  x10, [x21, #D_KIND]
+    cmp  x10, #K_BLES
+    b.eq Lde_read
     cmp  x10, #K_ST
     b.eq Lde_read
     cmp  x10, #K_HA
@@ -2321,6 +2591,36 @@ Lde_read:
     tbnz x1, #63, Lde_next
     cmp  x1, #1
     b.hi Lde_next
+    mov  x0, x20
+    bl   _rule_transition
+    b    Lde_next
+Lde_thr:                              // above / below, with half a unit of slack once crossed
+    add  x0, x20, #RU_SUBJ
+    bl   _sens_dev_by_name
+    tbnz x0, #63, Lde_next
+    ldr  x1, [x20, #RU_FIELD]
+    bl   _sens_value
+    cbz  x1, Lde_next
+    ldr  x10, [x20, #RU_MIN]
+    ldr  x11, [x20, #RU_PREV]
+    mov  x12, #50
+    ldr  x9, [x20, #RU_DAYS]
+    cbz  x9, Lde_below
+    cmp  x11, #1                      // above: v > limit (once above, until v <= limit - 0.5)
+    b.ne Lde_a_cmp
+    sub  x10, x10, x12
+Lde_a_cmp:
+    cmp  x0, x10
+    cset x1, gt
+    b    Lde_thr_go
+Lde_below:
+    cmp  x11, #1
+    b.ne Lde_b_cmp
+    add  x10, x10, x12
+Lde_b_cmp:
+    cmp  x0, x10
+    cset x1, lt
+Lde_thr_go:
     mov  x0, x20
     bl   _rule_transition
 Lde_next:
@@ -2439,8 +2739,8 @@ Ln_sat:          .asciz "Saturdays"
 Lf_rule_unknown: .asciz "\302\267 I don't know how to \342\200\234%s\342\200\235, so I didn't make that rule. Say \342\200\234help\342\200\235 for what I can do."
 Ls_rule_which:   .asciz "\302\267 More than one device matches \342\200\224 use its whole name (\342\200\234list devices\342\200\235 shows them), and I'll make the rule."
 Lf_rule_nodev:   .asciz "\302\267 I can't find a device called \342\200\234%s\342\200\235. Say \342\200\234list devices\342\200\235 to see their names."
-Lf_rule_nostate: .asciz "\302\267 I can only tell when %s opens, closes, locks or unlocks if it comes from SmartThings or Home Assistant."
-Ls_when_help:    .asciz "\302\267 I can follow: when <someone> arrives / leaves, and when <device> turns on / off, opens / closes, locks / unlocks \342\200\224 e.g. \342\200\234when Anna arrives turn on the hall light\342\200\235, \342\200\234notify me when the front door opens\342\200\235."
+Lf_rule_nostate: .asciz "\302\267 I can only tell when %s opens, closes, locks or unlocks if it comes from SmartThings, Home Assistant or a Bluetooth sensor (motion and water: Bluetooth sensors)."
+Ls_when_help:    .asciz "\302\267 I can follow: when <someone> arrives / leaves; when <device> turns on / off, opens / closes, locks / unlocks; and for Bluetooth sensors: detects motion, detects water, gets above / drops below <number>, is pressed / double-pressed / long-pressed \342\200\224 e.g. \342\200\234when Anna arrives turn on the hall light\342\200\235, \342\200\234when bedroom gets above 78 turn on the fan\342\200\235."
 Ls_rules_full:   .asciz "\302\267 That's 24 rules already \342\200\224 cancel one first (\342\200\234rules\342\200\235 lists them)."
 Ls_what_then:    .asciz "\302\267 And what should happen then? e.g. \342\200\234at 7 pm turn on the porch light\342\200\235."
 Ls_remind_help:  .asciz "\302\267 When? e.g. \342\200\234remind me in 20 minutes to check the oven\342\200\235 or \342\200\234remind me at 5 pm to call Anna\342\200\235."
@@ -2726,6 +3026,96 @@ Le_unlocks:      .asciz " unlocks"
 Le_is_unlocked:  .asciz " is unlocked"
 Le_locks:        .asciz " locks"
 Le_is_locked:    .asciz " is locked"
+Le_detects_motion: .asciz " detects motion"
+Le_sees_motion:  .asciz " sees motion"
+Le_senses_motion: .asciz " senses motion"
+Le_stops_motion: .asciz " stops detecting motion"
+Le_is_clear:     .asciz " is clear"
+Le_detects_water: .asciz " detects water"
+Le_detects_leak: .asciz " detects a leak"
+Le_gets_wet:     .asciz " gets wet"
+Le_is_wet:       .asciz " is wet"
+Le_is_dry:       .asciz " is dry"
+Le_gets_above:   .asciz " gets above"
+Le_goes_above:   .asciz " goes above"
+Le_rises_above:  .asciz " rises above"
+Le_climbs_above: .asciz " climbs above"
+Le_is_above:     .asciz " is above"
+Le_gets_over:    .asciz " gets over"
+Le_goes_over:    .asciz " goes over"
+Le_is_over:      .asciz " is over"
+Le_drops_below:  .asciz " drops below"
+Le_falls_below:  .asciz " falls below"
+Le_goes_below:   .asciz " goes below"
+Le_gets_below:   .asciz " gets below"
+Le_dips_below:   .asciz " dips below"
+Le_is_below:     .asciz " is below"
+Le_drops_under:  .asciz " drops under"
+Le_falls_under:  .asciz " falls under"
+Le_goes_under:   .asciz " goes under"
+Le_gets_under:   .asciz " gets under"
+Le_is_under:     .asciz " is under"
+Le_is_pressed:   .asciz " is pressed"
+Le_gets_pressed: .asciz " gets pressed"
+Le_is_clicked:   .asciz " is clicked"
+Le_is_double:    .asciz " is double pressed"
+Le_is_double2:   .asciz " is double-pressed"
+Le_is_double3:   .asciz " is double clicked"
+Le_is_triple:    .asciz " is triple pressed"
+Le_is_triple2:   .asciz " is triple-pressed"
+Le_is_long:      .asciz " is long pressed"
+Le_is_long2:     .asciz " is long-pressed"
+Le_is_held:      .asciz " is held"
+Le_is_held_down: .asciz " is held down"
+Le_pressed_held: .asciz " is pressed and held"
+Lp_motion:       .asciz "detected motion"
+Lp_still:        .asciz "stopped seeing motion"
+Lp_wet:          .asciz "detected water"
+Lp_dry:          .asciz "is dry again"
+Lp_above:        .asciz "went above the limit"
+Lp_below:        .asciz "went below the limit"
+Lp_pressed:      .asciz "was pressed"
+Lp_double:       .asciz "was double-pressed"
+Lp_triple:       .asciz "was triple-pressed"
+Lp_long:         .asciz "was long-pressed"
+Lq_motion:       .asciz "detects motion"
+Lq_still:        .asciz "stops detecting motion"
+Lq_wet:          .asciz "detects water"
+Lq_dry:          .asciz "is dry"
+Lq_above:        .asciz "goes above"
+Lq_below:        .asciz "goes below"
+Lq_pressed:      .asciz "is pressed"
+Lq_double:       .asciz "is double-pressed"
+Lq_triple:       .asciz "is triple-pressed"
+Lq_long:         .asciz "is long-pressed"
+Lf_notify_thr:   .asciz "notify %s is %s"
+Lf_ann_thr:      .asciz "\302\267 \360\237\224\224 Rule %ld: when %s goes %s \342\206\222 %s."
+Lf_btn_subj:     .asciz "%s button %ld"
+Ls_ann_sens:     .asciz "\302\267 It's a Bluetooth sensor, so the rule runs the moment it broadcasts \342\200\224 while asmmesh is open and the sensor is in range."
+Lf_rule_nosens:  .asciz "\302\267 I don't know a Bluetooth sensor called \342\200\234%s\342\200\235. Say \342\200\234sensors\342\200\235 to see what's nearby, then \342\200\234name sensor 2 bedroom\342\200\235."
+Ls_rule_thr_help: .asciz "\302\267 Tell me the number, e.g. \342\200\234when bedroom gets above 78 turn on the fan\342\200\235 or \342\200\234when the bathroom humidity goes above 70% turn on the fan\342\200\235."
+Lw_name_sensor:  .asciz "name sensor"
+Lw_sensors:      .asciz "sensors"
+Lw_list_sensors: .asciz "list sensors"
+Lw_my_sensors:   .asciz "my sensors"
+Lw_bt_sensors:   .asciz "bluetooth sensors"
+Lw_batteries:    .asciz "batteries"
+Lw_battery:      .asciz "battery"
+Lw_battery_levels: .asciz "battery levels"
+Lw_low_batteries: .asciz "low batteries"
+Lw_check_batteries: .asciz "check batteries"
+Lw_hp_here:      .asciz "headphones here"
+Lw_air_here:     .asciz "airpods here"
+Lw_hp_here2:     .asciz "move my headphones here"
+Lw_air_here2:    .asciz "move my airpods here"
+Lw_hp_take:      .asciz "connect my headphones"
+Lw_air_take:     .asciz "connect my airpods"
+Lw_hp_switch:    .asciz "switch my headphones here"
+Lw_air_switch:   .asciz "switch my airpods here"
+Lw_send_hp:      .asciz "send my headphones to"
+Lw_send_hp2:     .asciz "send headphones to"
+Lw_send_air:     .asciz "send my airpods to"
+Lw_send_air2:    .asciz "send airpods to"
 Lp_arrived:      .asciz "arrived"
 Lp_left:         .asciz "left"
 Lp_turned_on:    .asciz "turned on"

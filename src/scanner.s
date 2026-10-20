@@ -163,6 +163,8 @@ Ltk_second:
     bl   _ble_read_rssi_all
     bl   _ui_lists_changed
     bl   _alerts_tick                 // weather alerts, a waiting SOS
+    mov  x0, x20
+    bl   _sens_tick                   // the hourly low-battery check
     mov  x0, x20                      // seconds since launch
     bl   _hue_tick
     mov  x0, x20

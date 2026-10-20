@@ -14,10 +14,11 @@ SRCS    := $(SRCDIR)/main.s $(SRCDIR)/ui.s $(SRCDIR)/scanner.s $(SRCDIR)/util.s 
            $(SRCDIR)/cloud.s $(SRCDIR)/udp.s $(SRCDIR)/near.s $(SRCDIR)/bt.s $(SRCDIR)/voice.s $(SRCDIR)/test.s \
            $(SRCDIR)/weather.s $(SRCDIR)/crypto.s $(SRCDIR)/rules.s $(SRCDIR)/find.s $(SRCDIR)/extras.s $(SRCDIR)/spin.s $(SRCDIR)/services.s $(SRCDIR)/ident.s \
            $(SRCDIR)/fm.s $(SRCDIR)/fm_dsp.s $(SRCDIR)/fm_audio.s $(SRCDIR)/fm_io.s $(SRCDIR)/fm_pack.s \
-           $(SRCDIR)/fm_util.s $(SRCDIR)/fm_fec.s $(SRCDIR)/fm_html.s $(SRCDIR)/web.s $(SRCDIR)/spinui.s $(SRCDIR)/alerts.s $(SRCDIR)/files.s
+           $(SRCDIR)/fm_util.s $(SRCDIR)/fm_fec.s $(SRCDIR)/fm_html.s $(SRCDIR)/web.s $(SRCDIR)/spinui.s $(SRCDIR)/alerts.s $(SRCDIR)/files.s \
+           $(SRCDIR)/sens_decode.s $(SRCDIR)/sensors.s $(SRCDIR)/handoff.s
 OBJS    := $(SRCS:.s=.o)
 FRAMEWORKS := -framework Cocoa -framework CoreBluetooth -framework Security -framework Speech -framework AVFoundation \
-              -framework IOBluetooth -framework AudioToolbox -framework CoreAudio -framework CoreFoundation -framework CoreLocation -framework CoreImage -lz
+              -framework IOBluetooth -framework AudioToolbox -framework CoreAudio -framework CoreFoundation -framework CoreLocation -framework CoreImage -framework IOKit -lz
 APP     := asmmesh.app
 
 SIGN ?= $(shell security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Apple Development/ {print $$2; exit}')
@@ -30,7 +31,7 @@ all: $(APP)
 asmmesh: $(OBJS)
 	$(CC) $(ARCH) -o $@ $(OBJS) $(FRAMEWORKS)
 
-$(SRCDIR)/%.o: $(SRCDIR)/%.s $(SRCDIR)/macros.inc $(SRCDIR)/fm_defs.inc $(SRCDIR)/fm_fec_tables.inc
+$(SRCDIR)/%.o: $(SRCDIR)/%.s $(SRCDIR)/macros.inc $(SRCDIR)/fm_defs.inc $(SRCDIR)/fm_fec_tables.inc $(SRCDIR)/sens_bthome.inc
 	$(CC) $(ARCH) -I $(SRCDIR) -c $< -o $@
 
 $(APP): asmmesh Info.plist icon/AppIcon.icns

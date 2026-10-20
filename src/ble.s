@@ -409,6 +409,13 @@ Lcd_rssi:
     mov  x1, x24
     mov  x3, x21
     bl   _nearby_seen
+    mov  x0, x22                      // a sensor saying its readings? (sensors.s)
+    MSG0 Ls_integerValue
+    mov  x2, x0
+    mov  x0, x20
+    mov  x1, x24
+    mov  x3, x21
+    bl   _sens_seen
     mov  x0, x20                      // a SPIN remote? claim and connect it
     mov  x1, x24
     mov  x2, x21
