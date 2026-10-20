@@ -1583,10 +1583,62 @@ Lfr_done:
     bl   _t_report
     add  x19, x19, x0
 
+    // 115-116. a fault inside a guarded call is caught: the call returns -1 and the
+    //   app carries on; a second one is caught too
+    ADRL x8, _g_gd_nolog
+    mov  x9, #1
+    str  x9, [x8]
+    ADRL x8, _g_gd_faults
+    ldr  x20, [x8]
+    ADRL x0, _t_crash
+    mov  x1, #0x10                    // a null-ish pointer to read
+    bl   _guard_call
+    cmn  x0, #1
+    cset w1, eq
+    ADRL x0, Ln_t115
+    bl   _t_report
+    add  x19, x19, x0
+    ADRL x8, _g_gd_nolog              // this one writes its report (to $HOME/Library/...)
+    str  xzr, [x8]
+    ADRL x0, _t_crash
+    mov  x1, #0x18
+    bl   _guard_call
+    ADRL x8, _g_gd_nolog
+    mov  x9, #1
+    str  x9, [x8]
+    mov  x0, #-1
+    ADRL x8, _g_gd_faults
+    ldr  x9, [x8]
+    sub  x9, x9, x20
+    cmn  x0, #1
+    ccmp x9, #2, #0, eq
+    cset w1, eq
+    ADRL x0, Ln_t116
+    bl   _t_report
+    add  x19, x19, x0
+    ADRL x0, _t_fine                  // 117. and a call that doesn't fault returns its answer
+    mov  x1, #41
+    bl   _guard_call
+    cmp  x0, #42
+    cset w1, eq
+    ADRL x0, Ln_t117
+    bl   _t_report
+    add  x19, x19, x0
+
     mov  x0, #0
     bl   _t_quiet
     mov  x0, x19
     LEAVE 32
+
+// long _t_crash(const long *p) — reads through a bad pointer
+_t_crash:
+    ldr  x0, [x0]
+    ret
+
+// long _t_fine(long n) -> n + 1
+_t_fine:
+    add  x0, x0, #1
+    ret
 
 // int _t_sane(void) -> w1: the tables are still within bounds after a fuzz run
 _t_sane:
@@ -2268,6 +2320,9 @@ Ln_nodes_busy:  .asciz "111 a full people list of people all heard just now keep
 Ln_rooms_full:  .asciz "112 the 17th room is refused, not written past the end"
 Ln_t113:        .asciz "113 a long transcript is trimmed to under 200,000 characters"
 Ln_t114:        .asciz "114 limits: 200 made-up identities don't push out a key in use"
+Ln_t115:        .asciz "115 guard: a fault in a guarded call is caught, the app carries on"
+Ln_t116:        .asciz "116 guard: a second fault is caught too"
+Ln_t117:        .asciz "117 guard: a call that doesn't fault returns its answer"
 Ls_t_room:      .asciz "fuzz room"
 Ls_t_devnull:   .asciz "/dev/null"
 Ls_t_length:    .asciz "length"

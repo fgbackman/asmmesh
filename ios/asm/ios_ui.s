@@ -36,20 +36,20 @@ Lf_acc:      .double 0.0, 0.0, 280.0, 24.0
 .p2align 3
 Lmethods:
     .quad Li_m_cmState,     _ble_cm_state,      Li_ty_v1
-    .quad Li_m_cmDiscover,  _ble_cm_discover,   Li_ty_v4
+    .quad Li_m_cmDiscover,  _g_ble_cm_discover,   Li_ty_v4
     .quad Li_m_cmConnect,   _ble_cm_connect,    Li_ty_v2
     .quad Li_m_cmFail,      _ble_cm_lost,       Li_ty_v3
     .quad Li_m_cmDisconn,   _ble_cm_lost,       Li_ty_v3
     .quad Li_m_pServices,   _ble_p_services,    Li_ty_v2
     .quad Li_m_pChars,      _ble_p_chars,       Li_ty_v3
-    .quad Li_m_pValue,      _ble_p_value,       Li_ty_v3
+    .quad Li_m_pValue,      _g_ble_p_value,       Li_ty_v3
     .quad Li_m_pRSSI,       _ble_p_rssi,        Li_ty_v3
     .quad Li_m_pModify,     _ble_p_modify,      Li_ty_v2
     .quad Li_m_pmState,     _ble_pm_state,      Li_ty_v1
     .quad Li_m_pmAdded,     _ble_pm_added,      Li_ty_v3
     .quad Li_m_pmAdv,       _ble_pm_adv,        Li_ty_v2
     .quad Li_m_pmRead,      _ble_pm_read,       Li_ty_v2
-    .quad Li_m_pmWrites,    _ble_pm_writes,     Li_ty_v2
+    .quad Li_m_pmWrites,    _g_ble_pm_writes,     Li_ty_v2
     .quad Li_m_netData,     _net_data,          Li_ty_v3
     .quad Li_m_netDone,     _net_done,          Li_ty_v3
     .quad Li_m_bonjourFound, _lan_found,        Li_ty_found

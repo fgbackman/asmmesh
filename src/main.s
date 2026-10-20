@@ -125,20 +125,20 @@ Lmethods:
     .quad Ls_m_value,       _ds_value,          Ls_ty_value
     .quad Ls_m_selChanged,  _ds_selchange,      Ls_ty_v1
     .quad Ls_m_cmState,     _ble_cm_state,      Ls_ty_v1
-    .quad Ls_m_cmDiscover,  _ble_cm_discover,   Ls_ty_v4
+    .quad Ls_m_cmDiscover,  _g_ble_cm_discover,   Ls_ty_v4
     .quad Ls_m_cmConnect,   _ble_cm_connect,    Ls_ty_v2
     .quad Ls_m_cmFail,      _ble_cm_lost,       Ls_ty_v3
     .quad Ls_m_cmDisconn,   _ble_cm_lost,       Ls_ty_v3
     .quad Ls_m_pServices,   _ble_p_services,    Ls_ty_v2
     .quad Ls_m_pChars,      _ble_p_chars,       Ls_ty_v3
-    .quad Ls_m_pValue,      _ble_p_value,       Ls_ty_v3
+    .quad Ls_m_pValue,      _g_ble_p_value,       Ls_ty_v3
     .quad Ls_m_pRSSI,       _ble_p_rssi,        Ls_ty_v3
     .quad Ls_m_pModify,     _ble_p_modify,      Ls_ty_v2
     .quad Ls_m_pmState,     _ble_pm_state,      Ls_ty_v1
     .quad Ls_m_pmAdded,     _ble_pm_added,      Ls_ty_v3
     .quad Ls_m_pmAdv,       _ble_pm_adv,        Ls_ty_v2
     .quad Ls_m_pmRead,      _ble_pm_read,       Ls_ty_v2
-    .quad Ls_m_pmWrites,    _ble_pm_writes,     Ls_ty_v2
+    .quad Ls_m_pmWrites,    _g_ble_pm_writes,     Ls_ty_v2
     .quad Ls_m_talk,        _voice_toggle,      Ls_ty_v1
     .quad Ls_m_connectST,   _st_connect_dialog, Ls_ty_v1
     .quad Ls_m_pairHue,     _hue_pair,          Ls_ty_v1

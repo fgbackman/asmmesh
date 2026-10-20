@@ -560,7 +560,7 @@ _fm_rx_main:
     str  x9, [x8]
     mov  x0, x21
     mov  x1, x20
-    bl   _mesh_receive
+    bl   _guard_rx                    // a frame off the air: a fault drops it, not the app
     ADRL x8, _g_fm_rxing
     str  xzr, [x8]
     mov  x0, x21

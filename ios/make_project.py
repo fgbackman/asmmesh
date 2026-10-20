@@ -10,7 +10,7 @@ import hashlib, os
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 CORE = """mesh ident crypto util ble near home parse rules net hue st cloud lan udp weather
-extras find sens_decode sensors spin spinui alerts voice services handoff bt limits""".split()
+extras find sens_decode sensors spin spinui alerts voice services handoff bt limits guard""".split()
 SWIFT = ["App.swift", "Bridge.swift", "Mesh.swift", "RoomsView.swift", "PeopleView.swift",
          "NearbyView.swift", "SettingsView.swift"]
 FRAMEWORKS = ["CoreBluetooth", "Security", "CoreLocation", "Speech", "AVFoundation"]
