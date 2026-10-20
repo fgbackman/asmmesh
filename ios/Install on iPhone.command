@@ -33,11 +33,15 @@ APP="build/Debug-iphoneos/asmmesh.app"
 DEV=$(xcrun devicectl list devices --json-output /tmp/asmmesh-devs.json >/dev/null 2>&1 && /usr/bin/python3 - <<'EOF'
 import json
 d = json.load(open('/tmp/asmmesh-devs.json'))
+phones = []
 for x in d.get('result', {}).get('devices', []):
     hw = x.get('hardwareProperties', {})
     cp = x.get('connectionProperties', {})
-    if hw.get('platform') == 'iOS' and cp.get('pairingState') == 'paired':
-        print(x.get('identifier')); break
+    if hw.get('platform') == 'iOS' and hw.get('reality') == 'physical' and cp.get('pairingState') == 'paired':
+        phones.append((cp.get('transportType') != 'wired', x.get('identifier')))
+# the phone on the cable first, then one reachable over Wi-Fi
+if phones:
+    print(sorted(phones)[0][1])
 EOF
 )
 if [ -z "$DEV" ]; then
