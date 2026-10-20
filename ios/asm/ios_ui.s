@@ -93,6 +93,9 @@ _am_set_device_name:
 .globl _am_start
 _am_start:
     ENTER 0
+    ADRL x8, _g_adv_hidden
+    mov  x9, #1
+    str  x9, [x8]
     bl   _mesh_init
     bl   _rooms_init
     bl   _make_controller

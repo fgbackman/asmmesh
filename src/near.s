@@ -19,6 +19,8 @@
 _g_near_count:  .quad 0
 .globl _g_near
 .zerofill __DATA,__bss,_g_near,24576,4
+.globl _g_adv_hidden                  // 1 on iPhone and iPad: iOS keeps Apple's Find My adverts
+.zerofill __DATA,__bss,_g_adv_hidden,8,3   //   from apps, so AirTags arrive saying nothing at all
 .zerofill __DATA,__bss,_g_nr_tmp,96,4
 
 .section __DATA,__const
@@ -950,6 +952,15 @@ Lnl_svcs:                             // no maker we know: a service it offers, 
     bl   _near_svc_label
     mov  x1, x0
     cbnz x1, Lnl_copy
+    ADRL x8, _g_adv_hidden            // iOS: an advert with nothing in it is most likely an AirTag
+    ldr  x8, [x8]
+    cbz  x8, Lnl_none
+    ldr  x9, [x19, #NR_CO]
+    tbz  x9, #63, Lnl_none            // it did send manufacturer data, just not a maker we know
+    ldrb w9, [x19, #NR_SVCS]
+    cbnz w9, Lnl_none
+    ADRL x1, Ll_hidden
+    b    Lnl_copy
 Lnl_none:
     mov  x0, #0
 Lnl_ret:
@@ -1247,6 +1258,7 @@ Ll_cycling:    .asciz "Cycling sensor"
 Ll_fitness:    .asciz "Fitness machine"
 Lsn_eddystone_cap: .asciz "Eddystone beacon"
 Ll_exposure:   .asciz "Phone (exposure notifications)"
+Ll_hidden:     .asciz "Likely AirTag (iOS hides it)"
 Lat_ibeacon:   .asciz "iBeacon"
 Lat_airdrop:   .asciz "AirDrop"
 Lat_homekit:   .asciz "HomeKit"
