@@ -43,6 +43,17 @@ Lcompanies:
     .quad 0x0002, Lm_intel
     .quad 0x000A, Lm_qualcomm
     .quad 0x02E5, Lm_espressif
+    .quad 0x0001, Lm_nokia
+    .quad 0x0008, Lm_motorola
+    .quad 0x000D, Lm_ti
+    .quad 0x0030, Lm_st
+    .quad 0x0046, Lm_mediatek
+    .quad 0x005D, Lm_realtek
+    .quad 0x0131, Lm_cypress
+    .quad 0x01AB, Lm_meta
+    .quad 0x01DA, Lm_logitech
+    .quad 0x02FF, Lm_silabs
+    .quad 0x0499, Lm_ruuvi
     .quad -1, 0
 
 // Apple manufacturer-data types
@@ -75,6 +86,29 @@ Lservices:
     .quad Lu_FEED, Lsn_tile
     .quad Lu_FE07, Lsn_sonos
     .quad Lu_FE03, Lsn_alexa
+    .quad 0, 0
+
+// what to call a device with no name and no maker we know, from a service it offers
+//   (first match wins: Fast Pair before plain Google)
+Lservice_labels:
+    .quad Lsn_tile, Ll_tile
+    .quad Lsn_smarttag, Ll_smarttag
+    .quad Lsn_fastpair, Ll_fastpair
+    .quad Lsn_google, Ll_google
+    .quad Lsn_hue, Ll_hue
+    .quad Lsn_sonos, Ll_sonos
+    .quad Lsn_alexa, Ll_alexa
+    .quad Lsn_heart, Ll_heart
+    .quad Lsn_hid, Ll_hid
+    .quad Lsn_env, Ll_env
+    .quad Lsn_scale, Ll_scale
+    .quad Lsn_bp, Ll_bp
+    .quad Lsn_thermo, Ll_thermo
+    .quad Lsn_power, Ll_power
+    .quad Lsn_cycling, Ll_cycling
+    .quad Lsn_fitness, Ll_fitness
+    .quad Lsn_eddystone, Lsn_eddystone_cap
+    .quad Lsn_exposure, Ll_exposure
     .quad 0, 0
 
 .section __TEXT,__const
@@ -880,7 +914,7 @@ _near_label:
     tst  x9, #NF_MATTER
     b.ne Lnl_copy
     ldr  x3, [x19, #NR_MAKER]
-    cbz  x3, Lnl_none
+    cbz  x3, Lnl_svcs
     ldr  x4, [x19, #NR_SUB]           // Apple's own: the kind of thing it says it is
     ADRL x1, Lat_airpods
     cmp  x4, x1
@@ -896,6 +930,10 @@ _near_label:
     ADRL x1, Lat_nearby
     cmp  x4, x1
     b.eq Lnl_copy
+    bl   _near_svc_label              // "Samsung SmartTag" says more than "Samsung device"
+    mov  x1, x0
+    cbnz x1, Lnl_copy
+    ldr  x3, [x19, #NR_MAKER]
     mov  x0, x20                      // "Samsung device"
     mov  x1, x21
     ADRL x2, Lf_l_device
@@ -908,10 +946,36 @@ Lnl_copy:
     bl   _strlcpy
     mov  x0, x20
     LEAVE 0
+Lnl_svcs:                             // no maker we know: a service it offers, if we know it
+    bl   _near_svc_label
+    mov  x1, x0
+    cbnz x1, Lnl_copy
 Lnl_none:
     mov  x0, #0
 Lnl_ret:
     LEAVE 0
+
+// const char *_near_svc_label(void) — what the services of entry x19 say it is, or 0
+_near_svc_label:
+    stp  x29, x30, [sp, #-32]!
+    mov  x29, sp
+    str  x22, [sp, #16]
+    ADRL x22, Lservice_labels
+Lnsl_loop:
+    ldr  x1, [x22]
+    mov  x0, #0
+    cbz  x1, Lnsl_ret
+    add  x0, x19, #NR_SVCS
+    bl   _strstr
+    cbnz x0, Lnsl_hit
+    add  x22, x22, #16
+    b    Lnsl_loop
+Lnsl_hit:
+    ldr  x0, [x22, #8]
+Lnsl_ret:
+    ldr  x22, [sp, #16]
+    ldp  x29, x30, [sp], #32
+    ret
 
 
 // ===========================================================================
@@ -1154,6 +1218,35 @@ Lm_broadcom:   .asciz "Broadcom chip"
 Lm_intel:      .asciz "Intel"
 Lm_qualcomm:   .asciz "Qualcomm chip"
 Lm_espressif:  .asciz "Espressif (ESP32)"
+Lm_nokia:      .asciz "Nokia"
+Lm_motorola:   .asciz "Motorola"
+Lm_ti:         .asciz "Texas Instruments chip"
+Lm_st:         .asciz "STMicroelectronics chip"
+Lm_mediatek:   .asciz "MediaTek chip"
+Lm_realtek:    .asciz "Realtek chip"
+Lm_cypress:    .asciz "Cypress chip"
+Lm_meta:       .asciz "Meta"
+Lm_logitech:   .asciz "Logitech"
+Lm_silabs:     .asciz "Silicon Labs chip"
+Lm_ruuvi:      .asciz "Ruuvi"
+Ll_tile:       .asciz "Tile tracker"
+Ll_smarttag:   .asciz "Samsung SmartTag"
+Ll_fastpair:   .asciz "Google Fast Pair device"
+Ll_google:     .asciz "Google device"
+Ll_hue:        .asciz "Philips Hue light"
+Ll_sonos:      .asciz "Sonos speaker"
+Ll_alexa:      .asciz "Alexa device"
+Ll_heart:      .asciz "Heart rate monitor"
+Ll_hid:        .asciz "Keyboard or mouse"
+Ll_env:        .asciz "Environment sensor"
+Ll_scale:      .asciz "Weight scale"
+Ll_bp:         .asciz "Blood pressure monitor"
+Ll_thermo:     .asciz "Thermometer"
+Ll_power:      .asciz "Cycling power meter"
+Ll_cycling:    .asciz "Cycling sensor"
+Ll_fitness:    .asciz "Fitness machine"
+Lsn_eddystone_cap: .asciz "Eddystone beacon"
+Ll_exposure:   .asciz "Phone (exposure notifications)"
 Lat_ibeacon:   .asciz "iBeacon"
 Lat_airdrop:   .asciz "AirDrop"
 Lat_homekit:   .asciz "HomeKit"
