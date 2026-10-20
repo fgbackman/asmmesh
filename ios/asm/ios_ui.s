@@ -79,6 +79,16 @@ Lprotos:
 // Starting up, and the heartbeat
 // ===========================================================================
 
+// void am_set_device_name(const char *utf8) — "iPhone": the name to go by until you pick one
+.globl _am_set_device_name
+_am_set_device_name:
+    ENTER 0
+    mov  x1, x0
+    ADRL x0, _g_devname
+    mov  x2, #32
+    bl   _strlcpy
+    LEAVE 0
+
 // void am_start(void) — called once by Swift, after its hooks are ready
 .globl _am_start
 _am_start:

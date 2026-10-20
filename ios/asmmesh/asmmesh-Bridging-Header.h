@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 // starting and the heartbeat
+void am_set_device_name(const char *utf8);
 void am_start(void);
 void am_tick(void);
 

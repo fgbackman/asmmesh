@@ -63,6 +63,8 @@ _g_warned_clash:  .quad 0
 .zerofill __DATA,__bss,_g_nick,32,4
 .globl _g_hostnick
 .zerofill __DATA,__bss,_g_hostnick,32,4
+.globl _g_devname                     // the device's own name when the host name is no use
+.zerofill __DATA,__bss,_g_devname,32,4    //   (iPhone and iPad say "localhost"); set before _mesh_init
 .zerofill __DATA,__bss,_g_seen,8192,4
 .globl _g_rx_pended
 .zerofill __DATA,__bss,_g_inv_owner,8,3
@@ -135,7 +137,23 @@ Lmi_loop:
     b    Lmi_loop
 Lmi_end:
     strb wzr, [x8, x9]
-    cbnz x9, Lmi_host_ok
+    ADRL x0, _g_hostnick              // iPhone and iPad: "localhost" names nobody
+    ADRL x1, Ls_localhost
+    bl   _strcmp
+    cbnz w0, Lmi_host_len
+    ADRL x9, _g_devname
+    ldrb w9, [x9]
+    cbz  w9, Lmi_host_anon
+    ADRL x0, _g_hostnick
+    ADRL x1, _g_devname
+    mov  x2, #(NICK_MAX + 1)
+    bl   _strlcpy
+    b    Lmi_host_ok
+Lmi_host_len:
+    ADRL x8, _g_hostnick
+    ldrb w9, [x8]
+    cbnz w9, Lmi_host_ok
+Lmi_host_anon:
     ADRL x0, _g_hostnick
     ADRL x1, Ls_anon
     bl   _strcpy
@@ -1961,6 +1979,7 @@ Lrs_done:
 // ---------------------------------------------------------------------------
 .section __TEXT,__cstring,cstring_literals
 Ls_anon:              .asciz "anon"
+Ls_localhost:         .asciz "localhost"
 Ls_main:              .asciz "Main"
 Ls_home:              .asciz "Home"
 Ls_webroom:           .asciz "Web"

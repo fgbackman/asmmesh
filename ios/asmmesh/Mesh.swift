@@ -150,6 +150,7 @@ final class Mesh: ObservableObject {
         field.onChange = { [weak self] s in self?.input = s }
         g_field = Unmanaged.passRetained(field).toOpaque()
         g_talkbtn = Unmanaged.passRetained(talkButton).toOpaque()
+        am_set_device_name(UIDevice.current.name)     // gethostname() says "localhost" here
         am_start()
         let t = Timer(timeInterval: 0.1, repeats: true) { _ in am_tick() }
         RunLoop.main.add(t, forMode: .common)
