@@ -92,6 +92,20 @@ struct NearDevice: Identifiable, Equatable {
     let age: Int
 }
 
+/// A row of the scanner's list: everything around, as in the Mac's Mesh Scanner.
+struct ScanRow: Identifiable, Equatable {
+    let id: Int
+    let name: String
+    let kind: String
+    let signal: String
+    let last: String
+}
+
+struct QRText: Identifiable {
+    let id = UUID()
+    let text: String
+}
+
 struct Service: Identifiable, Equatable {
     let id: Int
     let title: String
@@ -113,9 +127,12 @@ final class Mesh: ObservableObject {
     @Published var myFingerprint = ""
     @Published var sensors: [Sensor] = []
     @Published var nearby: [NearDevice] = []
+    @Published var scan: [ScanRow] = []
     @Published var services: [Service] = []
     @Published var input = ""
     @Published var talkTitle = "Talk"
+    @Published var qrText: QRText?
+    @Published var pickingFiles = false
     var talking: Bool { talkTitle.contains("Stop") }
 
     private var started = false
@@ -217,6 +234,14 @@ final class Mesh: ObservableObject {
         }
         n.sort { $0.rssi > $1.rssi }
         if n != nearby { nearby = n }
+        var rows: [ScanRow] = []
+        for i in 0..<am_scan_count() {
+            rows.append(ScanRow(id: i, name: String(cString: am_scan_cell(i, 110)),     // 'n'
+                                kind: String(cString: am_scan_cell(i, 107)),            // 'k'
+                                signal: String(cString: am_scan_cell(i, 115)),          // 's'
+                                last: String(cString: am_scan_cell(i, 108))))           // 'l'
+        }
+        if rows != scan { scan = rows }
     }
 
     func loadServices() {

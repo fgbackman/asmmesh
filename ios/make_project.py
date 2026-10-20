@@ -10,9 +10,9 @@ import hashlib, os
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 CORE = """mesh ident crypto util ble near home parse rules net hue st cloud lan udp weather
-extras find sens_decode sensors spin spinui alerts voice services handoff bt limits guard""".split()
+extras find sens_decode sensors spin spinui alerts voice services handoff bt limits guard web fm_html fm_pack fm_util fm_io files scan_core""".split()
 SWIFT = ["App.swift", "Bridge.swift", "Mesh.swift", "RoomsView.swift", "PeopleView.swift",
-         "NearbyView.swift", "SettingsView.swift"]
+         "NearbyView.swift", "SettingsView.swift", "SpinView.swift"]
 FRAMEWORKS = ["CoreBluetooth", "Security", "CoreLocation", "Speech", "AVFoundation"]
 BUNDLE_ID = "com.fbackman.asmmesh.ios"
 
@@ -101,7 +101,7 @@ target_common = {
     "TARGETED_DEVICE_FAMILY": '"1,2"', "SUPPORTS_MACCATALYST": "NO",
     "HEADER_SEARCH_PATHS": '"$(SRCROOT)/../src"', "OTHER_CFLAGS": '"-I$(SRCROOT)/../src"',
     "LD_RUNPATH_SEARCH_PATHS": '"$(inherited) @executable_path/Frameworks"',
-    "ENABLE_PREVIEWS": "NO", "CURRENT_PROJECT_VERSION": "1", "MARKETING_VERSION": "0.8",
+    "ENABLE_PREVIEWS": "NO", "OTHER_LDFLAGS": '"-lz"', "CURRENT_PROJECT_VERSION": "1", "MARKETING_VERSION": "0.8",
 }
 cfg_td, cfg_tr = oid("cfg", "target", "debug"), oid("cfg", "target", "release")
 add(cfg_td, '{isa = XCBuildConfiguration; buildSettings = ' + settings(target_common) + '; name = Debug; }')

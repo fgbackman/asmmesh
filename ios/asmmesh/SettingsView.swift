@@ -5,9 +5,11 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var mesh: Mesh
+    @State private var showSpin = UserDefaults.standard.bool(forKey: "spin")   // "-spin YES"
 
-    // Mac-only switches (FM radio, web gateway, webhook, files page) aren't shown here.
-    private let macOnly: Set<Int> = [15, 16, 21, 22]
+    // Mac-only switches: FM radio (a transmitter on the headphone jack, an RTL-SDR
+    // stick) and the web gateway (it fetches pages with curl).
+    private let macOnly: Set<Int> = [15, 16]
 
     var body: some View {
         NavigationStack {
@@ -25,7 +27,37 @@ struct SettingsView: View {
                         Divider().overlay(Theme.bg)
                         ConnectRow(title: "Govee", subtitle: "API key", symbol: "light.strip.2.fill", color: Color(red: 0.39, green: 0.82, blue: 1)) { am_connect_govee() }
                         Divider().overlay(Theme.bg)
+                        ConnectRow(title: "Nanoleaf", subtitle: "Hold its power button 5 s, then tap", symbol: "hexagon.fill", color: Theme.green) { am_pair_nano() }
+                        Divider().overlay(Theme.bg)
                         ConnectRow(title: "Refresh home devices", subtitle: "Ask every connected service again", symbol: "arrow.clockwise", color: Theme.grey) { am_refresh_home() }
+                    }
+                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+                    SectionTitle(text: "Remote")
+                    NavigationLink(isActive: $showSpin) {
+                        SpinView()
+                    } label: {
+                        HStack(spacing: 14) {
+                            IconBadge(symbol: "dial.medium.fill", color: Theme.orange, size: 36)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("SPIN remote").font(.headline).foregroundStyle(.primary)
+                                Text("Profiles, devices and what each gesture does").font(.caption).foregroundStyle(Theme.dim)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.footnote).foregroundStyle(Theme.dim)
+                        }
+                        .padding(14)
+                    }
+                    .buttonStyle(.plain)
+                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+
+                    SectionTitle(text: "Share")
+                    VStack(spacing: 0) {
+                        ConnectRow(title: "Files on Wi-Fi", subtitle: "A web page other phones open: asmmesh's folder in Files", symbol: "folder.fill", color: Theme.blue) { mesh.home("files") }
+                        Divider().overlay(Theme.bg)
+                        ConnectRow(title: "AirDrop a file", subtitle: "Pick files, then share them", symbol: "airplayaudio", color: Theme.purple) { am_airdrop() }
+                        Divider().overlay(Theme.bg)
+                        ConnectRow(title: "Webhook", subtitle: "An address Shortcuts or IFTTT can post into a room", symbol: "link", color: Theme.grey) { mesh.home("webhook") }
                     }
                     .background(Theme.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
 
@@ -49,7 +81,7 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    Text("asmmesh for iPhone · the same mesh as your Macs")
+                    Text("asmmesh for iPhone and iPad · the same mesh as your Macs")
                         .font(.caption).foregroundStyle(Theme.dim)
                         .padding(.top, 8)
                 }

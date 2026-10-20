@@ -36,6 +36,15 @@ void am_connect_ha(void);
 void am_connect_lifx(void);
 void am_connect_govee(void);
 void am_pair_hue(void);
+void am_pair_nano(void);
+void am_airdrop(void);
+long am_scan_count(void);
+const char *am_scan_cell(long row, long column);
+const char *am_scan_details(long row);
+void am_scan_pair(long row);
+void am_scan_setup(long row);
+long am_spin_get(long what, long i, long s);
+void am_spin_set(long what, long i, long s, long value, const char *text);
 void am_mesh_pass(void);
 void am_refresh_home(void);
 

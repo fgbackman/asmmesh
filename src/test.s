@@ -1583,6 +1583,32 @@ Lfr_done:
     bl   _t_report
     add  x19, x19, x0
 
+    // 118. the SPIN screen's reader: 9 profiles, 19 gestures, 18 actions, not locked
+    mov  x0, #0
+    mov  x1, #0
+    mov  x2, #0
+    bl   _am_spin_get
+    mov  x20, x0
+    mov  x0, #6
+    bl   _am_spin_get
+    mov  x21, x0
+    mov  x0, #8
+    bl   _am_spin_get
+    mov  x22, x0
+    mov  x0, #13
+    mov  x1, #0
+    mov  x2, #0
+    bl   _am_spin_get
+    mov  x23, x0
+    cmp  x20, #9
+    ccmp x21, #19, #0, eq
+    ccmp x22, #18, #0, eq
+    ccmp x23, #0, #0, eq
+    cset w1, eq
+    ADRL x0, Ln_t118
+    bl   _t_report
+    add  x19, x19, x0
+
     // 115-116. a fault inside a guarded call is caught: the call returns -1 and the
     //   app carries on; a second one is caught too
     ADRL x8, _g_gd_nolog
@@ -2320,6 +2346,7 @@ Ln_nodes_busy:  .asciz "111 a full people list of people all heard just now keep
 Ln_rooms_full:  .asciz "112 the 17th room is refused, not written past the end"
 Ln_t113:        .asciz "113 a long transcript is trimmed to under 200,000 characters"
 Ln_t114:        .asciz "114 limits: 200 made-up identities don't push out a key in use"
+Ln_t118:        .asciz "118 SPIN screen: 9 profiles, 19 gestures, 18 actions (self-tests: not locked)"
 Ln_t115:        .asciz "115 guard: a fault in a guarded call is caught, the app carries on"
 Ln_t116:        .asciz "116 guard: a second fault is caught too"
 Ln_t117:        .asciz "117 guard: a call that doesn't fault returns its answer"

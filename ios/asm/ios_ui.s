@@ -24,6 +24,13 @@ _g_field:       .quad 0               // Swift's text field stand-in (voice writ
 .globl _g_tick
 _g_tick:        .quad 0               // tenths of a second since launch
 _g_ios_sel:     .quad -1              // the person picked for Invite
+// what the web code reads from the Mac's FM radio: never running here
+.globl _fm_envp
+_fm_envp:       .quad 0
+.globl _g_fm_running
+_g_fm_running:  .quad 0
+.globl _g_fm_baud
+_g_fm_baud:     .quad 2400
 .zerofill __DATA,__bss,_g_ios_buf,512,4
 
 .section __TEXT,__const
@@ -553,6 +560,41 @@ _am_status:
     ADRL x0, _g_ios_buf
     LEAVE 0
 
+// The scanner's list (scan_core.s): everything around, as on the Mac
+// long am_scan_count(void)
+.globl _am_scan_count
+_am_scan_count:
+    b    _scan_rows
+
+// const char *am_scan_cell(long row, long column) — 'n' name, 'k' kind, 's' signal,
+//   'l' last heard
+.globl _am_scan_cell
+_am_scan_cell:
+    ENTER 0
+    mov  x9, x0
+    mov  x0, x1
+    mov  x1, x9
+    ADRL x2, _g_ios_buf
+    bl   _scan_cell
+    ADRL x0, _g_ios_buf
+    LEAVE 0
+
+// const char *am_scan_details(long row)
+.globl _am_scan_details
+_am_scan_details:
+    ENTER 0
+    bl   _scan_details_text
+    ADRL x0, _g_scan_text
+    LEAVE 0
+
+.globl _am_scan_pair
+_am_scan_pair:
+    b    _scan_pair_row
+
+.globl _am_scan_setup
+_am_scan_setup:
+    b    _scan_setup_row
+
 // actions (each shows its own prompt through the NSAlert stand-in)
 .globl _am_new_room
 _am_new_room:
@@ -600,6 +642,14 @@ _am_connect_govee:
 .globl _am_pair_hue
 _am_pair_hue:
     b    _hue_pair
+
+.globl _am_pair_nano
+_am_pair_nano:
+    b    _nano_pair
+
+.globl _am_airdrop
+_am_airdrop:
+    b    _ios_share_files
 
 .globl _am_mesh_pass
 _am_mesh_pass:
@@ -692,46 +742,59 @@ _am_near_info:
 // Mac-only parts, answered here so the core links unchanged
 // ===========================================================================
 
-.globl _web_command
-_web_command:
-.globl _news_command
-_news_command:
-    ADRL x1, Li_no_web
-    mov  x0, #0
-    mov  x2, #1
-    b    _ios_note
-
-// void _ios_note(long, const char *text, long) — a line in the room you're in
-_ios_note:
+// void _room_append(long room, const char *utf8) — a web page or headlines: one line,
+//   no time stamp
+.globl _room_append
+_room_append:
+    ENTER 0
+    mov  x19, x0
+    ADRL x8, _g_rooms
+    add  x20, x8, x19, lsl #ROOM_SHIFT
+    ldr  x0, [x20, #R_ID]
+    mov  x2, #0
+    bl   _ios_room_line
     ADRL x8, _g_cur_room
-    ldr  x0, [x8]
-    mov  x2, #1
-    b    _room_line
+    ldr  x9, [x8]
+    cmp  x9, x19
+    b.eq 1f
+    ldr  x9, [x20, #R_UNREAD]
+    add  x9, x9, #1
+    str  x9, [x20, #R_UNREAD]
+    bl   _ui_rooms_changed
+1:  LEAVE 0
 
-.globl _web_rx
-_web_rx:
-    mov  x0, #0                       // not ours: pass it on
+// FM radio is the Mac's (a transmitter on the headphone jack, an RTL-SDR stick):
+// what the web and page-packing code look at, answered "off"
+.globl _fm_demod
+_fm_demod:
+.globl _fm_mod
+_fm_mod:
+.globl _fm_tx_push
+_fm_tx_push:
+    mov  x0, #0
     ret
 
-.globl _h_files
-_h_files:
-.globl _h_files_new
-_h_files_new:
-.globl _h_files_choose
-_h_files_choose:
-.globl _h_airdrop
-_h_airdrop:
 .globl _h_fm_repeat
 _h_fm_repeat:
     ADRL x0, Li_mac_only
     b    _home_say0
 
-.globl _web_gate_start
-_web_gate_start:
-.globl _files_start
-_files_start:
-.globl _files_stop
-_files_stop:
+// Files on Wi-Fi (files.s) on iPhone: the folder is asmmesh's own, which the Files
+// app shows under On My iPhone › asmmesh; AirDrop is the share sheet; the QR code a sheet
+.globl _h_files_choose
+_h_files_choose:
+    ADRL x0, Li_files_folder
+    b    _home_say0
+
+.globl _h_airdrop
+_h_airdrop:
+    b    _ios_share_files
+
+// void _fs_qr_show(const char *text)
+.globl _fs_qr_show
+_fs_qr_show:
+    b    _ios_show_qr
+
 .globl _fm_start
 _fm_start:
 .globl _fm_stop
@@ -1494,7 +1557,9 @@ Li_linefmt:            .asciz "%s  %s"
 Li_status_fmt:         .asciz "%ld linked nearby  \302\267  %ld on the mesh  \302\267  %ld relayed"
 Li_fmt_welcome:        .asciz "\302\267 asmmesh for iPhone (build %2$s) \342\200\224 you are \342\200\234%1$s\342\200\235. Main is open to everyone on the mesh; tap + for a room, and invite people from People."
 Li_pick_info:          .asciz "Open People, tap someone, then Invite. From Main this starts a room for the two of you; from a room it invites them into that room."
-Li_no_web:             .asciz "\302\267 The Web and News rooms work on the Macs for now; on iPhone they're coming later."
+Li_files_folder:       .asciz "\302\267 \360\237\223\202 On iPhone and iPad the shared folder is asmmesh\342\200\231s own: in the Files app, On My iPhone (or iPad) \342\200\272 asmmesh. Put files there; uploads from other phones land there too."
+.globl _fs_default_dir
+_fs_default_dir:       .asciz "%s/Documents"
 Li_mac_only:           .asciz "\302\267 That one is Mac-only (files page, AirDrop, FM radio)."
 Li_m_cmState:          .asciz "centralManagerDidUpdateState:"
 Li_m_cmDiscover:       .asciz "centralManager:didDiscoverPeripheral:advertisementData:RSSI:"

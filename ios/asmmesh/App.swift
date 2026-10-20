@@ -1,6 +1,8 @@
 // App.swift — asmmesh for iPhone and iPad: four tabs over the same mesh as the Macs.
 
 import SwiftUI
+import UniformTypeIdentifiers
+import CoreImage
 
 enum Theme {
     static let bg = Color(red: 0.07, green: 0.075, blue: 0.08)
@@ -33,22 +35,106 @@ struct AsmmeshApp: App {
 
 struct ContentView: View {
     @EnvironmentObject var mesh: Mesh
+    // "-tab 2" on the command line opens on that tab (for screenshots)
+    @State private var tab = UserDefaults.standard.integer(forKey: "tab")
 
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             RoomsView()
                 .tabItem { Label("Rooms", systemImage: "bubble.left.and.bubble.right.fill") }
+                .tag(0)
             PeopleView()
                 .tabItem { Label("People", systemImage: "person.2.fill") }
+                .tag(1)
             NearbyView()
                 .tabItem { Label("Nearby", systemImage: "dot.radiowaves.left.and.right") }
+                .tag(2)
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                .tag(3)
         }
         .onAppear {
             // after the first frame, so a prompt (Keychain, Bluetooth) has a screen to sit on
             DispatchQueue.main.async { mesh.start() }
         }
+        .sheet(item: $mesh.qrText) { qr in
+            QRSheet(text: qr.text)
+                .presentationDetents([.medium, .large])
+        }
+        .fileImporter(isPresented: $mesh.pickingFiles, allowedContentTypes: [.item],
+                      allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result, !urls.isEmpty { shareFiles(urls) }
+        }
+    }
+
+    /// The share sheet (AirDrop first in its row) for files picked anywhere.
+    private func shareFiles(_ urls: [URL]) {
+        // copies in tmp: the picked files' access ends when the picker's block returns
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("share", isDirectory: true)
+        try? FileManager.default.removeItem(at: tmp)
+        try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        var copies: [URL] = []
+        for u in urls {
+            let ok = u.startAccessingSecurityScopedResource()
+            defer { if ok { u.stopAccessingSecurityScopedResource() } }
+            let dest = tmp.appendingPathComponent(u.lastPathComponent)
+            if (try? FileManager.default.copyItem(at: u, to: dest)) != nil { copies.append(dest) }
+        }
+        guard !copies.isEmpty else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            guard let top = AlertRunner.topViewController() else { return }
+            let vc = UIActivityViewController(activityItems: copies, applicationActivities: nil)
+            vc.popoverPresentationController?.sourceView = top.view
+            vc.popoverPresentationController?.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY, width: 1, height: 1)
+            top.present(vc, animated: true)
+        }
+    }
+}
+
+/// Files on Wi-Fi's address, to scan with another phone's camera.
+struct QRSheet: View {
+    let text: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                if let img = qrImage(text) {
+                    Image(uiImage: img)
+                        .interpolation(.none)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: 260)
+                        .padding(16)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                }
+                Text(text)
+                    .font(.callout.monospaced())
+                    .textSelection(.enabled)
+                    .multilineTextAlignment(.center)
+                Text("Scan it with another phone's camera on the same Wi-Fi.")
+                    .font(.footnote).foregroundStyle(Theme.dim)
+                Button { UIPasteboard.general.string = text } label: {
+                    Label("Copy Address", systemImage: "doc.on.doc")
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Theme.bg)
+            .navigationTitle("Files on Wi-Fi")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+    }
+
+    private func qrImage(_ s: String) -> UIImage? {
+        guard let f = CIFilter(name: "CIQRCodeGenerator") else { return nil }
+        f.setValue(Data(s.utf8), forKey: "inputMessage")
+        f.setValue("M", forKey: "inputCorrectionLevel")
+        guard let out = f.outputImage?.transformed(by: CGAffineTransform(scaleX: 8, y: 8)),
+              let cg = CIContext().createCGImage(out, from: out.extent) else { return nil }
+        return UIImage(cgImage: cg)
     }
 }
 

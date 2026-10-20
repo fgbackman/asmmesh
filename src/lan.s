@@ -1481,6 +1481,13 @@ Lsu_home:                             // HomeKit and Matter pair in the Home app
 _open_home_app:
     ENTER 0
     CLS  Ls_NSWorkspace
+    cbnz x0, 1f
+    ADRL x0, Ls_home_url              // iPhone: the Home app's own address
+    bl   _open_url
+    ADRL x0, Ls_home_hint
+    bl   _scan_say
+    LEAVE 0
+1:  CLS  Ls_NSWorkspace
     MSG0 Ls_sharedWorkspace
     mov  x19, x0
     ADRL x0, Ls_home_app
@@ -1508,10 +1515,24 @@ _open_url:
     cbz  x0, Lou_done
     mov  x19, x0
     CLS  Ls_NSWorkspace
+    cbz  x0, Lou_ios
     MSG0 Ls_sharedWorkspace
     mov  x2, x19
     MSG1 Ls_openURL
 Lou_done:
+    LEAVE 0
+Lou_ios:                              // iPhone: UIApplication opens it
+    CLS  Ls_UIApplication
+    cbz  x0, Lou_done
+    MSG0 Ls_sharedApplication
+    mov  x20, x0
+    CLS  Ls_NSDictionary
+    MSG0 Ls_dictionary
+    mov  x3, x0
+    mov  x0, x20
+    mov  x2, x19
+    mov  x4, #0
+    MSG3 Ls_openURLOptions
     LEAVE 0
 
 // void _lan_open_web(long i) — its web page, for things that have one
@@ -1666,6 +1687,12 @@ Lhw_ret:
 Ls_NSNetServiceBrowser: .asciz "NSNetServiceBrowser"
 Ls_NSNetService:      .asciz "NSNetService"
 Ls_NSWorkspace:       .asciz "NSWorkspace"
+Ls_UIApplication:     .asciz "UIApplication"
+Ls_sharedApplication: .asciz "sharedApplication"
+Ls_NSDictionary:      .asciz "NSDictionary"
+Ls_dictionary:        .asciz "dictionary"
+Ls_openURLOptions:    .asciz "openURL:options:completionHandler:"
+Ls_home_url:          .asciz "com.apple.home://"
 Ls_NSURL:             .asciz "NSURL"
 Ls_new:               .asciz "new"
 Ls_retain:            .asciz "retain"

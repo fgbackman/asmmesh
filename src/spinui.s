@@ -40,6 +40,8 @@ _g_sui_devn:    .quad -1
 _g_sui_lock:    .quad 0
 _g_sui_testsw:  .quad 0
 _g_sui_status:  .quad 0
+_g_sui_last:    .quad -1     // the last gesture's row
+_g_sui_lastn:   .quad 0      // how many gestures so far
 .globl _g_spin_maps
 .zerofill __DATA,__bss,_g_spin_maps,8928,4
 .zerofill __DATA,__bss,_g_sui_tabs,80,4
@@ -65,6 +67,11 @@ Lact_names:
     .quad La_default, La_nothing, La_brighter, La_dimmer, La_on, La_off, La_toggle
     .quad La_louder, La_quieter, La_mute, La_play, La_pause, La_chup, La_chdown
     .quad La_next, La_prev, La_sos, La_cmd
+// am_spin_get's cases
+Lag_jump:
+    .quad Lag_profiles, Lag_colname, Lag_rgb, Lag_name, Lag_inuse, Lag_devs
+    .quad Lag_slots, Lag_slotname, Lag_acts, Lag_actname, Lag_slotact, Lag_slottext
+    .quad Lag_test, Lag_locked, Lag_linked, Lag_driving, Lag_last, Lag_lastn
 // action -> _spin_gdo kind (-1: something else)
 Lact_kind:
     .quad -1, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, -1, -1, -1, -1
@@ -241,6 +248,12 @@ _sui_seen:
     bl   _sui_slot
     mov  x19, x0
     tbnz x19, #63, Lsn_test
+    ADRL x8, _g_sui_last              // for the iPhone's SPIN screen
+    str  x19, [x8]
+    ADRL x8, _g_sui_lastn
+    ldr  x9, [x8]
+    add  x9, x9, #1
+    str  x9, [x8]
     ADRL x8, _g_sui_win
     ldr  x9, [x8]
     cbz  x9, Lsn_test
@@ -1179,6 +1192,13 @@ _sui_name:
     MSG0 Ls_stringValue
     MSG0 Ls_UTF8String
     cbz  x0, Lsnm_done
+    bl   _sui_name_to
+Lsnm_done:
+    LEAVE 0
+
+// void _sui_name_to(const char *utf8) — the profile being edited gets a name
+_sui_name_to:
+    ENTER 0
     mov  x19, x0
     ADRL x8, _g_sui_prof
     ldr  x0, [x8]
@@ -1189,7 +1209,6 @@ _sui_name:
     bl   _text_copy_trim
     bl   _sui_save
     bl   _sui_refresh
-Lsnm_done:
     LEAVE 0
 
 // - spinEnable:
@@ -1199,7 +1218,14 @@ _sui_enable:
     mov  x0, x2
     MSG0 Ls_state
     cmp  x0, #0
-    cset x20, ne
+    cset x0, ne
+    bl   _sui_enable_to
+    LEAVE 0
+
+// void _sui_enable_to(long on) — the profile being edited switched on or off
+_sui_enable_to:
+    ENTER 0
+    mov  x20, x0
     ADRL x8, _g_sui_prof
     ldr  x19, [x8]
     mov  x0, x19
@@ -1340,9 +1366,21 @@ _sui_action:
     mov  x20, x0
     mov  x0, x19
     MSG0 Ls_indexOfSelectedItem
-    cmp  x0, #NACT
-    b.hs Lsac_done
-    mov  x21, x0
+    mov  x1, x0
+    mov  x0, x20
+    bl   _sui_action_to
+Lsac_done:
+    LEAVE 0
+
+// void _sui_action_to(long slot, long action) — in the profile being edited
+_sui_action_to:
+    ENTER 0
+    cmp  x0, #NSLOT
+    b.hs Lsat_done
+    cmp  x1, #NACT
+    b.hs Lsat_done
+    mov  x20, x0
+    mov  x21, x1
     ADRL x8, _g_sui_prof
     ldr  x0, [x8]
     bl   _sui_rec
@@ -1350,7 +1388,7 @@ _sui_action:
     madd x0, x20, x9, x0
     strb w21, [x0, #PR_SLOTS]
     bl   _sui_save
-Lsac_done:
+Lsat_done:
     LEAVE 0
 
 // - spinText: — the command for "Run a command…" (typing one picks that action)
@@ -1367,7 +1405,20 @@ _sui_text:
     MSG0 Ls_stringValue
     MSG0 Ls_UTF8String
     cbz  x0, Lstx_done
-    mov  x21, x0
+    mov  x1, x0
+    mov  x0, x20
+    bl   _sui_text_to
+Lstx_done:
+    LEAVE 0
+
+// void _sui_text_to(long slot, const char *utf8) — "Run a command…" text (non-empty
+//   text picks that action)
+_sui_text_to:
+    ENTER 0
+    cmp  x0, #NSLOT
+    b.hs Lstt_done
+    mov  x20, x0
+    mov  x21, x1
     ADRL x8, _g_sui_prof
     ldr  x0, [x8]
     bl   _sui_rec
@@ -1384,7 +1435,7 @@ _sui_text:
 Lstx_save:
     bl   _sui_save
     bl   _sui_refresh
-Lstx_done:
+Lstt_done:
     LEAVE 0
 
 // - spinLock: — "Remote on"
@@ -1412,6 +1463,205 @@ _sui_test:
     ADRL x8, _g_spin_test
     str  x9, [x8]
     bl   _sui_status_now
+    LEAVE 0
+
+
+// ---------------------------------------------------------------------------
+// The iPhone and iPad SPIN screen reads and changes the same profiles
+// ---------------------------------------------------------------------------
+
+// long am_spin_get(long what, long i, long s)
+//   0 profiles  1 colour name(i)  2 colour 0xRRGGBB(i)  3 name(i)  4 in use(i)
+//   5 devices(i)  6 gestures  7 gesture name(s)  8 actions  9 action name(i)
+//   10 action of gesture s in profile i  11 its command  12 test mode  13 locked
+//   14 linked  15 profile driving now (-1)  16 last gesture's row (-1)  17 gestures so far
+//   (names are C strings, as a long)
+.globl _am_spin_get
+_am_spin_get:
+    ENTER 0
+    mov  x19, x1
+    mov  x20, x2
+    cmp  x0, #17
+    b.hi Lag_zero
+    ADRL x8, Lag_jump
+    ldr  x9, [x8, x0, lsl #3]
+    br   x9
+Lag_profiles:
+    mov  x0, #NPROF
+    LEAVE 0
+Lag_colname:
+    cmp  x19, #NPROF
+    b.hs Lag_zero
+    mov  x0, x19
+    bl   _spin_colour
+    LEAVE 0
+Lag_rgb:
+    cmp  x19, #NPROF
+    b.hs Lag_zero
+    mov  x0, x19
+    bl   _spin_colour
+    and  x0, x1, #0xffffff
+    LEAVE 0
+Lag_name:
+    cmp  x19, #NPROF
+    b.hs Lag_zero
+    mov  x0, x19
+    bl   _sui_rec
+    add  x0, x0, #1
+    LEAVE 0
+Lag_inuse:
+    cmp  x19, #NPROF
+    b.hs Lag_zero
+    mov  x0, x19
+    bl   _sui_enabled
+    LEAVE 0
+Lag_devs:
+    cmp  x19, #NPROF
+    b.hs Lag_zero
+    ADRL x8, _g_spin_groups
+    add  x0, x8, x19, lsl #8
+    LEAVE 0
+Lag_slots:
+    mov  x0, #NSLOT
+    LEAVE 0
+Lag_slotname:
+    cmp  x20, #NSLOT
+    b.hs Lag_zero
+    ADRL x8, Lslot_names
+    ldr  x0, [x8, x20, lsl #3]
+    LEAVE 0
+Lag_acts:
+    mov  x0, #NACT
+    LEAVE 0
+Lag_actname:
+    cmp  x19, #NACT
+    b.hs Lag_zero
+    ADRL x8, Lact_names
+    ldr  x0, [x8, x19, lsl #3]
+    LEAVE 0
+Lag_slotact:
+    cmp  x19, #NPROF
+    b.hs Lag_zero
+    cmp  x20, #NSLOT
+    b.hs Lag_zero
+    mov  x0, x19
+    bl   _sui_rec
+    mov  x9, #SL_SIZE
+    madd x0, x20, x9, x0
+    ldrb w0, [x0, #PR_SLOTS]
+    LEAVE 0
+Lag_slottext:
+    cmp  x19, #NPROF
+    b.hs Lag_zero
+    cmp  x20, #NSLOT
+    b.hs Lag_zero
+    mov  x0, x19
+    bl   _sui_rec
+    mov  x9, #SL_SIZE
+    madd x0, x20, x9, x0
+    add  x0, x0, #(PR_SLOTS + 1)
+    LEAVE 0
+Lag_test:
+    ADRL x8, _g_spin_test
+    ldr  x0, [x8]
+    LEAVE 0
+Lag_locked:
+    ADRL x8, _g_spin_lock
+    ldr  x0, [x8]
+    LEAVE 0
+Lag_linked:
+    ADRL x8, _g_spin_ready
+    ldr  x0, [x8]
+    LEAVE 0
+Lag_driving:
+    ADRL x8, _g_spin_gcur
+    ldr  x0, [x8]
+    LEAVE 0
+Lag_last:
+    ADRL x8, _g_sui_last
+    ldr  x0, [x8]
+    LEAVE 0
+Lag_lastn:
+    ADRL x8, _g_sui_lastn
+    ldr  x0, [x8]
+    LEAVE 0
+Lag_zero:
+    mov  x0, #0
+    LEAVE 0
+
+// void am_spin_set(long what, long i, long s, long value, const char *text)
+//   0 drive profile i (if it's in use)  1 switch profile i on/off (value)  2 name it (text)
+//   3 its devices (text: "Kitchen lamp, Desk lamp"; "" clears)  4 gesture s does action value
+//   5 gesture s runs the command text  6 test mode (value)  7 remote locked (value)
+.globl _am_spin_set
+_am_spin_set:
+    ENTER 0
+    mov  x19, x1
+    mov  x20, x2
+    mov  x21, x3
+    mov  x22, x4
+    cmp  x0, #6
+    b.eq Las_test
+    cmp  x0, #7
+    b.eq Las_lock
+    cmp  x19, #NPROF
+    b.hs Las_done
+    ADRL x8, _g_sui_prof
+    str  x19, [x8]
+    cmp  x0, #1
+    b.lo Las_drive
+    b.eq Las_enable
+    cmp  x0, #3
+    b.lo Las_name
+    b.eq Las_devs
+    cmp  x0, #4
+    b.eq Las_action
+    cmp  x0, #5
+    b.ne Las_done
+    mov  x0, x20
+    mov  x1, x22
+    bl   _sui_text_to
+    b    Las_done
+Las_drive:
+    mov  x0, x19
+    bl   _sui_enabled
+    cbz  x0, Las_done
+    mov  x0, x19
+    bl   _spin_gselect
+    b    Las_done
+Las_enable:
+    cmp  x21, #0
+    cset x0, ne
+    bl   _sui_enable_to
+    b    Las_done
+Las_name:
+    cbz  x22, Las_done
+    mov  x0, x22
+    bl   _sui_name_to
+    b    Las_done
+Las_devs:
+    cbz  x22, Las_done
+    mov  x0, x22
+    bl   _sui_apply_devs
+    b    Las_done
+Las_action:
+    mov  x0, x20
+    mov  x1, x21
+    bl   _sui_action_to
+    b    Las_done
+Las_test:
+    cmp  x21, #0
+    cset x9, ne
+    ADRL x8, _g_spin_test
+    str  x9, [x8]
+    b    Las_done
+Las_lock:
+    cmp  x21, #0
+    cset x0, ne
+    mov  x1, #0
+    mov  x2, #0
+    bl   _h_spin_lock_arg
+Las_done:
     LEAVE 0
 
 // void _h_spin_lock_arg(long locked) — the lock, as "spin off" / "spin on" set it

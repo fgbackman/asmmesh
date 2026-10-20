@@ -7,6 +7,7 @@ struct NearbyView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var naming: Sensor?
     @State private var newName = ""
+    @State private var picked: ScanRow?
 
     var body: some View {
         NavigationStack {
@@ -57,25 +58,30 @@ struct NearbyView: View {
                         }
                     }
 
-                    SectionTitle(text: "Around you")
-                    ForEach(mesh.nearby.prefix(40)) { d in
-                        HStack(spacing: 12) {
-                            Image(systemName: "dot.radiowaves.right")
-                                .foregroundStyle(d.rssi > -65 ? Theme.green : (d.rssi > -80 ? Theme.orange : Theme.grey))
-                                .frame(width: 22)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(d.name.isEmpty ? (d.maker.isEmpty ? "Unnamed device" : d.maker) : d.name)
-                                    .font(.subheadline.weight(.semibold))
-                                let detail = [d.name.isEmpty ? "" : d.maker, d.what].filter { !$0.isEmpty }.joined(separator: " · ")
-                                if !detail.isEmpty {
-                                    Text(detail).font(.caption).foregroundStyle(Theme.dim).lineLimit(1)
+                    SectionTitle(text: "Everything around")
+                    ForEach(mesh.scan) { r in
+                        Button { picked = r } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: symbol(for: r.kind))
+                                    .foregroundStyle(Theme.blue)
+                                    .frame(width: 22)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(r.name.isEmpty ? "Unnamed" : r.name)
+                                        .font(.subheadline.weight(.semibold))
+                                        .lineLimit(1)
+                                    Text(r.kind).font(.caption).foregroundStyle(Theme.dim).lineLimit(1)
+                                }
+                                Spacer()
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text(r.signal).font(.caption.monospacedDigit()).foregroundStyle(Theme.dim)
+                                    Text(r.last).font(.caption2).foregroundStyle(Theme.dim)
                                 }
                             }
-                            Spacer()
-                            Text("\(d.rssi) dBm").font(.caption.monospacedDigit()).foregroundStyle(Theme.dim)
+                            .padding(.horizontal, 14).padding(.vertical, 10)
+                            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .contentShape(Rectangle())
                         }
-                        .padding(.horizontal, 14).padding(.vertical, 10)
-                        .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding()
@@ -83,6 +89,9 @@ struct NearbyView: View {
             }
             .background(Theme.bg)
             .navigationTitle("Nearby")
+            .sheet(item: $picked) { r in
+                ScanDetail(row: r).presentationDetents([.medium, .large])
+            }
             .alert("Name this sensor", isPresented: Binding(get: { naming != nil }, set: { if !$0 { naming = nil } })) {
                 TextField("e.g. Bedroom", text: $newName)
                 Button("Save") {
@@ -170,5 +179,58 @@ struct RadarView: View {
         var h: UInt32 = 2166136261
         for b in key.utf8 { h = (h ^ UInt32(b)) &* 16777619 }
         return CGFloat(h % 3600) / 3600 * 2 * .pi
+    }
+}
+
+private func symbol(for kind: String) -> String {
+    let k = kind.lowercased()
+    if k.contains("mesh") || k.contains("mac") { return "person.fill" }
+    if k.contains("bonjour") || k.contains("network") || k.contains("upnp") || k.contains("wi-fi") { return "wifi" }
+    if k.contains("paired") { return "link" }
+    if k.contains("light") || k.contains("lamp") { return "lightbulb.fill" }
+    return "dot.radiowaves.right"
+}
+
+/// One row's details, with the same two buttons as the Mac's scanner.
+struct ScanDetail: View {
+    let row: ScanRow
+    @State private var details = ""
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(details)
+                        .font(.callout)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 10) {
+                        Button { am_scan_pair(row.id); reload() } label: {
+                            Label("Connect & Pair", systemImage: "link")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        Button { am_scan_setup(row.id); reload() } label: {
+                            Label("Set Up", systemImage: "gearshape")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    Text("Connect & Pair reads a Bluetooth device's maker, model, firmware and battery. Set Up pairs a Hue Bridge or Nanoleaf, connects Home Assistant, opens the Home app for HomeKit and Matter devices, or opens a device's web page. What happens shows in Home.")
+                        .font(.caption).foregroundStyle(Theme.dim)
+                }
+                .padding()
+            }
+            .background(Theme.bg)
+            .navigationTitle(row.name.isEmpty ? "Device" : row.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .onAppear { reload() }
+        }
+    }
+
+    private func reload() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            details = String(cString: am_scan_details(row.id))
+        }
     }
 }

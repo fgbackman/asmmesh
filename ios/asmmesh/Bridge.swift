@@ -37,6 +37,18 @@ func iosStatus(_ text: UnsafePointer<CChar>?) {
     Mesh.shared.status = String(cString: text)
 }
 
+// Files on Wi-Fi: its address as a QR code; "airdrop": pick files, then the share sheet
+@_cdecl("ios_show_qr")
+func iosShowQR(_ text: UnsafePointer<CChar>?) {
+    guard let text else { return }
+    Mesh.shared.qrText = QRText(text: String(cString: text))
+}
+
+@_cdecl("ios_share_files")
+func iosShareFiles() {
+    Mesh.shared.pickingFiles = true
+}
+
 // MARK: - Text field stand-ins (NSTextField, NSSecureTextField, NSComboBox)
 
 @objc(NSTextField)

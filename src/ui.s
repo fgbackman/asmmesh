@@ -116,6 +116,51 @@ Lrl_unread:
 Lrl_done:
     LEAVE 1136
 
+// void _room_append(long room, const char *utf8) — text of any length, no time stamp
+//   (a web page, headlines)
+.globl _room_append
+_room_append:
+    ENTER 16
+    mov  x20, x1
+    mov  x19, x0
+    ADRL x8, _g_rooms
+    add  x21, x8, x19, lsl #ROOM_SHIFT
+    ldr  x22, [x21, #R_STORE]
+    cbz  x22, 9f
+    mov  x0, x20
+    bl   _nsstr
+    mov  x23, x0
+    CLS  Ls_NSAttributedString
+    MSG0 Ls_alloc
+    mov  x24, x0
+    SELX1 Ls_initWithStringAttrs
+    mov  x0, x24
+    mov  x2, x23
+    ADRL x8, _g_attr_msg
+    ldr  x3, [x8]
+    bl   _objc_msgSend
+    mov  x24, x0
+    mov  x0, x22
+    mov  x2, x24
+    MSG1 Ls_appendAttributedString
+    mov  x0, x24
+    MSG0 Ls_release
+    ADRL x8, _g_cur_room
+    ldr  x9, [x8]
+    cmp  x9, x19
+    b.ne 1f
+    ADRL x8, _g_chatview
+    ldr  x0, [x8]
+    cbz  x0, 9f
+    mov  x2, #0
+    MSG1 Ls_scrollToEndOfDocument
+    b    9f
+1:  ldr  x9, [x21, #R_UNREAD]
+    add  x9, x9, #1
+    str  x9, [x21, #R_UNREAD]
+    bl   _ui_rooms_changed
+9:  LEAVE 16
+
 // void _room_fmt(long room, int sys, const char *fmt, a, b, c)
 .globl _room_fmt
 _room_fmt:
