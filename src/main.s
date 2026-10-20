@@ -61,6 +61,7 @@ _g_attr_radar:    .quad 0
 Lc_zero:     .double 0.0
 Lc_W:        .double 820.0
 Lc_H:        .double 640.0
+Lc_Hshow:    .double 740.0
 Lc_minW:     .double 640.0
 Lc_minH:     .double 420.0
 Lc_big:      .double 10000000.0
@@ -77,22 +78,22 @@ Lc_rc_r:     .double 0.70
 Lc_rc_g:     .double 1.0
 Lc_rc_b:     .double 0.80
 // frames: x, y, w, h
-Lf_roomslbl: .double 14.0, 610.0, 150.0, 16.0
-Lf_addroom:  .double 176.0, 604.0, 36.0, 28.0
-Lf_rooms:    .double 8.0, 420.0, 204.0, 180.0
-Lf_peoplelbl: .double 14.0, 392.0, 196.0, 16.0
-Lf_people:   .double 8.0, 130.0, 204.0, 256.0
-Lf_invite:   .double 8.0, 88.0, 204.0, 32.0
-Lf_scanner:  .double 8.0, 50.0, 204.0, 32.0
-Lf_services: .double 8.0, 12.0, 204.0, 32.0
-Lf_sidecard: .double 6.0, 6.0, 210.0, 628.0
-Lf_header:   .double 236.0, 606.0, 390.0, 22.0
+Lf_roomslbl: .double 16.0, 610.0, 150.0, 16.0
+Lf_addroom:  .double 206.0, 604.0, 36.0, 28.0
+Lf_rooms:    .double 6.0, 306.0, 240.0, 294.0
+Lf_peoplelbl: .double 16.0, 284.0, 196.0, 16.0
+Lf_people:   .double 6.0, 128.0, 240.0, 152.0
+Lf_invite:   .double 8.0, 88.0, 236.0, 32.0
+Lf_scanner:  .double 8.0, 50.0, 236.0, 32.0
+Lf_services: .double 8.0, 12.0, 236.0, 32.0
+Lf_header:   .double 266.0, 606.0, 360.0, 22.0
 Lf_namebtn:  .double 632.0, 602.0, 176.0, 30.0
-Lf_status:   .double 236.0, 586.0, 572.0, 16.0
-Lf_chat:     .double 226.0, 52.0, 586.0, 526.0
-Lf_field:    .double 236.0, 14.0, 368.0, 24.0
-Lf_talk:     .double 612.0, 10.0, 100.0, 30.0
-Lf_send:     .double 716.0, 10.0, 92.0, 30.0
+Lf_status:   .double 266.0, 586.0, 542.0, 16.0
+Lf_chat:     .double 256.0, 58.0, 556.0, 520.0
+Lf_fieldbox: .double 262.0, 12.0, 456.0, 36.0
+Lf_field:    .double 14.0, 9.0, 428.0, 19.0
+Lf_talk:     .double 726.0, 12.0, 36.0, 36.0
+Lf_send:     .double 770.0, 12.0, 36.0, 36.0
 
 // Controller methods: selector name, IMP, type encoding. Zero-terminated.
 .section __DATA,__const
@@ -265,6 +266,7 @@ _build_ui:
     MSG1 Ls_setDelegate
     bl   _make_radar_class
     bl   _make_attrs
+    bl   _cards_init
 
     // ---- window ----
     CLS  Ls_NSWindow
@@ -313,20 +315,7 @@ _build_ui:
     ADRL x8, _g_content
     str  x21, [x8]
 
-    // ---- sidebar: one rounded dark card ----
-    mov  x0, x21
-    ADRL x8, Lf_sidecard
-    ldp  d0, d1, [x8]
-    ldp  d2, d3, [x8, #16]
-    bl   _plain_view
-    mov  x23, x0
-    mov  x2, #16                      // HeightSizable
-    MSG1 Ls_setAutoresizingMask
-    mov  x0, x23
-    mov  x1, #0x2426
-    movk x1, #0x24, lsl #16
-    LDD  d0, Lc_card
-    bl   _card
+    // ---- sidebar: room and people cards straight on the window, as on iPhone ----
     ADRL x0, Ls_rooms_lbl
     mov  x1, #8                       // MinYMargin: stays at the top
     mov  x2, #1
@@ -364,6 +353,9 @@ _build_ui:
     mov  x2, #0
     LDD  d0, Lc_colw
     bl   _add_col
+    ADRL x8, _g_rooms_table
+    ldr  x0, [x8]
+    bl   _cards_attach
 
     ADRL x0, Ls_people_lbl
     mov  x1, #8
@@ -389,6 +381,9 @@ _build_ui:
     mov  x2, #0
     LDD  d0, Lc_colw
     bl   _add_col
+    ADRL x8, _g_people_table
+    ldr  x0, [x8]
+    bl   _cards_attach
 
     ADRL x0, Ls_invite_title
     ADRL x1, Ls_m_invite
@@ -468,11 +463,25 @@ _build_ui:
     bl   _mk_textview
     ADRL x8, _g_chatview
     str  x0, [x8]
-    mov  x1, #0x2426                  // a rounded dark card, like the app's habit rows
-    movk x1, #0x24, lsl #16
+    mov  x1, #0x1A1C                  // flat on the window, like the iPhone's chat
+    movk x1, #0x1A, lsl #16
     bl   _card_scroll
 
-    // ---- input field and Send ----
+    // ---- input: a rounded card holding a plain field, round mic and send ----
+    mov  x0, x21
+    ADRL x8, Lf_fieldbox
+    ldp  d0, d1, [x8]
+    ldp  d2, d3, [x8, #16]
+    bl   _plain_view
+    mov  x24, x0
+    mov  x2, #34                      // WidthSizable | MaxYMargin
+    MSG1 Ls_setAutoresizingMask
+    mov  x0, x24
+    mov  x1, #0x2426
+    movk x1, #0x22, lsl #16
+    LDD  d0, Lc_r18
+    bl   _card
+
     CLS  Ls_NSTextField
     MSG0 Ls_alloc
     mov  x23, x0
@@ -494,51 +503,75 @@ _build_ui:
     mov  x0, x23
     MSG1 Ls_setAction
     mov  x0, x23
-    mov  x2, #34                      // WidthSizable | MaxYMargin
+    mov  x2, #2                       // WidthSizable
     MSG1 Ls_setAutoresizingMask
     mov  x0, x23
-    mov  x2, #1                       // NSTextFieldRoundedBezel
-    MSG1 Ls_setBezelStyle
+    mov  x2, #0
+    MSG1 Ls_setBezeled
+    mov  x0, x23
+    mov  x2, #0
+    MSG1 Ls_setBordered
+    mov  x0, x23
+    mov  x2, #0
+    MSG1 Ls_setDrawsBackground
+    mov  x0, x23
+    mov  x2, #1                       // NSFocusRingTypeNone: the card is the field
+    MSG1 Ls_setFocusRingType
     LDD  d0, Lc_14
     mov  w0, #0
     bl   _font
     mov  x2, x0
     mov  x0, x23
     MSG1 Ls_setFont
-    mov  x0, x21
+    mov  x0, x24
     mov  x2, x23
     MSG1 Ls_addSubview
 
-    ADRL x0, Ls_send_title
+    ADRL x0, Ls_y_send
     ADRL x1, Ls_m_send
     mov  x2, #33                      // MinXMargin | MaxYMargin
     mov  x3, x21
+    mov  x4, #0x9E0A                  // amber, black arrow
+    movk x4, #0xFF, lsl #16
+    mov  x5, #1
     ADRL x8, Lf_send
     ldp  d0, d1, [x8]
     ldp  d2, d3, [x8, #16]
-    bl   _mk_button
-    mov  x1, #0xB82E                  // the app's amber "Get started" pill
-    movk x1, #0xF5, lsl #16
-    mov  x2, #1
-    bl   _pill
+    bl   _cd_round
+    ADRL x1, Ls_send_title
+    bl   _tooltip
 
-    ADRL x0, Ls_talk_title
+    ADRL x0, Ls_y_mic
     ADRL x1, Ls_m_talk
     mov  x2, #33
     mov  x3, x21
+    mov  x4, #0x2E2F                  // dark grey, white mic
+    movk x4, #0x33, lsl #16
+    mov  x5, #0
     ADRL x8, Lf_talk
     ldp  d0, d1, [x8]
     ldp  d2, d3, [x8, #16]
-    bl   _mk_button
+    bl   _cd_round
     ADRL x8, _g_talkbtn
     str  x0, [x8]
+    ADRL x1, Ls_talk_tip
+    bl   _tooltip
 
     // ---- menus, menu-bar item ----
     mov  x0, x19
     bl   _build_menus
     bl   _build_status_item
 
-    // ---- show ----
+    // ---- show: taller than the 640 it was laid out at, so People has room ----
+    SELX1 Ls_setContentSize
+    ADRL x8, _g_window
+    ldr  x0, [x8]
+    LDD  d0, Lc_W
+    LDD  d1, Lc_Hshow
+    bl   _objc_msgSend
+    ADRL x8, _g_window
+    ldr  x0, [x8]
+    MSG0 Ls_center
     ADRL x8, _g_window
     ldr  x0, [x8]
     mov  x2, #0
@@ -1400,11 +1433,23 @@ _symbol_image:
     MSG2 Ls_imageWithSymbol
     LEAVE 0
 
+// void _tooltip(id view, const char *utf8)
+_tooltip:
+    ENTER 0
+    mov  x19, x0
+    mov  x0, x1
+    bl   _nsstr
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_setToolTip
+    LEAVE 0
+
 // ---------------------------------------------------------------------------
 .section __TEXT,__const
 .p2align 3
+Lc_r18:      .double 18.0
 Lc_20r:      .double 26.0
-Lc_colw:     .double 196.0
+Lc_colw:     .double 236.0
 
 .section __TEXT,__cstring,cstring_literals
 Ls_selftest_flag:      .asciz "--selftest"
@@ -1660,6 +1705,14 @@ Ls_plus:               .asciz "+"
 Ls_invite_title:       .asciz "Invite to Chat"
 Ls_scanner_title:      .asciz "Mesh Scanner"
 Ls_send_title:         .asciz "Send"
+Ls_talk_tip:           .asciz "Talk (\342\214\230T)"
+Ls_y_send:             .asciz "arrow.up"
+Ls_y_mic:              .asciz "mic.fill"
+Ls_setToolTip:         .asciz "setToolTip:"
+Ls_setContentSize:     .asciz "setContentSize:"
+Ls_setBezeled:         .asciz "setBezeled:"
+Ls_setBordered:        .asciz "setBordered:"
+Ls_setFocusRingType:   .asciz "setFocusRingType:"
 Ls_col_main:           .asciz "main"
 Ls_status0:            .asciz "Starting Bluetooth\342\200\246"
 Ls_NSBundle:           .asciz "NSBundle"

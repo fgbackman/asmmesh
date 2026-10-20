@@ -364,16 +364,84 @@ Lvd_release:
     str  xzr, [x8]
     LEAVE 0
 
-// void _talk_title(const char *utf8)
+// void _talk_title(const char *utf8) — iPhone reads the title; on the Mac the
+//   round button shows a mic, or a stop square on red while listening
 _talk_title:
     ENTER 0
+    mov  x21, x0
     bl   _nsstr
     mov  x2, x0
     ADRL x8, _g_talkbtn
-    ldr  x0, [x8]
-    cbz  x0, Ltt_done
+    ldr  x19, [x8]
+    cbz  x19, Ltt_done
+    mov  x0, x19
     MSG1 Ls_setTitle
+    ADRL x0, Ls_setImage
+    bl   _sel_registerName
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_respondsTo
+    cbz  x0, Ltt_done
+    ldrb w9, [x21]                    // "■ Stop" starts with 0xE2, "🎤 Talk" with 0xF0
+    cmp  w9, #0xE2
+    cset w20, eq
+    ADRL x0, Ls_sym_mic
+    ADRL x8, Ls_sym_stop
+    cmp  w20, #0
+    csel x0, x8, x0, ne
+    bl   Ltt_symbol
+    cbz  x0, Ltt_done
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_setImage
+    mov  x0, #0x2E2F                  // dark grey, or red while listening
+    movk x0, #0x33, lsl #16
+    mov  x8, #0x453A
+    movk x8, #0xFF, lsl #16
+    cmp  w20, #0
+    csel x0, x8, x0, ne
+    bl   _rgb
+    MSG0 Ls_CGColor
+    mov  x20, x0
+    mov  x0, x19
+    MSG0 Ls_layer
+    cbz  x0, Ltt_done
+    mov  x2, x20
+    MSG1 Ls_setBackgroundColor
 Ltt_done:
+    LEAVE 0
+
+// id Ltt_symbol(const char *name) — an SF Symbol at the round button's size (Mac)
+Ltt_symbol:
+    ENTER 0
+    bl   _nsstr
+    mov  x19, x0
+    CLS  Ls_NSImage
+    mov  x2, x19
+    mov  x3, #0
+    MSG2 Ls_imageWithSymbol
+    mov  x19, x0
+    cbz  x19, Lts_done
+    CLS  Ls_NSImageSymbolConfiguration
+    mov  x20, x0
+    cbz  x20, Lts_done
+    ADRL x0, Ls_cfgPointWeight
+    bl   _sel_registerName
+    mov  x1, x0
+    mov  x0, x20
+    adrp x16, Lc_gsize@PAGE
+    ldr  d0, [x16, Lc_gsize@PAGEOFF]
+    adrp x16, Lc_gweight@PAGE
+    ldr  d1, [x16, Lc_gweight@PAGEOFF]
+    bl   _objc_msgSend
+    cbz  x0, Lts_done
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_withConfig
+    cbz  x0, Lts_done
+    mov  x19, x0
+Lts_done:
+    mov  x0, x19
     LEAVE 0
 
 // void _field_placeholder(const char *utf8) — "" = the room's usual prompt
@@ -396,6 +464,11 @@ Lfp_done:
     LEAVE 0
 
 // ---------------------------------------------------------------------------
+.section __TEXT,__const
+.p2align 3
+Lc_gsize:        .double 15.0
+Lc_gweight:      .double 0.3
+
 .section __TEXT,__cstring,cstring_literals
 Lsig_tap:        .asciz "v24@?0@8@16"
 Lsig_auth:       .asciz "v16@?0q8"
@@ -430,6 +503,18 @@ Ls_setTitle:     .asciz "setTitle:"
 Ls_empty:        .asciz ""
 Ls_talk_title:   .asciz "\360\237\216\244 Talk"
 Ls_stop_title:   .asciz "\342\226\240 Stop"
+Ls_sym_mic:      .asciz "mic.fill"
+Ls_NSImage:      .asciz "NSImage"
+Ls_NSImageSymbolConfiguration: .asciz "NSImageSymbolConfiguration"
+Ls_imageWithSymbol: .asciz "imageWithSystemSymbolName:accessibilityDescription:"
+Ls_cfgPointWeight: .asciz "configurationWithPointSize:weight:"
+Ls_withConfig:   .asciz "imageWithSymbolConfiguration:"
+Ls_sym_stop:     .asciz "stop.fill"
+Ls_setImage:     .asciz "setImage:"
+Ls_respondsTo:   .asciz "respondsToSelector:"
+Ls_CGColor:      .asciz "CGColor"
+Ls_layer:        .asciz "layer"
+Ls_setBackgroundColor: .asciz "setBackgroundColor:"
 Ls_listening:    .asciz "Listening\342\200\246 say something like \342\200\234kitchen lights off\342\200\235"
 Ls_denied:       .asciz "\302\267 asmmesh isn't allowed to use speech recognition. Turn it on in System Settings \342\200\272 Privacy & Security \342\200\272 Speech Recognition (and Microphone)."
 Ls_unavailable:  .asciz "\302\267 Speech recognition isn't available right now for this Mac's language."

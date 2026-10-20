@@ -2,69 +2,69 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key>
-    <string>asmmesh</string>
-    <key>CFBundleDisplayName</key>
-    <string>asmmesh</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.fbackman.asmmesh</string>
-    <key>CFBundleExecutable</key>
-    <string>asmmesh</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
-    <key>LSApplicationCategoryType</key>
-    <string>public.app-category.social-networking</string>
-    <key>CFBundleShortVersionString</key>
-    <string>0.8</string>
-    <key>CFBundleVersion</key>
-    <string>14</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>12.0</string>
-    <key>NSPrincipalClass</key>
-    <string>NSApplication</string>
-    <key>NSHighResolutionCapable</key>
-    <true/>
-    <key>NSMicrophoneUsageDescription</key>
-    <string>asmmesh listens while you hold Talk, to turn what you say into a command for your lights and locks. If you pick a sound input in FM Radio, it also listens to that input for mesh messages sent over FM (the tones from a radio).</string>
-    <key>NSSpeechRecognitionUsageDescription</key>
-    <string>asmmesh turns what you say into commands like "kitchen lights off". It uses on-device recognition when your Mac supports it.</string>
-    <key>NSLocalNetworkUsageDescription</key>
-    <string>asmmesh finds lights, TVs and other smart-home devices on your network (Hue, WLED, Elgato, Shelly, Nanoleaf, Roku, WiZ, Home Assistant) so you can control them, and lists everything nearby in the Mesh Scanner.</string>
-    <key>NSBonjourServices</key>
-    <array>
-        <string>_hue._tcp</string>
-        <string>_wled._tcp</string>
-        <string>_elg._tcp</string>
-        <string>_shelly._tcp</string>
-        <string>_nanoleafapi._tcp</string>
-        <string>_home-assistant._tcp</string>
-        <string>_hap._tcp</string>
-        <string>_matterc._udp</string>
-        <string>_matter._tcp</string>
-        <string>_googlecast._tcp</string>
-        <string>_airplay._tcp</string>
-        <string>_sonos._tcp</string>
-        <string>_spotify-connect._tcp</string>
-        <string>_ipp._tcp</string>
-        <string>_esphomelib._tcp</string>
-        <string>_ewelink._tcp</string>
-        <string>_companion-link._tcp</string>
-        <string>_amzn-wplay._tcp</string>
-        <string>_androidtvremote2._tcp</string>
-        <string>_miio._udp</string>
-    </array>
-    <key>NSAppTransportSecurity</key>
-    <dict>
-        <key>NSAllowsLocalNetworking</key>
-        <true/>
-    </dict>
-    <key>NSLocationUsageDescription</key>
-    <string>With Location switched on in Settings, an SOS tells the people on your mesh where you are, "where am i" shows your address, and weather alerts are for where you actually are. asmmesh only asks when one of those needs it.</string>
-    <key>NSLocationWhenInUseUsageDescription</key>
-    <string>With Location switched on in Settings, an SOS tells the people on your mesh where you are, "where am i" shows your address, and weather alerts are for where you actually are. asmmesh only asks when one of those needs it.</string>
-    <key>NSBluetoothAlwaysUsageDescription</key>
-    <string>asmmesh talks directly to nearby Macs over Bluetooth to pass chat messages along without the internet, controls Bluetooth Hue bulbs, and shows nearby Bluetooth devices in the Mesh Scanner.</string>
+	<key>CFBundleDisplayName</key>
+	<string>asmmesh</string>
+	<key>CFBundleExecutable</key>
+	<string>asmmesh</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.fbackman.asmmesh</string>
+	<key>CFBundleName</key>
+	<string>asmmesh</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.8</string>
+	<key>CFBundleVersion</key>
+	<string>15</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.social-networking</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>12.0</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>asmmesh talks directly to nearby Macs over Bluetooth to pass chat messages along without the internet, controls Bluetooth Hue bulbs, and shows nearby Bluetooth devices in the Mesh Scanner.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_hue._tcp</string>
+		<string>_wled._tcp</string>
+		<string>_elg._tcp</string>
+		<string>_shelly._tcp</string>
+		<string>_nanoleafapi._tcp</string>
+		<string>_home-assistant._tcp</string>
+		<string>_hap._tcp</string>
+		<string>_matterc._udp</string>
+		<string>_matter._tcp</string>
+		<string>_googlecast._tcp</string>
+		<string>_airplay._tcp</string>
+		<string>_sonos._tcp</string>
+		<string>_spotify-connect._tcp</string>
+		<string>_ipp._tcp</string>
+		<string>_esphomelib._tcp</string>
+		<string>_ewelink._tcp</string>
+		<string>_companion-link._tcp</string>
+		<string>_amzn-wplay._tcp</string>
+		<string>_androidtvremote2._tcp</string>
+		<string>_miio._udp</string>
+	</array>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>asmmesh finds lights, TVs and other smart-home devices on your network (Hue, WLED, Elgato, Shelly, Nanoleaf, Roku, WiZ, Home Assistant) so you can control them, and lists everything nearby in the Mesh Scanner.</string>
+	<key>NSLocationUsageDescription</key>
+	<string>With Location switched on in Settings, an SOS tells the people on your mesh where you are, "where am i" shows your address, and weather alerts are for where you actually are. asmmesh only asks when one of those needs it.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>With Location switched on in Settings, an SOS tells the people on your mesh where you are, "where am i" shows your address, and weather alerts are for where you actually are. asmmesh only asks when one of those needs it.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>asmmesh listens while you hold Talk, to turn what you say into a command for your lights and locks. If you pick a sound input in FM Radio, it also listens to that input for mesh messages sent over FM (the tones from a radio).</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>asmmesh turns what you say into commands like "kitchen lights off". It uses on-device recognition when your Mac supports it.</string>
 </dict>
 </plist>
