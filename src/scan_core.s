@@ -280,10 +280,12 @@ Lsv_near:
     ADRL x0, Ls_d_bcast
 Lsvn_ret:
     LEAVE 16
-Lsvn_name:
-    add  x0, x24, #NR_NAME
-    ldrb w9, [x0]
-    cbnz w9, Lsvn_ret
+Lsvn_name:                            // its name, or its brand
+    mov  x0, x23
+    mov  x1, x19
+    mov  x2, #120
+    bl   _near_label
+    cbnz x0, Lsvn_ret
     ADRL x0, Ls_unnamed
     LEAVE 16
 Lsvn_kind:
@@ -423,9 +425,11 @@ Lsd_node_h:
 Lsd_near:
     ADRL x8, _g_near
     add  x24, x8, x23, lsl #NEAR_SHIFT
-    add  x0, x24, #NR_NAME            // "Name — kind"
-    ldrb w9, [x0]
-    cbnz w9, Lsdn_name
+    mov  x0, x23                      // "Name — kind"
+    ADRL x1, _g_scan_tmp
+    mov  x2, #160
+    bl   _near_label
+    cbnz x0, Lsdn_name
     ADRL x0, Ls_unnamed
 Lsdn_name:
     bl   _cat

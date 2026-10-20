@@ -125,6 +125,7 @@ struct ChatView: View {
     @Environment(\.dismiss) private var dismiss
     let roomID: UInt64
     @State private var inviting = false
+    @State private var deleting: DeletePrompt?
     @FocusState private var typing: Bool
 
     private var room: Room? { mesh.rooms.first { $0.id == roomID } }
@@ -161,12 +162,14 @@ struct ChatView: View {
                     Menu {
                         Button { inviting = true } label: { Label("Invite…", systemImage: "person.badge.plus") }
                         if room.kind == .privateRoom {
-                            // after the menu has closed, so the core's confirmation has a screen to sit on
                             Button(role: .destructive) {
-                                afterMenu { mesh.select(room); am_leave_room(); closeIfGone() }
+                                mesh.select(room); am_leave_room(); closeIfGone()
                             } label: { Label("Leave Room", systemImage: "rectangle.portrait.and.arrow.right") }
+                            // asked here, not by the core: its prompts wait in place, and a wait
+                            // started from a menu action could stop the app answering taps
                             Button(role: .destructive) {
-                                afterMenu { mesh.select(room); am_delete_room(); closeIfGone() }
+                                mesh.select(room)
+                                deleting = DeletePrompt.ask(am_delete_room_ask)
                             } label: { Label("Delete for Everyone", systemImage: "trash") }
                         }
                     } label: { Image(systemName: "ellipsis.circle") }
@@ -182,11 +185,28 @@ struct ChatView: View {
             .environmentObject(mesh)
             .presentationDetents([.medium, .large])
         }
+        .alert(deleting?.title ?? "", isPresented: Binding(get: { deleting != nil },
+                                                           set: { if !$0 { deleting = nil } }),
+               presenting: deleting) { prompt in
+            if prompt.canDelete {
+                Button("Delete Room", role: .destructive) { deleteConfirmed() }
+                Button("Cancel", role: .cancel) {}
+            } else {
+                Button("OK", role: .cancel) {}
+            }
+        } message: { prompt in
+            Text(prompt.info)
+        }
         .onAppear { if let room { mesh.select(room) } }
     }
 
-    private func afterMenu(_ work: @escaping () -> Void) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
+    private func deleteConfirmed() {
+        if let room { mesh.select(room) }
+        let refused = DeletePrompt.ask(am_delete_room_confirmed)
+        closeIfGone()
+        if !refused.canDelete {         // it couldn't go: say why, once this alert has closed
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { deleting = refused }
+        }
     }
 
     private func closeIfGone() {
@@ -242,6 +262,21 @@ struct LineRow: View {
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+}
+
+/// What Delete for Everyone says: the question (it's yours) or why it can't be deleted.
+struct DeletePrompt {
+    let title: String
+    let info: String
+    let canDelete: Bool
+
+    /// am_delete_room_ask or am_delete_room_confirmed: 0 yes/done, 1 no (the text says why)
+    static func ask(_ core: (UnsafeMutablePointer<CChar>, UnsafeMutablePointer<CChar>) -> Int) -> DeletePrompt {
+        var title = [CChar](repeating: 0, count: 256)
+        var info = [CChar](repeating: 0, count: 256)
+        let r = core(&title, &info)
+        return DeletePrompt(title: String(cString: title), info: String(cString: info), canDelete: r == 0)
     }
 }
 

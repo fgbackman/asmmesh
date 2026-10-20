@@ -575,8 +575,7 @@ _am_scan_cell:
     mov  x0, x1
     mov  x1, x9
     ADRL x2, _g_ios_buf
-    bl   _scan_cell
-    ADRL x0, _g_ios_buf
+    bl   _scan_cell                   // its answer: the buffer, or a name it points at
     LEAVE 0
 
 // const char *am_scan_details(long row)
@@ -614,6 +613,129 @@ _am_leave_room:
 .globl _am_delete_room
 _am_delete_room:
     b    _ui_delete_room
+
+// long am_delete_room_ask(char *title, char *info) — Delete for Everyone without waiting on a
+//   prompt (SwiftUI asks): 0 this Mac made the selected room, title/info hold the question, then
+//   am_delete_room_confirmed(); 1 it can't be deleted, title/info say why. Both 256 bytes.
+.globl _am_delete_room_ask
+_am_delete_room_ask:
+    ENTER 32                          // [96] the room's name
+    mov  x22, x0
+    mov  x23, x1
+    ADRL x8, _g_cur_room
+    ldr  x19, [x8]
+    cbz  x19, Lda_builtin
+    ADRL x8, _g_rooms
+    add  x20, x8, x19, lsl #ROOM_SHIFT
+    ldr  x9, [x20, #R_ID]
+    sub  x9, x9, #1
+    cmp  x9, #(LOCAL_ROOMS - 2)
+    b.ls Lda_builtin
+    add  x1, x20, #R_NAME
+    add  x0, sp, #96
+    mov  x2, #32
+    bl   _strlcpy
+    ldr  x21, [x20, #R_OWNER]
+    cbz  x21, Lda_unknown
+    ADRL x8, _g_node_id
+    ldr  x9, [x8]
+    cmp  x21, x9
+    b.ne Lda_notyours
+    add  x9, sp, #96                  // ours: are you sure?
+    str  x9, [sp]
+    mov  x0, x22
+    mov  x1, #256
+    ADRL x2, Ls_del_msg
+    bl   _snprintf
+    ADRL x1, Ls_del_info
+    mov  x24, #0
+    b    Lda_info
+Lda_notyours:                         // someone else's: who can delete it
+    mov  x0, x21
+    bl   _node_find
+    ADRL x21, Ls_its_maker
+    tbnz x0, #63, 1f
+    ADRL x8, _g_nodes
+    add  x0, x8, x0, lsl #NODE_SHIFT
+    bl   _node_name
+    mov  x21, x0
+1:  str  x21, [sp]
+    add  x9, sp, #96
+    str  x9, [sp, #8]
+    mov  x0, x22
+    mov  x1, #256
+    ADRL x2, Ls_del_notyours
+    bl   _snprintf
+    ADRL x1, Ls_del_leave
+    b    Lda_refuse
+Lda_unknown:
+    add  x9, sp, #96
+    str  x9, [sp]
+    mov  x0, x22
+    mov  x1, #256
+    ADRL x2, Ls_del_unknown
+    bl   _snprintf
+    ADRL x1, Ls_del_unknown_info
+    b    Lda_refuse
+Lda_builtin:
+    mov  x0, x22
+    ADRL x1, Ls_del_builtin
+    mov  x2, #256
+    bl   _strlcpy
+    ADRL x1, Ls_del_builtin_info
+Lda_refuse:
+    mov  x24, #1
+Lda_info:
+    mov  x0, x23
+    mov  x2, #256
+    bl   _strlcpy
+    mov  x0, x24
+    LEAVE 32
+
+// long am_delete_room_confirmed(char *title, char *info) — you said yes: tell the room and forget
+//   it. 0 done; 1 not done, title/info say why (as am_delete_room_ask).
+.globl _am_delete_room_confirmed
+_am_delete_room_confirmed:
+    ENTER 32                          // [96] the room's name
+    mov  x22, x0
+    mov  x23, x1
+    bl   _am_delete_room_ask          // still ours?
+    cbnz x0, Ldc_done
+    ADRL x8, _g_cur_room
+    ldr  x19, [x8]
+    ADRL x8, _g_rooms
+    add  x20, x8, x19, lsl #ROOM_SHIFT
+    add  x1, x20, #R_NAME
+    add  x0, sp, #96
+    mov  x2, #32
+    bl   _strlcpy
+    mov  x0, x19
+    bl   _mesh_send_roomdel
+    tbnz x0, #63, Ldc_noid
+    mov  x0, #0
+    bl   _ui_select_room
+    mov  x0, x19
+    bl   _room_remove
+    bl   _ui_rooms_changed
+    mov  x0, #0
+    mov  x1, #1
+    ADRL x2, Lf_you_deleted
+    add  x3, sp, #96
+    bl   _room_fmt
+    mov  x0, #0
+    b    Ldc_done
+Ldc_noid:
+    mov  x0, x22
+    ADRL x1, Ls_del_noid
+    mov  x2, #256
+    bl   _strlcpy
+    mov  x0, x23
+    ADRL x1, Ls_del_noid_info
+    mov  x2, #256
+    bl   _strlcpy
+    mov  x0, #1
+Ldc_done:
+    LEAVE 32
 
 .globl _am_change_name
 _am_change_name:

@@ -29,6 +29,8 @@ void am_new_room(void);
 void am_invite(long node);
 void am_leave_room(void);
 void am_delete_room(void);
+long am_delete_room_ask(char *title, char *info);
+long am_delete_room_confirmed(char *title, char *info);
 void am_change_name(void);
 void am_talk(void);
 void am_connect_st(void);

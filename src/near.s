@@ -863,6 +863,57 @@ Lnk_ret:
     LEAVE 0
 
 
+// char *_near_label(long i, char *buf, size_t max) — its name or, when it doesn't say one
+//   (iPhone and iPad rarely hear names from devices they haven't connected to), what its
+//   advertisement says it is: "AirPods / Beats", "Samsung device", "Matter device"; 0 if nothing
+.globl _near_label
+_near_label:
+    ENTER 0
+    NEARE x19, x0
+    mov  x20, x1
+    mov  x21, x2
+    add  x0, x19, #NR_NAME
+    ldrb w9, [x0]
+    cbnz w9, Lnl_ret
+    ldr  x9, [x19, #NR_FLAGS]
+    ADRL x1, Ls_l_matter
+    tst  x9, #NF_MATTER
+    b.ne Lnl_copy
+    ldr  x3, [x19, #NR_MAKER]
+    cbz  x3, Lnl_none
+    ldr  x4, [x19, #NR_SUB]           // Apple's own: the kind of thing it says it is
+    ADRL x1, Lat_airpods
+    cmp  x4, x1
+    b.eq Lnl_copy
+    ADRL x1, Ls_l_watch
+    ADRL x8, Lat_watch
+    cmp  x4, x8
+    b.eq Lnl_copy
+    ADRL x1, Ls_l_findmy
+    ADRL x8, Lat_findmy
+    cmp  x4, x8
+    b.eq Lnl_copy
+    ADRL x1, Lat_nearby
+    cmp  x4, x1
+    b.eq Lnl_copy
+    mov  x0, x20                      // "Samsung device"
+    mov  x1, x21
+    ADRL x2, Lf_l_device
+    bl   _sfmt
+    mov  x0, x20
+    LEAVE 0
+Lnl_copy:
+    mov  x0, x20
+    mov  x2, x21
+    bl   _strlcpy
+    mov  x0, x20
+    LEAVE 0
+Lnl_none:
+    mov  x0, #0
+Lnl_ret:
+    LEAVE 0
+
+
 // ===========================================================================
 // Where things are: distance from signal strength
 // ===========================================================================
@@ -1026,6 +1077,10 @@ Lf_two:               .asciz "%s \302\267 %s"
 Lf_company:           .asciz "maker 0x%04lX"
 Ls_k_ble:             .asciz "Bluetooth LE"
 Ls_k_matter:          .asciz "Matter (pairing)"
+Ls_l_matter:          .asciz "Matter device"
+Ls_l_watch:           .asciz "Apple Watch"
+Ls_l_findmy:          .asciz "AirTag or Find My item"
+Lf_l_device:          .asciz "%s device"
 Ls_this_device:       .asciz "this device"
 Ls_locked:            .asciz "some details need pairing"
 Ls_no_answer:         .asciz "didn't answer (out of range or busy)"
