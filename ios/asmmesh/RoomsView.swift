@@ -161,12 +161,12 @@ struct ChatView: View {
                     Menu {
                         Button { inviting = true } label: { Label("Invite…", systemImage: "person.badge.plus") }
                         if room.kind == .privateRoom {
+                            // after the menu has closed, so the core's confirmation has a screen to sit on
                             Button(role: .destructive) {
-                                mesh.select(room); am_leave_room(); dismiss()
+                                afterMenu { mesh.select(room); am_leave_room(); closeIfGone() }
                             } label: { Label("Leave Room", systemImage: "rectangle.portrait.and.arrow.right") }
                             Button(role: .destructive) {
-                                mesh.select(room); am_delete_room()
-                                if !mesh.rooms.contains(where: { $0.id == roomID }) { dismiss() }
+                                afterMenu { mesh.select(room); am_delete_room(); closeIfGone() }
                             } label: { Label("Delete for Everyone", systemImage: "trash") }
                         }
                     } label: { Image(systemName: "ellipsis.circle") }
@@ -183,6 +183,15 @@ struct ChatView: View {
             .presentationDetents([.medium, .large])
         }
         .onAppear { if let room { mesh.select(room) } }
+    }
+
+    private func afterMenu(_ work: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
+    }
+
+    private func closeIfGone() {
+        mesh.roomsChanged()
+        if !mesh.rooms.contains(where: { $0.id == roomID }) { dismiss() }
     }
 
     private var inputBar: some View {

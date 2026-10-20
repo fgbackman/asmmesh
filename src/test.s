@@ -71,6 +71,10 @@
 _g_tpeer:       .quad 0                   // a second identity: "the other Mac"
 _g_t_flip:      .quad 0                   // 1: damage the packet after signing it
 .zerofill __DATA,__bss,_g_tbuf,128,4
+.zerofill __DATA,__bss,_g_tfz,320,4
+.zerofill __DATA,__bss,_g_tline,1024,4
+_g_t_seed:      .quad 0
+_g_t_err:       .quad -1
 .zerofill __DATA,__bss,_g_tbuf2,128,4
 .zerofill __DATA,__bss,_g_tpeer_pub,72,4
 .zerofill __DATA,__bss,_g_trx,256,4
@@ -1157,6 +1161,8 @@ _selftest:
     add  x19, x19, x0
     bl   _sens_selftest               // Bluetooth sensors and their rules (sensors.s)
     add  x19, x19, x0
+    bl   _t_hard                      // fuzzing, flood limits, full tables (last: it fills them)
+    add  x19, x19, x0
 
     // summary
     str  x19, [sp]
@@ -1256,6 +1262,399 @@ _test_devices2:
     str  x0, [x8]
     ldp  x29, x30, [sp], #16
     ret
+
+
+// ---------------------------------------------------------------------------
+// long _t_hard(void) — 106-113: damaged and random packets (nothing may crash),
+//   the flood limits, and full people and room tables. Returns failures.
+// ---------------------------------------------------------------------------
+.set FUZZ_SIGNED, 20000
+.set FUZZ_RAW,    50000
+_t_hard:
+    ENTER 32                          // [96] now
+    mov  x19, #0
+    mov  x0, #1                       // the chat lines these make would bury the report
+    bl   _t_quiet
+    ADRL x8, _g_t_seed
+    ldr  x9, Lt_seed0
+    str  x9, [x8]
+
+    // 106. damaged packets, signed so they get past the signature into the parsers
+    ADRL x8, _g_rate_off
+    mov  x9, #1
+    str  x9, [x8]
+    ADRL x23, _g_tfz
+    mov  x20, #0
+Lfz_loop:
+    mov  x9, #FUZZ_SIGNED
+    cmp  x20, x9
+    b.hs Lfz_done
+    bl   _t_rand
+    and  x9, x0, #7                   // one of 8 canned packets
+    ADRL x8, Lt_tmpl
+    add  x8, x8, x9, lsl #4
+    ldr  x21, [x8]
+    ldr  x22, [x8, #8]
+    mov  x24, #0                      // random bytes after it
+1:  bl   _t_rand
+    str  x0, [x23, x24]
+    add  x24, x24, #8
+    cmp  x24, #128
+    b.lo 1b
+    mov  x0, x23
+    mov  x1, x21
+    mov  x2, x22
+    bl   _memcpy
+    bl   _t_rand                      // a fresh packet id, so it isn't a duplicate
+    orr  x0, x0, #1
+    str  x0, [x23, #4]
+    bl   _t_rand
+    and  x24, x0, #3
+    add  x24, x24, #1                 // 1-4 changes
+2:  bl   _t_rand
+    and  x10, x0, #3                  // what kind
+    lsr  x11, x0, #8                  // where: 0-99
+    mov  x12, #100
+    udiv x13, x11, x12
+    msub x11, x13, x12, x11
+    lsr  x14, x0, #24
+    and  x14, x14, #0xff              // a byte
+    cmp  x10, #1
+    b.lo 3f
+    b.eq 4f
+    cmp  x10, #2
+    b.eq 5f
+    mov  x12, #12                     // 3: another type, 1-12
+    udiv x13, x14, x12
+    msub x14, x13, x12, x14
+    add  x14, x14, #1
+    strb w14, [x23, #3]
+    b    6f
+3:  strb w14, [x23, x11]              // 0: any byte
+    b    6f
+4:  and  x14, x14, #7                 // 1: an edge value
+    ADRL x8, Lt_edge
+    ldrb w14, [x8, x14]
+    strb w14, [x23, x11]
+    b    6f
+5:  mov  x12, #101                    // 2: another length, 0-100
+    udiv x13, x14, x12
+    msub x22, x13, x12, x14
+6:  subs x24, x24, #1
+    b.ne 2b
+    ldrb w9, [x23, #3]                // never a headphones handoff: it would move
+    cmp  w9, #T_HP                    //   real AirPods
+    b.ne 7f
+    mov  w9, #T_MSG
+    strb w9, [x23, #3]
+7:  mov  x0, x23
+    mov  x1, x22
+    bl   _t_rx
+    add  x20, x20, #1
+    b    Lfz_loop
+Lfz_done:
+    bl   _t_sane
+    ADRL x0, Ln_fz_signed
+    bl   _t_report
+    add  x19, x19, x0
+
+    // 107. random bytes, often with a plausible header
+    mov  x20, #0
+Lfr_loop:
+    mov  x9, #FUZZ_RAW
+    cmp  x20, x9
+    b.hs Lfr_done
+    mov  x24, #0
+1:  bl   _t_rand
+    str  x0, [x23, x24]
+    add  x24, x24, #8
+    cmp  x24, #256
+    b.lo 1b
+    bl   _t_rand
+    mov  x12, #241
+    udiv x13, x0, x12
+    msub x22, x13, x12, x0            // 0-240 bytes
+    tbz  x0, #40, 2f
+    mov  w9, #'M'
+    strb w9, [x23]
+    mov  w9, #PROTO_VER
+    strb w9, [x23, #1]
+    and  x9, x0, #7
+    add  x9, x9, #1
+    strb w9, [x23, #2]
+2:  mov  x0, x23
+    mov  x1, x22
+    bl   _mesh_receive
+    add  x20, x20, #1
+    b    Lfr_loop
+Lfr_done:
+    bl   _t_sane
+    ADRL x0, Ln_fz_raw
+    bl   _t_report
+    add  x19, x19, x0
+
+    // 108. one sender flooding: about 120 messages get through, the rest are dropped
+    ADRL x8, _g_rate_off
+    str  xzr, [x8]
+    bl   _rate_reset
+    ldr  x0, Lt_alice                 // the fuzzing's made-up hellos pushed alice's key out
+    ADRL x1, _g_tpeer_pub
+    bl   _key_put
+    mov  x20, #0
+    mov  x21, #0
+1:  mov  x0, x23
+    ADRL x1, Lp_msg
+    mov  x2, #(Lp_msg_end - Lp_msg)
+    bl   _memcpy
+    bl   _t_rand
+    orr  x0, x0, #1
+    str  x0, [x23, #4]
+    mov  x0, x23
+    mov  x1, #(Lp_msg_end - Lp_msg)
+    bl   _t_rx
+    cmp  x0, #RX_NEW
+    cinc x21, x21, eq
+    add  x20, x20, #1
+    cmp  x20, #200
+    b.lo 1b
+    cmp  x21, #120                    // 120 at once, plus up to 2 seconds of refill
+    cset x9, hs
+    cmp  x21, #145
+    cset x10, ls
+    and  x9, x9, x10
+    cmp  x9, #1
+    cset w1, eq
+    ADRL x0, Ln_rate_one
+    bl   _t_report
+    add  x19, x19, x0
+
+    // 109. packets from senders nobody has a key for share one small budget
+    bl   _rate_reset
+    mov  x20, #0
+    mov  x21, #0
+1:  mov  x0, x23
+    ADRL x1, Lp_msg
+    mov  x2, #(Lp_msg_end - Lp_msg)
+    bl   _memcpy
+    bl   _t_rand
+    orr  x0, x0, #1
+    str  x0, [x23, #4]
+    bl   _t_rand                      // a made-up sender each time
+    orr  x0, x0, #1
+    str  x0, [x23, #20]
+    mov  x0, x23
+    mov  x1, #(Lp_msg_end - Lp_msg)
+    bl   _t_rx
+    cmp  x0, #RX_NEW
+    cinc x21, x21, eq
+    add  x20, x20, #1
+    cmp  x20, #80
+    b.lo 1b
+    cmp  x21, #16
+    cset x9, hs
+    cmp  x21, #32
+    cset x10, ls
+    and  x9, x9, x10
+    cmp  x9, #1
+    cset w1, eq
+    ADRL x0, Ln_rate_unver
+    bl   _t_report
+    add  x19, x19, x0
+
+    // 114. a flood of made-up identities doesn't push out someone actually talking
+    bl   _rate_reset
+    ldr  x0, Lt_alice
+    ADRL x1, _g_tpeer_pub
+    bl   _key_put
+    mov  x20, #0
+1:  bl   _t_rand
+    orr  x0, x0, #1
+    ADRL x1, _g_tpeer_pub
+    bl   _key_put
+    add  x20, x20, #1
+    cmp  x20, #200
+    b.lo 1b
+    ldr  x0, Lt_alice
+    bl   _key_find
+    cmp  x0, #0
+    cset w1, ne
+    ADRL x0, Ln_t114
+    bl   _t_report
+    add  x19, x19, x0
+    ADRL x8, _g_rate_off
+    mov  x9, #1
+    str  x9, [x8]
+
+    // 110-111. a full people list: the quietest (over 2 minutes) makes room; if
+    //   everyone was heard just now, a newcomer waits
+1:  ADRL x8, _g_node_count
+    ldr  x9, [x8]
+    cmp  x9, #NODE_MAX
+    b.hs 2f
+    ldr  x0, Lt_nodebase
+    add  x0, x0, x9
+    mov  x1, #0
+    mov  x2, #1
+    bl   _node_touch
+    b    1b
+2:  mov  x0, #0
+    bl   _time
+    str  x0, [sp, #96]
+    sub  x1, x0, #300
+    bl   _t_seen_all                  // everyone 5 minutes ago
+    ldr  x0, Lt_newcomer
+    mov  x1, #0
+    mov  x2, #2
+    bl   _node_touch
+    mov  x20, x0
+    ldr  x0, Lt_newcomer
+    bl   _node_find
+    ADRL x8, _g_node_count
+    ldr  x9, [x8]
+    cmp  x9, #NODE_MAX
+    ccmp x0, x20, #0, eq
+    cset w1, eq
+    tbnz x20, #63, 3f
+    b    4f
+3:  mov  w1, #0
+4:  ADRL x0, Ln_nodes_reuse
+    bl   _t_report
+    add  x19, x19, x0
+    ldr  x1, [sp, #96]
+    bl   _t_seen_all                  // everyone just now
+    ldr  x0, Lt_newcomer
+    add  x0, x0, #1
+    mov  x1, #0
+    mov  x2, #2
+    bl   _node_touch
+    cmn  x0, #1
+    cset w1, eq
+    ADRL x0, Ln_nodes_busy
+    bl   _t_report
+    add  x19, x19, x0
+
+    // 112. a full room list: the 17th room is refused, not written past the end
+1:  ldr  x0, Lt_roombase
+    ADRL x8, _g_room_count
+    ldr  x9, [x8]
+    add  x0, x0, x9
+    ADRL x1, Ls_t_room
+    mov  x2, #0
+    bl   _room_add
+    tbz  x0, #63, 1b
+    ADRL x8, _g_room_count
+    ldr  x0, [x8]
+    cmp  x0, #ROOM_MAX
+    cset w1, eq
+    ADRL x0, Ln_rooms_full
+    bl   _t_report
+    add  x19, x19, x0
+
+    // 113. a long day's transcript is trimmed, not kept for ever (Mac)
+    ADRL x8, _g_rooms
+    ldr  x0, [x8, #R_STORE]
+    cbz  x0, 3f
+    ADRL x0, _g_tline                 // a 900-character line
+    mov  w1, #'x'
+    mov  x2, #900
+    bl   _memset
+    ADRL x8, _g_tline
+    strb wzr, [x8, #900]
+    mov  x20, #0
+1:  mov  x0, #0
+    ADRL x1, _g_tline
+    mov  x2, #1
+    bl   _room_line
+    add  x20, x20, #1
+    cmp  x20, #300
+    b.lo 1b
+    ADRL x8, _g_rooms
+    ldr  x0, [x8, #R_STORE]
+    ADRL x1, Ls_t_length
+    bl   _msg0
+    mov  x9, #0x0D40                  // under 200,000 characters + one line
+    movk x9, #0x3, lsl #16
+    add  x9, x9, #1024
+    cmp  x0, x9
+    cset w1, lo
+    b    4f
+3:  mov  w1, #0                       // no transcript store: fail
+4:  ADRL x0, Ln_t113
+    bl   _t_report
+    add  x19, x19, x0
+
+    mov  x0, #0
+    bl   _t_quiet
+    mov  x0, x19
+    LEAVE 32
+
+// int _t_sane(void) -> w1: the tables are still within bounds after a fuzz run
+_t_sane:
+    ADRL x8, _g_node_count
+    ldr  x9, [x8]
+    ADRL x8, _g_room_count
+    ldr  x10, [x8]
+    cmp  x9, #NODE_MAX
+    ccmp x10, #ROOM_MAX, #2, ls       // (nodes > max: force "hi")
+    cset w1, ls
+    ret
+
+// void _t_seen_all(long when /*x1*/) — every node last heard at `when`
+_t_seen_all:
+    ADRL x8, _g_node_count
+    ldr  x9, [x8]
+    ADRL x8, _g_nodes
+1:  cbz  x9, 2f
+    str  x1, [x8, #N_SEEN]
+    add  x8, x8, #64
+    sub  x9, x9, #1
+    b    1b
+2:  ret
+
+// uint64 _t_rand(void) — xorshift64, from a fixed seed so a failure can be repeated
+_t_rand:
+    ADRL x8, _g_t_seed
+    ldr  x0, [x8]
+    eor  x0, x0, x0, lsl #13
+    eor  x0, x0, x0, lsr #7
+    eor  x0, x0, x0, lsl #17
+    str  x0, [x8]
+    ret
+
+// void _t_quiet(int on) — stderr to /dev/null and back
+_t_quiet:
+    ENTER 0
+    cbz  x0, 1f
+    mov  x0, #2
+    bl   _dup
+    ADRL x8, _g_t_err
+    str  x0, [x8]
+    ADRL x0, Ls_t_devnull
+    mov  x1, #1                       // O_WRONLY
+    bl   _open
+    tbnz w0, #31, 2f
+    mov  x19, x0
+    mov  x1, #2
+    bl   _dup2
+    mov  x0, x19
+    bl   _close
+    b    2f
+1:  ADRL x8, _g_t_err
+    ldr  x0, [x8]
+    tbnz x0, #63, 2f
+    mov  x1, #2
+    bl   _dup2
+    ADRL x8, _g_t_err
+    ldr  x0, [x8]
+    bl   _close
+2:  LEAVE 0
+
+.p2align 3
+Lt_seed0:    .quad 0x9E3779B97F4A7C15
+Lt_alice:    .quad 0x0A11CE0000000001
+Lt_nodebase: .quad 0x7E57000000000100
+Lt_newcomer: .quad 0x7E57FFFF00000001
+Lt_roombase: .quad 0x7E57000000AB0000
 
 // long _t_report(const char *name, int pass) -> 0 if pass, 1 if fail
 // long _t_rx(const uint8 *pkt, size_t len) — a canned v2-style packet, made into a
@@ -1842,3 +2241,33 @@ Ln7_dist:        .asciz "signal to distance: -59 dBm = 1 m, -84 dBm = 10 m"
 Lc7_lights:      .asciz "list lights"
 Lc7_tvs:         .asciz "list tvs"
 Lc7_devices:     .asciz "list devices"
+
+.section __DATA,__const
+.p2align 3
+// canned packets the fuzzer starts from (none addressed to this Mac: those ask questions)
+Lt_tmpl:
+    .quad Lp_msg,       Lp_msg_end - Lp_msg
+    .quad Lp_hello,     Lp_hello_end - Lp_hello
+    .quad Lp_inv_other, Lp_inv_other_end - Lp_inv_other
+    .quad Lp_room_msg,  Lp_room_msg_end - Lp_room_msg
+    .quad Lp_ctrl,      Lp_ctrl_end - Lp_ctrl
+    .quad Lp_carol_msg, Lp_carol_msg_end - Lp_carol_msg
+    .quad Lp_plain_main, Lp_plain_main_end - Lp_plain_main
+    .quad Lp_room_msg2, Lp_room_msg2_end - Lp_room_msg2
+
+.section __TEXT,__const
+Lt_edge:     .byte 0, 1, 23, 24, 0x7f, 0x80, 0xfe, 0xff
+
+.section __TEXT,__cstring,cstring_literals
+Ln_fz_signed:   .asciz "106 fuzz: 20,000 damaged signed packets, nothing crashed, tables in bounds"
+Ln_fz_raw:      .asciz "107 fuzz: 50,000 random packets, nothing crashed, tables in bounds"
+Ln_rate_one:    .asciz "108 limits: one sender flooding 200 messages gets about 120 through"
+Ln_rate_unver:  .asciz "109 limits: 80 packets from unknown senders share one small budget"
+Ln_nodes_reuse: .asciz "110 a full people list makes room for a newcomer when someone has gone quiet"
+Ln_nodes_busy:  .asciz "111 a full people list of people all heard just now keeps them"
+Ln_rooms_full:  .asciz "112 the 17th room is refused, not written past the end"
+Ln_t113:        .asciz "113 a long transcript is trimmed to under 200,000 characters"
+Ln_t114:        .asciz "114 limits: 200 made-up identities don't push out a key in use"
+Ls_t_room:      .asciz "fuzz room"
+Ls_t_devnull:   .asciz "/dev/null"
+Ls_t_length:    .asciz "length"

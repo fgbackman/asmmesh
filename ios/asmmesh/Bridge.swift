@@ -148,8 +148,21 @@ enum AlertRunner {
             })
         }
         top.present(ac, animated: true)
+        // Wait for a tap. If iOS didn't show the alert (a menu or sheet was still
+        // closing), try again on whatever is on top now; if it still can't be shown
+        // after a few seconds, give the safe answer rather than wait for ever.
+        let started = Date()
+        var lastTry = started
         while answer == nil {
             RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.05))
+            if answer != nil || ac.presentingViewController != nil { continue }
+            if Date().timeIntervalSince(started) > 4 {
+                return buttons.count > 1 ? 1000 + buttons.count - 1 : 1000
+            }
+            if Date().timeIntervalSince(lastTry) > 0.4, let now = topViewController(), now !== ac {
+                lastTry = Date()
+                now.present(ac, animated: true)
+            }
         }
         return answer ?? 1001
     }

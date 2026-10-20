@@ -23,10 +23,11 @@
 
 .include "macros.inc"
 
-.set KEYS_N,    32
+.set KEYS_N,    64
 .set KE_SIZE,   96          // +0 id, +8 in use, +16 public key[65], +88 SecKeyRef
 .set KE_PUB,    16
 .set KE_REF,    88
+.set KE_SEEN,   84          // u32: when a signature of theirs last checked out
 .set PEND_N,    8
 .set PE_SHIFT,  8           // 256-byte slots: +0 length, +8 packet
 .set PRIVLEN,   97
@@ -52,7 +53,7 @@ _g_rx_replay:   .quad 0                // 1 while a pending packet is being re-r
 _g_time_override: .quad 0              // tests: sign as if at this time
 .globl _g_my_pub
 .zerofill __DATA,__bss,_g_my_pub,72,4
-.zerofill __DATA,__bss,_g_keys,3072,4
+.zerofill __DATA,__bss,_g_keys,6144,4
 .zerofill __DATA,__bss,_g_pend,2048,4
 .zerofill __DATA,__bss,_g_sigbuf,256,4
 .zerofill __DATA,__bss,_g_hash,32,4
@@ -661,14 +662,30 @@ _key_put:
     mov  x0, x19
     bl   _key_find
     cbnz x0, Lkpt_have
-    ADRL x8, _g_keys_pos              // a free row, else the oldest one
-    ldr  x9, [x8]
-    add  x10, x9, #1
-    str  x10, [x8]
-    and  x9, x9, #(KEYS_N - 1)
-    ADRL x8, _g_keys
+    mov  x0, #RL_NEWKEY               // new identities are taken at most one a second
+    mov  x1, #1                       //   (16 at once), so a flood of made-up ones can't
+    mov  x2, #16                      //   push out the people actually talking
+    mov  x3, #1
+    bl   _rate_take
+    cbz  x0, Lkpt_refused
+    ADRL x8, _g_keys                  // a free row, else the one quiet longest
+    mov  x9, #0
+    mov  x0, x8
+    mov  w11, #-1
+1:  cmp  x9, #KEYS_N
+    b.hs Lkpt_have
     mov  x10, #KE_SIZE
-    madd x0, x9, x10, x8
+    madd x12, x9, x10, x8
+    ldr  x13, [x12, #8]
+    cbz  x13, 2f
+    ldr  w13, [x12, #KE_SEEN]
+    cmp  w13, w11
+    b.hs 3f
+    mov  w11, w13
+    mov  x0, x12
+3:  add  x9, x9, #1
+    b    1b
+2:  mov  x0, x12
 Lkpt_have:
     mov  x22, x0
     ldr  x0, [x22, #KE_REF]
@@ -683,8 +700,14 @@ Lkpt_fill:
     mov  x2, #PUBLEN
     bl   _memcpy
     str  x21, [x22, #KE_REF]
+    mov  x0, #0
+    bl   _time
+    str  w0, [x22, #KE_SEEN]
     mov  x0, x22
     LEAVE 0
+Lkpt_refused:
+    mov  x0, x21
+    bl   _CFRelease
 Lkpt_no:
     mov  x0, #0
     LEAVE 0
@@ -960,11 +983,19 @@ _sender_check:
     mov  x0, x2
     bl   _key_find
     cbz  x0, Lsk2_unknown
+    mov  x21, x0
     ldr  x2, [x0, #KE_REF]
     mov  x0, x19
     mov  x1, x20
     bl   _pkt_check
-    LEAVE 0
+    cmp  x0, #1
+    b.ne 1f
+    mov  x22, x0                      // genuine: they're still around
+    mov  x0, #0
+    bl   _time
+    str  w0, [x21, #KE_SEEN]
+    mov  x0, x22
+1:  LEAVE 0
 Lsk2_unknown:
     mov  x0, #3
     LEAVE 0

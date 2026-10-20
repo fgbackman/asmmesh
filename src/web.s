@@ -2396,7 +2396,17 @@ Lwt_gate:
     b.ne 40f
     str  xzr, [x22, #P_LIVE]         // pieces of the request never came: forget it
     b    41f
-40: mov  x9, #3                      // fetching (freed when the page is ready)
+40: ldr  x0, [x22, #P_REQ]           // each asker: 6 pages at once, then one per
+    mov  x9, #0x6A7E
+    eor  x0, x0, x9                  //   10 s (limits.s; its own bucket, not their
+    mov  x1, #10                     //   packets'), so nobody can keep the gateway
+    mov  x2, #60                     //   to themselves
+    mov  x3, #1
+    bl   _rate_take
+    cbnz x0, 42f
+    str  xzr, [x22, #P_LIVE]         // over: dropped (they'll hear nothing back)
+    b    41f
+42: mov  x9, #3                      // fetching (freed when the page is ready)
     str  x9, [x22, #P_LIVE]
     ldr  x0, [x22, #P_REQ]
     ldr  x1, [x22, #P_ID]

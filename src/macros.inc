@@ -98,6 +98,9 @@
 .set T_INVITE,      3
 .set T_ROOMDEL,     10       // the room's owner deleted it (+12 room, +20 owner, +28 nlen, +29 nick)
 .set T_HP,          11       // headphones: +12 target (0 any) +20 sender +28 nlen +29 nick, op, hash[16]
+.set RL_UNVERIFIED,  1        // limits.s buckets that aren't a sender: packets nobody can check yet
+.set RL_RELAY,      2        //   and everything this Mac passes on
+.set RL_NEWKEY,     3        //   and new identities' keys taken in
 .set RX_BAD,        0
 .set RX_NEW,        1
 .set RX_DUP,        2

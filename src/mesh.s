@@ -941,6 +941,12 @@ Lrx_auth:
     ADRL x8, _g_rx_replay             // their hello hasn't come yet: hold it, pass it on
     ldr  x9, [x8]
     cbnz x9, Lrx_forged
+    mov  x0, #RL_UNVERIFIED           // ...within the budget for packets nobody can check yet
+    mov  x1, #4
+    mov  x2, #64
+    mov  x3, #8
+    bl   _rate_take
+    cbz  x0, Lrx_dup
     mov  x0, x19
     ldr  x1, [sp, #120]
     bl   _pending_put
@@ -956,6 +962,27 @@ Lrx_auth_hello:
     cmp  x0, #1
     b.ne Lrx_forged
 Lrx_ok:
+    // ---- within this sender's budget? (limits.s) a flood is dropped, not passed on ----
+    ADRL x8, _g_rx_replay             // a held packet was counted when it arrived
+    ldr  x9, [x8]
+    cbnz x9, Lrx_go
+    mov  x0, x19
+    bl   _pkt_sender
+    mov  x1, #4                       // a message, hello, invite...: 4
+    ldr  x22, [sp, #112]
+    cmp  w22, #T_WEBPART
+    b.ne 1f
+    mov  x1, #1                       // a web page piece: 1
+1:  mov  x2, #480
+    mov  x3, #48
+    bl   _rate_take
+    cbnz x0, Lrx_go
+    cbz  x1, Lrx_dup
+    mov  x0, x19                      // the first one over: say so once
+    bl   _pkt_sender
+    bl   _rate_note
+    b    Lrx_dup
+Lrx_go:
 
     ldr  x22, [sp, #112]
     cmp  w22, #T_MSG
@@ -1357,6 +1384,12 @@ Lrx_relay:
     mov  x1, x20
     bl   _store_put
 Lrx_send:
+    mov  x0, #RL_RELAY                // this Mac's own relaying budget
+    mov  x1, #1
+    mov  x2, #600
+    mov  x3, #60
+    bl   _rate_take
+    cbz  x0, Lrx_new
     ADRL x0, _g_fwd
     mov  x1, x20
     bl   _ble_broadcast
@@ -1387,6 +1420,28 @@ Lrx_oldver:                           // say so once; after that, stay quiet
     bl   _chat_line
 Lrx_bad:
     mov  x0, #RX_BAD
+    LEAVE 32
+
+// void _rate_note(uint64 id) — in Main, once per flood: who is being held back
+_rate_note:
+    ENTER 32                          // [96] fingerprint
+    mov  x19, x0
+    bl   _node_find
+    ADRL x20, Ls_rate_someone
+    tbnz x0, #63, 1f
+    ADRL x8, _g_nodes
+    add  x0, x8, x0, lsl #NODE_SHIFT
+    bl   _node_name
+    mov  x20, x0
+1:  mov  x0, x19
+    add  x1, sp, #96
+    bl   _fp
+    mov  x4, x0
+    mov  x3, x20
+    mov  x0, #0
+    mov  x1, #1
+    ADRL x2, Ls_fmt_rate
+    bl   _room_fmt
     LEAVE 32
 
 // void _name_clash(uint64 id) — someone else already goes by this node's name? say so,
@@ -1536,7 +1591,38 @@ Lnt_ret:
     mov  x0, x23
     mov  x1, x22
     LEAVE 16
-Lnt_full:
+Lnt_full:                             // full: take the slot of whoever has been quiet
+    mov  x0, #0                       //   longest, if that's over 2 minutes
+    bl   _time
+    mov  x23, x0
+    ADRL x8, _g_nodes
+    mov  x9, #0
+    mov  x10, #-1
+    mov  x11, x23
+1:  cmp  x9, #NODE_MAX
+    b.hs 2f
+    add  x12, x8, x9, lsl #NODE_SHIFT
+    ldr  x13, [x12, #N_SEEN]
+    cmp  x13, x11
+    b.hs 3f
+    mov  x11, x13
+    mov  x10, x9
+3:  add  x9, x9, #1
+    b    1b
+2:  tbnz x10, #63, Lnt_really
+    sub  x9, x23, x11
+    cmp  x9, #120
+    b.lt Lnt_really
+    mov  x0, x10
+    mov  x22, #1
+    add  x8, x8, x0, lsl #NODE_SHIFT
+    str  x19, [x8, #N_ID]
+    str  xzr, [x8, #N_RSSI]
+    str  xzr, [x8, #N_RELAYED]
+    str  xzr, [x8, #N_HOPS]
+    strb wzr, [x8, #N_NICK]
+    b    Lnt_have
+Lnt_really:                           // 32 people all heard from in the last 2 minutes
     mov  x0, #-1
     mov  x1, #0
     LEAVE 16
@@ -1902,6 +1988,8 @@ Ls_fmt_me_sent:       .asciz "me: %s   \302\267 sent to %ld nearby"
 Ls_fmt_me_held:       .asciz "me: %s   \302\267 nobody in range yet \342\200\224 holding it for the next Mac that appears"
 Ls_fmt_rx:            .asciz "%s: %s   \302\267 hop %ld"
 Ls_fmt_notice:        .asciz "\302\267 %s %s"
+Ls_fmt_rate:          .asciz "\302\267 \342\232\240\357\270\217 %s (key %s) is sending too fast; packets over the limit are being dropped and not passed on."
+Ls_rate_someone:      .asciz "Someone"
 Ls_fmt_joined_near:   .asciz "\302\267 %s joined the mesh \342\200\224 in Bluetooth range"
 Ls_fmt_joined_far:    .asciz "\302\267 %s joined the mesh \342\200\224 %ld hops away"
 Ls_locked_none:        .asciz "\360\237\224\222 (encrypted \342\200\224 set the same mesh passphrase to read it)"

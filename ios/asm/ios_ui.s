@@ -1291,7 +1291,7 @@ _invite_cb:
     mov  x2, #1
     bl   _room_add
     mov  x20, x0
-    tbnz x20, #63, Lic_free
+    tbnz x20, #63, Lic_full
     ldr  x9, [x19, #136]              // who made it, if the invite said
     ADRL x8, _g_rooms
     add  x8, x8, x20, lsl #ROOM_SHIFT
@@ -1356,12 +1356,17 @@ Lic_rk_ask:
     ADRL x2, Ls_fmt_rekeyed
     add  x3, x19, #40
     bl   _room_fmt
+    b    Lic_free
+Lic_full:                             // 16 rooms already: say why nothing happened
+    ADRL x0, Ls_inv_full
+    bl   _chat_line
 Lic_free:
     mov  x0, x19
     bl   _free
     LEAVE 256
 
 .section __TEXT,__cstring,cstring_literals
+Ls_inv_full:          .asciz "\302\267 You\342\200\231re already in 16 rooms, the most asmmesh keeps. Leave one first, then ask for the invite again."
 Ls_fmt_invite_nokey: .asciz "\302\267 \360\237\224\221 Can\342\200\231t invite %s yet: their Mac hasn\342\200\231t introduced its key. Wait a few seconds for them to show up, then try again."
 Ls_NSAttributedString: .asciz "NSAttributedString"
 Ls_NSIndexSet:        .asciz "NSIndexSet"
