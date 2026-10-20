@@ -82,3 +82,15 @@ Numbers now taken:
 - The project file is generated: `python3 ios/make_project.py` (lists every core .s file). Please keep
   the list in step when you add a source file used on both.
 - iOS stubs: web/news rooms, files, AirDrop, FM, IOKit battery calls (return 0).
+
+## Builds 15-16 (Oct 20): iPhone-style Mac look, hardening, iPhone/iPad parity
+- New files: cards.s (Mac card lists), limits.s (flood limits), guard.s (guarded radio input),
+  scan_core.s (scanner logic, shared), files_mac.s (Mac-only Files on Wi-Fi parts).
+  Shared with iOS now: limits, guard, web, fm_html, fm_pack, fm_util, fm_io, files, scan_core.
+- Numbers taken: RL_UNVERIFIED 1, RL_RELAY 2, RL_NEWKEY 3 (limits.s bucket ids); key table
+  KEYS_N 64 with KE_SEEN at +84; self-tests 106-118.
+- Platform hooks each side must provide: _room_append (ui.s / ios_ui.s), _fs_default_dir,
+  _fs_qr_show, _h_files_choose, _h_airdrop, _scan_say.
+- Radio entry points in the method tables are the _g_ble_* guarded versions (guard.s); keep it so.
+- A packet that crashes the guard lands in ~/Library/Logs/asmmesh-guard.log as hex: add it
+  to the fuzz templates in test.s.

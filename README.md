@@ -143,6 +143,11 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
     src/sens_bthome.inc BTHome object sizes (generated from bthome-ble)
     src/sensors.s  Bluetooth sensors as Home devices, "sensors", "name sensor", "batteries", their self-tests
     src/handoff.s  "headphones here" / "send my headphones to …": AirPods between your Macs over the mesh
+    src/cards.s    the Rooms and People lists drawn as cards (Mac), and the round icon buttons
+    src/limits.s   flood limits: token buckets per sender, for unverified packets and for relaying
+    src/guard.s    radio input runs guarded: a fault drops that packet, logged, and asmmesh keeps going
+    src/scan_core.s the scanner's list, details and Connect & Pair / Set Up (Mac window and iPhone)
+    src/files_mac.s Files on Wi-Fi's Mac side: folder chooser, AirDrop, the QR window
     src/test.s     `asmmesh --selftest`
     src/util.s     objc_msgSend shortcuts, NSString helpers, chat formatting
     src/macros.inc frame and messaging macros
