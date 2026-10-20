@@ -54,6 +54,7 @@ struct SettingsView: View {
                         .padding(.top, 8)
                 }
                 .padding()
+                .readableWidth()
             }
             .background(Theme.bg)
             .navigationTitle("Settings")

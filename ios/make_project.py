@@ -98,7 +98,7 @@ target_common = {
     "SWIFT_OBJC_BRIDGING_HEADER": '"asmmesh/asmmesh-Bridging-Header.h"',
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
     "CODE_SIGN_STYLE": "Automatic", "DEVELOPMENT_TEAM": '""',
-    "TARGETED_DEVICE_FAMILY": "1", "SUPPORTS_MACCATALYST": "NO",
+    "TARGETED_DEVICE_FAMILY": '"1,2"', "SUPPORTS_MACCATALYST": "NO",
     "HEADER_SEARCH_PATHS": '"$(SRCROOT)/../src"', "OTHER_CFLAGS": '"-I$(SRCROOT)/../src"',
     "LD_RUNPATH_SEARCH_PATHS": '"$(inherited) @executable_path/Frameworks"',
     "ENABLE_PREVIEWS": "NO", "CURRENT_PROJECT_VERSION": "1", "MARKETING_VERSION": "0.8",

@@ -4,38 +4,79 @@ import SwiftUI
 
 struct RoomsView: View {
     @EnvironmentObject var mesh: Mesh
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @State private var picked: UInt64?
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 12) {
-                    Card(padding: 12) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "antenna.radiowaves.left.and.right")
-                                .foregroundStyle(Theme.green)
-                            Text(mesh.status.isEmpty ? "Starting Bluetooth…" : mesh.status)
-                                .font(.footnote)
-                                .foregroundStyle(Theme.dim)
-                        }
+        if sizeClass == .regular {
+            // iPad: the room list stays in a sidebar beside the open room
+            NavigationSplitView {
+                RoomList(picked: $picked, split: true)
+                    .navigationSplitViewColumnWidth(min: 300, ideal: 340, max: 420)
+            } detail: {
+                if let id = picked, mesh.rooms.contains(where: { $0.id == id }) {
+                    NavigationStack { ChatView(roomID: id).id(id) }
+                } else {
+                    ContentUnavailableView("No Room Open", systemImage: "bubble.left.and.bubble.right",
+                                           description: Text("Pick a room on the left."))
+                        .background(Theme.bg)
+                }
+            }
+            .onChange(of: mesh.rooms.first?.id, initial: true) { _, first in
+                // rooms arrive after the mesh starts; open Main once they do
+                if picked == nil { picked = first }
+            }
+        } else {
+            NavigationStack {
+                RoomList(picked: $picked, split: false)
+                    .navigationDestination(for: UInt64.self) { id in
+                        ChatView(roomID: id)
                     }
-                    ForEach(mesh.rooms) { room in
+            }
+        }
+    }
+}
+
+struct RoomList: View {
+    @EnvironmentObject var mesh: Mesh
+    @Binding var picked: UInt64?
+    let split: Bool
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 12) {
+                Card(padding: 12) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                            .foregroundStyle(Theme.green)
+                        Text(mesh.status.isEmpty ? "Starting Bluetooth…" : mesh.status)
+                            .font(.footnote)
+                            .foregroundStyle(Theme.dim)
+                    }
+                }
+                ForEach(mesh.rooms) { room in
+                    if split {
+                        Button { picked = room.id } label: {
+                            RoomCard(room: room, last: mesh.lines[room.id]?.last?.text,
+                                     selected: picked == room.id, chevron: false)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
                         NavigationLink(value: room.id) {
                             RoomCard(room: room, last: mesh.lines[room.id]?.last?.text)
                         }
                         .buttonStyle(.plain)
                     }
                 }
-                .padding()
             }
-            .background(Theme.bg)
-            .navigationTitle("Rooms")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { am_new_room() } label: { Image(systemName: "plus.circle.fill") }
-                }
-            }
-            .navigationDestination(for: UInt64.self) { id in
-                ChatView(roomID: id)
+            .padding()
+        }
+        .background(Theme.bg)
+        .navigationTitle("Rooms")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { am_new_room() } label: { Image(systemName: "plus.circle.fill") }
+                    .keyboardShortcut("n", modifiers: .command)
             }
         }
     }
@@ -44,6 +85,8 @@ struct RoomsView: View {
 struct RoomCard: View {
     let room: Room
     let last: String?
+    var selected = false
+    var chevron = true
 
     var body: some View {
         Card {
@@ -64,7 +107,14 @@ struct RoomCard: View {
                         .background(Theme.orange, in: Capsule())
                         .foregroundStyle(.black)
                 }
-                Image(systemName: "chevron.right").font(.footnote).foregroundStyle(Theme.dim)
+                if chevron {
+                    Image(systemName: "chevron.right").font(.footnote).foregroundStyle(Theme.dim)
+                }
+            }
+        }
+        .overlay {
+            if selected {
+                RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.orange, lineWidth: 2)
             }
         }
     }

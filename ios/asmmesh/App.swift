@@ -1,4 +1,4 @@
-// App.swift — asmmesh for iPhone: four tabs over the same mesh as the Macs.
+// App.swift — asmmesh for iPhone and iPad: four tabs over the same mesh as the Macs.
 
 import SwiftUI
 
@@ -53,6 +53,13 @@ struct ContentView: View {
 }
 
 // MARK: - Shared pieces
+
+extension View {
+    /// On iPad, keeps a column of cards at a comfortable width instead of edge to edge.
+    func readableWidth(_ width: CGFloat = 720) -> some View {
+        frame(maxWidth: width).frame(maxWidth: .infinity)
+    }
+}
 
 struct Card<Content: View>: View {
     var padding: CGFloat = 16

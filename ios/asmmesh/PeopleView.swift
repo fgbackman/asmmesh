@@ -46,6 +46,7 @@ struct PeopleView: View {
                     }
                 }
                 .padding()
+                .readableWidth()
             }
             .background(Theme.bg)
             .navigationTitle("People")

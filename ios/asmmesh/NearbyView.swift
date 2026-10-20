@@ -4,6 +4,7 @@ import SwiftUI
 
 struct NearbyView: View {
     @EnvironmentObject var mesh: Mesh
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var naming: Sensor?
     @State private var newName = ""
 
@@ -13,7 +14,7 @@ struct NearbyView: View {
                 VStack(spacing: 12) {
                     Card(padding: 8) {
                         RadarView(people: mesh.people, devices: mesh.nearby)
-                            .frame(height: 300)
+                            .frame(height: sizeClass == .regular ? 460 : 300)
                     }
                     HStack(spacing: 10) {
                         QuickButton(title: "Batteries", symbol: "battery.75percent", color: Theme.green) {
@@ -78,6 +79,7 @@ struct NearbyView: View {
                     }
                 }
                 .padding()
+                .readableWidth()
             }
             .background(Theme.bg)
             .navigationTitle("Nearby")
