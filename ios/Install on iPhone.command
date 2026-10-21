@@ -19,7 +19,8 @@ echo "team: $TEAM"
 
 echo "building (the first time takes a minute)..."
 xcodebuild -project asmmesh.xcodeproj -target asmmesh -configuration Debug -sdk iphoneos \
-  -allowProvisioningUpdates DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic \
+  -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
+  DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic \
   build > build-full.log 2>&1
 rc=$?
 grep -E "error:|warning: .*\.(s|swift):|\*\* BUILD" build-full.log | head -60
@@ -29,7 +30,9 @@ if [ $rc -ne 0 ]; then
 fi
 APP="build/Debug-iphoneos/asmmesh.app"
 
-# every paired iPhone and iPad (cable or Wi-Fi), so they all run the same build
+# every paired iPhone and iPad (cable or Wi-Fi), so they all run the same build. A new one
+# must be in the signing profile: -allowProvisioningDeviceRegistration adds plugged-in ones;
+# if one still says "profile cannot be installed", build once with -destination id=<its UDID>.
 DEVS=$(xcrun devicectl list devices --json-output /tmp/asmmesh-devs.json >/dev/null 2>&1 && /usr/bin/python3 - <<'EOF2'
 import json
 d = json.load(open('/tmp/asmmesh-devs.json'))
@@ -55,10 +58,12 @@ while IFS="$(printf '\t')" read -r DEV NAME; do
     failed=1
     continue
   fi
-  if xcrun devicectl device process launch --device "$DEV" com.fbackman.asmmesh.ios >/dev/null 2>&1; then
+  if out=$(xcrun devicectl device process launch --device "$DEV" com.fbackman.asmmesh.ios 2>&1); then
     echo "asmmesh is open on $NAME."
+  elif echo "$out" | grep -q "Locked"; then
+    echo "Installed on $NAME, but it was locked: unlock it and tap asmmesh."
   else
-    echo "Installed on $NAME, but it didn't open: unlock it, or the first time trust your certificate:"
+    echo "Installed on $NAME, but it didn't open. The first time, trust your certificate:"
     echo "  Settings > General > VPN & Device Management > Apple Development: ... > Trust"
   fi
 done <<< "$DEVS"
