@@ -118,6 +118,14 @@ _am_start:
     bl   _dispatch_async_f
     LEAVE 0
 
+// void _main_later(void (*fn)(void *), void *ctx) — run fn(ctx) after the current callback,
+//   from the run loop and once no prompt is open (Bridge.swift, ios_later). A prompt waits in
+//   a nested run loop; started inside a main-queue block, nothing else queued there could run
+//   while it waited, and the app stopped answering taps.
+.globl _main_later
+_main_later:
+    b    _ios_later
+
 // void am_tick(void) — every tenth of a second (a Swift timer)
 .globl _am_tick
 _am_tick:
@@ -142,6 +150,8 @@ _am_tick:
     mov  x0, x20
     bl   _udp_tick
     bl   _near_tick
+    bl   _ios_alert_open              // a rule may ask something: not on top of another prompt
+    cbnz x0, Lat_hello
     mov  x0, x20
     bl   _rules_tick
 Lat_hello:
@@ -1450,10 +1460,9 @@ _invite_queue:
     ADRL x8, _g_window                // selftest: no window, no run loop
     ldr  x8, [x8]
     cbz  x8, Liq_free
-    LDGOT x0, __dispatch_main_q
+    ADRL x0, _invite_cb               // Join / Not now, once this Bluetooth callback is over
     mov  x1, x22
-    ADRL x2, _invite_cb
-    bl   _dispatch_async_f
+    bl   _main_later
 Liq_done:
     LEAVE 0
 Liq_free:

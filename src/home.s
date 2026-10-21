@@ -1165,10 +1165,9 @@ Lci_allowed:
     mov  x1, x21
     mov  x2, #232
     bl   _strlcpy
-    LDGOT x0, __dispatch_main_q
+    ADRL x0, _cmd_incoming_cb
     mov  x1, x22
-    ADRL x2, _cmd_incoming_cb
-    bl   _dispatch_async_f
+    bl   _main_later
 Lci_done:
     LEAVE 0
 

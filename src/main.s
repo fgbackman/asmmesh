@@ -177,6 +177,15 @@ Lprotos:
 .text
 .p2align 2
 
+// void _main_later(void (*fn)(void *), void *ctx) — run fn(ctx) on the main thread, after the
+//   current callback. Code that may ask something goes through here (the iPhone's version
+//   waits for the run loop instead: ios_ui.s).
+.globl _main_later
+_main_later:
+    mov  x2, x0
+    LDGOT x0, __dispatch_main_q
+    b    _dispatch_async_f
+
 // const char *_app_build(void) — this app's build number (CFBundleVersion), or "?"
 .globl _app_build
 _app_build:

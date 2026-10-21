@@ -1,7 +1,7 @@
 #!/bin/bash
-# Double-click me (or: bash "Install on iPhone.command") with your iPhone plugged in.
-# Builds asmmesh for iPhone with your Apple ID's signing certificate, installs it on
-# the phone and opens it. Everything is also written to build.log next to this file.
+# Double-click me (or: bash "Install on iPhone.command") with your iPhone or iPad plugged in.
+# Builds asmmesh for iPhone and iPad with your Apple ID's signing certificate, installs it on
+# every paired one and opens it. Everything is also written to build.log next to this file.
 cd "$(dirname "$0")"
 exec > >(tee build.log) 2>&1
 echo "== asmmesh for iPhone =="
@@ -29,36 +29,38 @@ if [ $rc -ne 0 ]; then
 fi
 APP="build/Debug-iphoneos/asmmesh.app"
 
-# the plugged-in iPhone
-DEV=$(xcrun devicectl list devices --json-output /tmp/asmmesh-devs.json >/dev/null 2>&1 && /usr/bin/python3 - <<'EOF'
+# every paired iPhone and iPad (cable or Wi-Fi), so they all run the same build
+DEVS=$(xcrun devicectl list devices --json-output /tmp/asmmesh-devs.json >/dev/null 2>&1 && /usr/bin/python3 - <<'EOF2'
 import json
 d = json.load(open('/tmp/asmmesh-devs.json'))
-phones = []
 for x in d.get('result', {}).get('devices', []):
     hw = x.get('hardwareProperties', {})
     cp = x.get('connectionProperties', {})
     if hw.get('platform') == 'iOS' and hw.get('reality') == 'physical' and cp.get('pairingState') == 'paired':
-        phones.append((cp.get('transportType') != 'wired', x.get('identifier')))
-# the phone on the cable first, then one reachable over Wi-Fi
-if phones:
-    print(sorted(phones)[0][1])
-EOF
+        name = x.get('deviceProperties', {}).get('name', '?')
+        print(x.get('identifier') + '\t' + name)
+EOF2
 )
-if [ -z "$DEV" ]; then
-  echo "Built, but no iPhone found. Plug it in with a cable, unlock it, tap Trust, and run me again."
-  echo "(First time: on the iPhone, Settings > Privacy & Security > Developer Mode > On, then restart it.)"
+if [ -z "$DEVS" ]; then
+  echo "Built, but no iPhone or iPad found. Plug it in with a cable, unlock it, tap Trust, and run me again."
+  echo "(First time: on the device, Settings > Privacy & Security > Developer Mode > On, then restart it.)"
   exit 1
 fi
-echo "installing on $DEV..."
-if ! xcrun devicectl device install app --device "$DEV" "$APP"; then
-  echo "Install failed - see above. Developer Mode must be on (Settings > Privacy & Security)."
-  exit 1
-fi
-if xcrun devicectl device process launch --device "$DEV" com.fbackman.asmmesh.ios; then
-  echo "asmmesh is open on your iPhone."
-else
-  echo "Installed. The first time, iPhone won't open it until you trust your certificate:"
-  echo "  Settings > General > VPN & Device Management > Apple Development: ... > Trust"
-  echo "Then tap asmmesh on the home screen."
-fi
+failed=0
+while IFS="$(printf '\t')" read -r DEV NAME; do
+  echo "== $NAME =="
+  xcrun devicectl device install app --device "$DEV" "$APP" 2>&1 | grep -E "App installed|ERROR|locked" | head -3
+  if ! xcrun devicectl device info apps --device "$DEV" --bundle-id com.fbackman.asmmesh.ios 2>/dev/null | grep -q asmmesh; then
+    echo "Not installed on $NAME - unlock it; the first time, turn on Developer Mode (Settings > Privacy & Security)."
+    failed=1
+    continue
+  fi
+  if xcrun devicectl device process launch --device "$DEV" com.fbackman.asmmesh.ios >/dev/null 2>&1; then
+    echo "asmmesh is open on $NAME."
+  else
+    echo "Installed on $NAME, but it didn't open: unlock it, or the first time trust your certificate:"
+    echo "  Settings > General > VPN & Device Management > Apple Development: ... > Trust"
+  fi
+done <<< "$DEVS"
 echo "With a free Apple ID the app stops opening after 7 days; run me again to renew it."
+exit $failed

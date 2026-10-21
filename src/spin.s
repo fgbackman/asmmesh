@@ -376,8 +376,9 @@ _spin_value:
     cbz  x0, Lval_yes
     mov  x0, x19
     MSG0 Ls_bytes
-    ldrb w0, [x0]
-    bl   _spin_act
+    ldrb w1, [x0]                     // the gesture's action may ask something: run it once
+    ADRL x0, _spin_act                //   this Bluetooth callback is over
+    bl   _main_later
 Lval_yes:
     mov  x0, #1
     LEAVE 16

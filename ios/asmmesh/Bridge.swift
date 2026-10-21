@@ -123,6 +123,8 @@ class AMAlert: NSObject {
 
 enum AlertRunner {
     private static let cancelWords: Set<String> = ["cancel", "not now", "deny", "no"]
+    /// prompts open now (one inside another only if something skipped coreLater)
+    static private(set) var open = 0
 
     /// Shows the alert and keeps the main run loop turning until a button is tapped,
     /// like AppKit's runModal. Returns 1000 + the button's index.
@@ -159,6 +161,8 @@ enum AlertRunner {
                 answer = 1000 + i
             })
         }
+        open += 1
+        defer { open -= 1 }
         top.present(ac, animated: true)
         // Wait for a tap. If iOS didn't show the alert (a menu or sheet was still
         // closing), try again on whatever is on top now; if it still can't be shown
@@ -189,6 +193,40 @@ enum AlertRunner {
         return vc
     }
 }
+
+// MARK: - Running core work that may ask something
+
+/// Runs `work` from the main run loop, not from a main-queue block, and only once no prompt is
+/// open. A prompt waits for its answer in a nested run loop; inside a main-queue block (a
+/// Bluetooth or speech callback, DispatchQueue.main.async) nothing else queued there can run
+/// meanwhile, and the app stopped answering taps (the Delete Room freeze).
+func coreLater(after delay: TimeInterval = 0, _ work: @escaping () -> Void) {
+    func attempt() {
+        // not over another prompt (ours, or a SwiftUI alert), and not in the background, where
+        // it would get the safe answer unseen: an invite would be turned down
+        if AlertRunner.open > 0 || AlertRunner.topViewController() is UIAlertController
+            || UIApplication.shared.applicationState == .background {
+            coreLater(after: 0.3, work)
+        } else {
+            work()
+        }
+    }
+    if delay > 0 {
+        RunLoop.main.add(Timer(timeInterval: delay, repeats: false) { _ in attempt() }, forMode: .common)
+    } else {
+        RunLoop.main.perform(inModes: [.common]) { attempt() }
+    }
+}
+
+/// The core's _main_later on iPhone and iPad (ios_ui.s)
+@_cdecl("ios_later")
+func iosLater(_ fn: @convention(c) (UnsafeMutableRawPointer?) -> Void, _ ctx: UnsafeMutableRawPointer?) {
+    coreLater { fn(ctx) }
+}
+
+/// 1 while a prompt is open: am_tick holds rules back meanwhile
+@_cdecl("ios_alert_open")
+func iosAlertOpen() -> Int { AlertRunner.open > 0 ? 1 : 0 }
 
 // MARK: - Small helpers for reading C strings from the core
 

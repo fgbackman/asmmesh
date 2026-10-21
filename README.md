@@ -84,7 +84,7 @@ Sensor readings can be faked by anyone with a radio nearby, so unlocking and ope
 
 The same assembly core (`src/*.s`) runs on iPhone. `ios/asm/ios_ui.s` takes the place of main.s, ui.s and scanner.s, and a thin SwiftUI front end (`ios/asmmesh/*.swift`) draws four tabs: **Rooms** (mesh chat, Home with the Talk mic), **People**, **Nearby** (radar, Bluetooth sensors, batteries, headphones) and **Settings** (Hue, SmartThings, Home Assistant, LIFX, Govee, the mesh passphrase and the service switches).
 
-To install: plug in the iPhone, then run `cd ~/Developer/asmmesh/ios && bash "Install on iPhone.command"`. It signs with your free Apple ID, installs and opens the app. The first time, turn on Settings > Privacy & Security > Developer Mode, and trust your certificate under Settings > General > VPN & Device Management. With a free Apple ID the app stops opening after 7 days; run the script again to renew it.
+To install: plug in the iPhone or iPad, then run `cd ~/Developer/asmmesh/ios && bash "Install on iPhone.command"`. It signs with your free Apple ID, then installs and opens the app on every paired iPhone and iPad. The first time, turn on Settings > Privacy & Security > Developer Mode, and trust your certificate under Settings > General > VPN & Device Management. With a free Apple ID the app stops opening after 7 days; run the script again to renew it.
 
 Not on iPhone (yet): the Web and News rooms, FM radio, the files page, AirDrop and the web gateway. iOS only scans for Bluetooth while the app is open, and Hue/Sonos discovery by SSDP needs an entitlement free accounts can't get (Bonjour discovery still works). After adding a source file, run `python3 ios/make_project.py`.
 

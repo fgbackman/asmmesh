@@ -322,6 +322,16 @@ Lvf_done:
     LEAVE 0
 
 // - speechRecognitionTask:didFinishSuccessfully: — run it, tidy up
+// void _voice_run(char *text) — what was said, as a command; frees it
+_voice_run:
+    ENTER 0
+    mov  x19, x0
+    mov  w1, #1
+    bl   _home_command
+    mov  x0, x19
+    bl   _free
+    LEAVE 0
+
 .globl _voice_done
 _voice_done:
     ENTER 0
@@ -341,9 +351,12 @@ Lvd_check:
     ADRL x8, _g_voice_text
     ldrb w9, [x8]
     cbz  w9, Lvd_nothing
-    ADRL x0, _g_voice_text
-    mov  w1, #1
-    bl   _home_command
+    ADRL x0, _g_voice_text            // run it once the speech callback is over: it may ask something
+    bl   _strdup
+    cbz  x0, Lvd_release
+    mov  x1, x0
+    ADRL x0, _voice_run
+    bl   _main_later
     b    Lvd_release
 Lvd_nothing:
     ADRL x8, _g_have_hyp

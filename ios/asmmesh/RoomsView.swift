@@ -180,7 +180,7 @@ struct ChatView: View {
             InviteSheet { person in
                 inviting = false
                 if let room { mesh.select(room) }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { am_invite(person.id) }
+                coreLater(after: 0.4) { am_invite(person.id) }   // once the sheet has gone
             }
             .environmentObject(mesh)
             .presentationDetents([.medium, .large])
@@ -205,7 +205,7 @@ struct ChatView: View {
         let refused = DeletePrompt.ask(am_delete_room_confirmed)
         closeIfGone()
         if !refused.canDelete {         // it couldn't go: say why, once this alert has closed
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { deleting = refused }
+            coreLater(after: 0.4) { deleting = refused }
         }
     }
 
