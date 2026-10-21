@@ -72,6 +72,7 @@ _g_warned_clash:  .quad 0
 .zerofill __DATA,__bss,_g_rx_pended,8,3
 .globl _g_store
 .zerofill __DATA,__bss,_g_store,8192,4
+.globl _g_pkt
 .zerofill __DATA,__bss,_g_pkt,256,4
 .zerofill __DATA,__bss,_g_fwd,256,4
 .globl _g_txt
@@ -106,6 +107,7 @@ _new_id:
     LEAVE 16
 
 // id _defaults(void)
+.globl _defaults
 _defaults:
     ENTER 0
     CLS  Ls_NSUserDefaults
@@ -314,6 +316,7 @@ Lsc_dup:
     ret
 
 // void _store_put(const void *pkt, size_t len)
+.globl _store_put
 _store_put:
     ENTER 0
     mov  x19, x0
@@ -613,6 +616,9 @@ _mesh_send_hello:
     mov  x1, x0
     mov  x0, x19
     bl   _ble_broadcast
+    mov  x20, x0
+    bl   _rooms_advertise             // and the rooms we list (listed.s)
+    mov  x0, x20
     LEAVE 0
 Lsh_none:
     mov  x0, #0
@@ -884,6 +890,10 @@ _mesh_receive:
     b.eq Lrx_vcmd
     cmp  w22, #T_HP
     b.eq Lrx_vcmd
+    cmp  w22, #T_ROOMAD
+    b.eq Lrx_vcmd
+    cmp  w22, #T_JOINREQ
+    b.eq Lrx_vcmd
     b    Lrx_bad
 Lrx_vseen:
     cmp  x20, #22
@@ -1015,6 +1025,10 @@ Lrx_go:
     b.eq Lrx_roomdel
     cmp  w22, #T_HP
     b.eq Lrx_hp
+    cmp  w22, #T_ROOMAD
+    b.eq Lrx_roomad
+    cmp  w22, #T_JOINREQ
+    b.eq Lrx_joinreq
     cmp  w22, #T_NEWS
     b.hs Lrx_web
 
@@ -1351,6 +1365,35 @@ Lrx_hp:
     cbnz x0, Lrx_new
     b    Lrx_relay
 
+    // ---- ROOMAD / JOINREQ: listed rooms, and asking to be let into one (listed.s) ----
+Lrx_roomad:
+    add  x0, x19, #29
+    ldr  x1, [sp, #104]
+    bl   _copy_nick
+    ldr  x0, [x19, #20]
+    ADRL x1, _g_nickbuf
+    ldr  x2, [sp, #96]
+    bl   _node_touch_announce
+    mov  x0, x19
+    mov  x1, x20
+    ldr  x2, [sp, #104]
+    bl   _roomad_rx
+    b    Lrx_relay
+Lrx_joinreq:
+    add  x0, x19, #29
+    ldr  x1, [sp, #104]
+    bl   _copy_nick
+    ldr  x0, [x19, #20]
+    ADRL x1, _g_nickbuf
+    ldr  x2, [sp, #96]
+    bl   _node_touch_announce
+    mov  x0, x19
+    mov  x1, x20
+    ldr  x2, [sp, #104]
+    bl   _joinreq_rx
+    cbnz x0, Lrx_new                  // for us: nobody else needs it
+    b    Lrx_relay
+
     // ---- SEEN: what another Mac hears (for "where is my …"); passed on, not kept ----
 Lrx_seen:
     add  x0, x19, #22
@@ -1523,6 +1566,7 @@ Lnc_done:
     LEAVE 0
 
 // void _copy_nick(const char *src, size_t n) -> NUL-terminated, sanitised _g_nickbuf
+.globl _copy_nick
 _copy_nick:
     ENTER 0
     mov  x19, x1
@@ -1892,6 +1936,7 @@ Lri_done:
     ldr  x8, [x8]
     cbz  x8, Lri_owners
 Lri_end:
+    bl   _listed_init
     LEAVE 48
 
 // void _rooms_save(void) — id + name of every room except Main

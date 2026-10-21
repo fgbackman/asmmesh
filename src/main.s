@@ -106,6 +106,8 @@ Lmethods:
     .quad Ls_m_invite,      _ui_invite,         Ls_ty_v1
     .quad Ls_m_leave,       _ui_leave_room,     Ls_ty_v1
     .quad Ls_m_delroom,     _ui_delete_room,    Ls_ty_v1
+    .quad Ls_m_listroom,    _ui_list_room,      Ls_ty_v1
+    .quad Ls_m_joinroom,    _ui_join_room,      Ls_ty_v1
     .quad Ls_m_changeName,  _ui_change_name,    Ls_ty_v1
     .quad Ls_m_showScanner, _scanner_show,      Ls_ty_v1
     .quad Ls_m_showSettings, _svc_show,         Ls_ty_v1
@@ -1191,6 +1193,16 @@ _build_menus:
     ADRL x3, Ls_empty
     bl   _add_item
     mov  x0, x21
+    ADRL x1, Ls_listroom_item
+    ADRL x2, Ls_m_listroom
+    ADRL x3, Ls_empty
+    bl   _add_item
+    mov  x0, x21
+    ADRL x1, Ls_joinroom_item
+    ADRL x2, Ls_m_joinroom
+    ADRL x3, Ls_empty
+    bl   _add_item
+    mov  x0, x21
     ADRL x1, Ls_talk_item
     ADRL x2, Ls_m_talk
     ADRL x3, Ls_key_t
@@ -1561,6 +1573,10 @@ Ls_m_invite:           .asciz "inviteSelected:"
 Ls_m_leave:            .asciz "leaveRoom:"
 Ls_m_delroom:          .asciz "deleteRoom:"
 Ls_delroom_item:       .asciz "Delete Room\342\200\246"
+Ls_m_listroom:         .asciz "listRoom:"
+Ls_m_joinroom:         .asciz "joinRoom:"
+Ls_listroom_item:      .asciz "List This Room for Everyone (on/off)"
+Ls_joinroom_item:      .asciz "Ask to Join a Room\342\200\246"
 Ls_m_changeName:       .asciz "changeName:"
 Ls_m_showScanner:      .asciz "showScanner:"
 Ls_m_showSettings:     .asciz "showSettings:"

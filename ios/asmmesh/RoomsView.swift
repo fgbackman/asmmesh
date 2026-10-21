@@ -55,17 +55,12 @@ struct RoomList: View {
                     }
                 }
                 ForEach(mesh.rooms) { room in
-                    if split {
-                        Button { picked = room.id } label: {
-                            RoomCard(room: room, last: mesh.lines[room.id]?.last?.text,
-                                     selected: picked == room.id, chevron: false)
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        NavigationLink(value: room.id) {
-                            RoomCard(room: room, last: mesh.lines[room.id]?.last?.text)
-                        }
-                        .buttonStyle(.plain)
+                    roomRow(room)
+                }
+                if !mesh.listed.isEmpty {
+                    SectionTitle(text: "Rooms you can ask to join")
+                    ForEach(mesh.listed) { ad in
+                        ListedCard(room: ad) { mesh.askToJoin(ad) }
                     }
                 }
             }
@@ -75,8 +70,47 @@ struct RoomList: View {
         .navigationTitle("Rooms")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button { am_new_room() } label: { Image(systemName: "plus.circle.fill") }
+                Button { coreLater { am_new_room() } } label: { Image(systemName: "plus.circle.fill") }
                     .keyboardShortcut("n", modifiers: .command)
+            }
+        }
+    }
+
+    @ViewBuilder private func roomRow(_ room: Room) -> some View {
+        if split {
+            Button { picked = room.id } label: {
+                RoomCard(room: room, last: mesh.lines[room.id]?.last?.text,
+                         selected: picked == room.id, chevron: false)
+            }
+            .buttonStyle(.plain)
+        } else {
+            NavigationLink(value: room.id) {
+                RoomCard(room: room, last: mesh.lines[room.id]?.last?.text)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
+/// Someone else's listed room: ask its owner to let you in
+struct ListedCard: View {
+    let room: ListedRoom
+    let ask: () -> Void
+
+    var body: some View {
+        Card(padding: 12) {
+            HStack(spacing: 12) {
+                IconBadge(symbol: "door.left.hand.open", color: Theme.purple)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(room.name).font(.headline).lineLimit(1)
+                    Text(room.asked ? "Asked \(room.owner) \u{2014} you join when they say yes"
+                                    : "\(room.owner)\u{2019}s room")
+                        .font(.caption).foregroundStyle(Theme.dim).lineLimit(2)
+                }
+                Spacer()
+                Button(room.asked ? "Asked" : "Ask to Join", action: ask)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(room.asked)
             }
         }
     }
@@ -162,6 +196,14 @@ struct ChatView: View {
                     Menu {
                         Button { inviting = true } label: { Label("Invite…", systemImage: "person.badge.plus") }
                         if room.kind == .privateRoom {
+                            if room.mine {
+                                Button {
+                                    _ = am_room_set_listed(room.index, room.listed ? 0 : 1)
+                                } label: {
+                                    Label(room.listed ? "Stop Listing" : "List for Everyone Nearby",
+                                          systemImage: room.listed ? "eye.slash" : "megaphone")
+                                }
+                            }
                             Button(role: .destructive) {
                                 mesh.select(room); am_leave_room(); closeIfGone()
                             } label: { Label("Leave Room", systemImage: "rectangle.portrait.and.arrow.right") }
@@ -179,6 +221,7 @@ struct ChatView: View {
         .sheet(isPresented: $inviting) {
             InviteSheet { person in
                 inviting = false
+                mesh.invited.insert(person.fingerprint)
                 if let room { mesh.select(room) }
                 coreLater(after: 0.4) { am_invite(person.id) }   // once the sheet has gone
             }

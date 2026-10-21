@@ -1150,6 +1150,106 @@ _selftest:
     cmp  x9, #1
 2:  EXPECT_TRUE Ln_roomdel
 
+    // 119. alice lists "den": it's offered, with her name on it (listed.s)
+    ldr  x0, Lid_den
+    ADRL x1, Ls_den
+    mov  x2, #3
+    bl   _t_roomad
+    bl   _ad_count
+    cmp  x0, #1
+    b.ne 1f
+    mov  x0, #0
+    bl   _ad_nth
+    mov  x20, x0
+    mov  x1, #0
+    bl   _ad_field
+    ADRL x1, Ls_den
+    bl   _strcmp
+    cbnz w0, 1f
+    mov  x0, x20
+    mov  x1, #1
+    bl   _ad_field
+    ADRL x1, Ls_t_alice
+    bl   _strcmp
+    cmp  w0, #0
+    b    2f
+1:  mov  x9, #0
+    cmp  x9, #1
+2:  EXPECT_TRUE Ln_ad_offer
+
+    // 120. a listed room we're in already isn't offered
+    ldr  x0, Lid_cafe
+    ADRL x1, Ls_cafe
+    mov  x2, #0
+    bl   _room_add
+    ldr  x0, Lid_cafe
+    ADRL x1, Ls_cafe
+    mov  x2, #4
+    bl   _t_roomad
+    bl   _ad_count
+    cmp  x0, #1
+    EXPECT_TRUE Ln_ad_member
+
+    // 121. asking alice to let us in: her invite into "den" is then taken without a
+    //   question, nobody else's is
+    ldr  x0, Lid_den
+    ldr  x1, Lid_alice
+    bl   _join_asked
+    mov  x21, x0
+    mov  x0, #0
+    bl   _ad_nth
+    bl   _join_ask
+    ldr  x0, Lid_den
+    ldr  x1, Lid_alice
+    bl   _join_asked
+    mov  x22, x0
+    ldr  x0, Lid_den
+    ldr  x1, Lid_bob
+    bl   _join_asked
+    cmp  x21, #0
+    ccmp x22, #1, #0, eq
+    ccmp x0, #0, #0, eq
+    EXPECT_TRUE Ln_ad_asked
+
+    // 122/123. alice asks to join a room of ours: ignored while it isn't listed, passed on
+    //   once when it is (the same ask again at once is a resend)
+    ldr  x0, Lid_ours
+    ADRL x1, Ls_ours
+    mov  x2, #0
+    bl   _room_add
+    mov  x20, x0
+    ADRL x8, _g_rooms
+    add  x8, x8, x20, lsl #ROOM_SHIFT
+    ADRL x9, _g_node_id
+    ldr  x9, [x9]
+    str  x9, [x8, #R_OWNER]
+    ADRL x8, _g_joinreqs_for_me
+    ldr  x21, [x8]
+    bl   _t_joinreq
+    ADRL x8, _g_joinreqs_for_me
+    ldr  x9, [x8]
+    cmp  x9, x21
+    EXPECT_TRUE Ln_jr_unlisted
+    mov  x0, x20
+    mov  x1, #1
+    bl   _room_set_listed
+    bl   _t_joinreq
+    bl   _t_joinreq
+    ADRL x8, _g_joinreqs_for_me
+    ldr  x9, [x8]
+    sub  x9, x9, x21
+    cmp  x9, #1
+    EXPECT_TRUE Ln_jr_listed
+    mov  x0, x20                          // tidy up: the rooms these tests made
+    mov  x1, #0
+    bl   _room_set_listed
+    ldr  x0, Lid_ours
+    bl   _room_find
+    bl   _room_remove
+    ldr  x0, Lid_cafe
+    bl   _room_find
+    bl   _room_remove
+
     // FM radio and the web over the mesh (fm.s, web.s)
     bl   _fm_selftest
     add  x19, x19, x0
@@ -1816,6 +1916,74 @@ _t_rx_room:
     bl   _mesh_receive
     LEAVE 0
 
+// long _t_roomad(uint64 room, const char *name, long n) — alice lists a room
+_t_roomad:
+    ENTER 0
+    mov  x20, x0
+    mov  x21, x1
+    mov  x22, x2
+    ADRL x19, _g_tbuf
+    mov  w9, #'M'
+    strb w9, [x19]
+    mov  w9, #2                           // (version 2: _t_rx signs it as alice)
+    strb w9, [x19, #1]
+    mov  w9, #7
+    strb w9, [x19, #2]
+    mov  w9, #T_ROOMAD
+    strb w9, [x19, #3]
+    bl   _new_id
+    str  x0, [x19, #4]
+    str  x20, [x19, #12]
+    ldr  x9, Lid_alice
+    str  x9, [x19, #20]
+    mov  w9, #5
+    strb w9, [x19, #28]
+    add  x0, x19, #29
+    ADRL x1, Ls_t_alice
+    mov  x2, #5
+    bl   _memcpy
+    strb w22, [x19, #34]
+    add  x0, x19, #35
+    mov  x1, x21
+    mov  x2, x22
+    bl   _memcpy
+    mov  x0, x19
+    add  x1, x22, #35
+    bl   _t_rx
+    LEAVE 0
+
+// long _t_joinreq(void) — alice asks us to let her into "ours"
+_t_joinreq:
+    ENTER 0
+    ADRL x19, _g_tbuf
+    mov  w9, #'M'
+    strb w9, [x19]
+    mov  w9, #2
+    strb w9, [x19, #1]
+    mov  w9, #7
+    strb w9, [x19, #2]
+    mov  w9, #T_JOINREQ
+    strb w9, [x19, #3]
+    bl   _new_id
+    str  x0, [x19, #4]
+    ldr  x9, Lid_ours
+    str  x9, [x19, #12]
+    ldr  x9, Lid_alice
+    str  x9, [x19, #20]
+    mov  w9, #5
+    strb w9, [x19, #28]
+    add  x0, x19, #29
+    ADRL x1, Ls_t_alice
+    mov  x2, #5
+    bl   _memcpy
+    ADRL x8, _g_node_id                   // for us
+    ldr  x9, [x8]
+    str  x9, [x19, #34]
+    mov  x0, x19
+    mov  x1, #42
+    bl   _t_rx
+    LEAVE 0
+
 // long _t_roomdel(void) — alice says: room "lab" is deleted
 _t_roomdel:
     ENTER 0
@@ -1920,6 +2088,9 @@ Lid_alice:  .quad 0x0A11CE0000000001
 Lid_bob:    .quad 0x0B0B000000000001
 Lid_lab:    .quad 0x1AB0000000000001
 Lid_carol:  .quad 0x0CA2010000000001
+Lid_den:    .quad 0x0DE0000000000001
+Lid_cafe:   .quad 0x0CAFE00000000001
+Lid_ours:   .quad 0x0005000000000001
 
 // ---------------------------------------------------------------------------
 .section __TEXT,__const
@@ -2132,6 +2303,9 @@ Ls_ctrl_expect:  .asciz "a b c"
 Ls_alice:        .asciz "alice"
 Ls_bob:          .asciz "bob"
 Ls_lab:          .asciz "lab"
+Ls_den:          .asciz "den"
+Ls_cafe:         .asciz "cafe"
+Ls_ours:         .asciz "ours"
 Ls_fred:         .asciz "Fred"
 Ls_name_spaces:  .asciz "   Fred  "
 Ls_cut:          .asciz "ab\303"
@@ -2155,6 +2329,11 @@ Ln_hello:        .asciz "HELLO adds name, hops and relay count; relayed but not 
 Ln_inv_other:    .asciz "invite for someone else is passed on, not shown to us"
 Ln_inv_rekey:    .asciz "17b an invite with a new key for a room we are in asks again; the same key does not"
 Ln_roomdel:      .asciz "78 a room deleted by whoever made it goes; anyone else's delete is ignored"
+Ln_ad_offer:     .asciz "119 a listed room is offered, with its owner's name"
+Ln_ad_member:    .asciz "120 a listed room we're already in isn't offered"
+Ln_ad_asked:     .asciz "121 after asking, only the owner's invite is taken without a question"
+Ln_jr_unlisted:  .asciz "122 asking to join a room that isn't listed is ignored"
+Ln_jr_listed:    .asciz "123 asking to join a listed room reaches its owner once"
 Ls_t_alice:      .asciz "alice"
 Ln_inv_me:       .asciz "invite for us is noticed and waits for Join"
 Ln_room_hidden:  .asciz "message in a room we're not in is relayed quietly"

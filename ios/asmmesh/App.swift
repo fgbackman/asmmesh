@@ -57,6 +57,15 @@ struct ContentView: View {
             // after the first frame, so a prompt (Keychain, Bluetooth) has a screen to sit on
             DispatchQueue.main.async { mesh.start() }
         }
+        // someone asks to join one of your listed rooms (one at a time; the rest wait)
+        .alert(mesh.joinRequests.first.map { "\($0.who) asks to join \u{201C}\($0.room)\u{201D}" } ?? "",
+               isPresented: Binding(get: { !mesh.joinRequests.isEmpty }, set: { _ in }),
+               presenting: mesh.joinRequests.first) { req in
+            Button("Let In") { mesh.answer(req, letIn: true) }
+            Button("Not Now", role: .cancel) { mesh.answer(req, letIn: false) }
+        } message: { _ in
+            Text("Let them in and they get the room\u{2019}s key: they can read everything said in it from now on.")
+        }
         .sheet(item: $mesh.qrText) { qr in
             QRSheet(text: qr.text)
                 .presentationDetents([.medium, .large])

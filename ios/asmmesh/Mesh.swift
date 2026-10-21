@@ -48,6 +48,7 @@ struct Room: Identifiable, Equatable {
     let name: String
     let unread: Int
     let mine: Bool
+    var listed = false   // others nearby can see it and ask to join (only rooms you made)
     var kind: RoomKind {
         if index == 0 { return .main }
         switch id {
@@ -57,6 +58,21 @@ struct Room: Identifiable, Equatable {
         default: return .privateRoom
         }
     }
+}
+
+/// Someone else's listed room you aren't in
+struct ListedRoom: Identifiable, Equatable {
+    let id: UInt64       // the room's id
+    let name: String
+    let owner: String
+    let asked: Bool
+}
+
+/// Someone asking to be let into one of your listed rooms
+struct JoinRequest: Identifiable, Equatable {
+    let id: Int          // place in the core's queue
+    let who: String
+    let room: String
 }
 
 struct Person: Identifiable, Equatable {
@@ -119,6 +135,10 @@ final class Mesh: ObservableObject {
     static let shared = Mesh()
 
     @Published var rooms: [Room] = []
+    @Published var listed: [ListedRoom] = []
+    @Published var joinRequests: [JoinRequest] = []
+    /// people you've invited (by key fingerprint) since the app opened: People shows a check
+    @Published var invited: Set<String> = []
     @Published var current = 0
     @Published var lines: [UInt64: [Line]] = [:]
     @Published var people: [Person] = []
@@ -181,9 +201,11 @@ final class Mesh: ObservableObject {
         var r: [Room] = []
         for i in 0..<am_room_count() {
             r.append(Room(id: am_room_id(i), index: i, name: cstr(am_room_name(i)),
-                          unread: am_room_unread(i), mine: am_room_mine(i) != 0))
+                          unread: am_room_unread(i), mine: am_room_mine(i) != 0,
+                          listed: am_room_listed(i) != 0))
         }
         if r != rooms { rooms = r }
+        listedNow()
         let c = am_cur_room()
         if c != current { current = c }
     }
@@ -243,6 +265,37 @@ final class Mesh: ObservableObject {
                                 last: String(cString: am_scan_cell(i, 108))))           // 'l'
         }
         if rows != scan { scan = rows }
+        listedNow()
+    }
+
+    /// Other people's listed rooms (they go quiet after two minutes) and asks to join ours
+    func listedNow() {
+        var l: [ListedRoom] = []
+        for k in 0..<am_ad_count() {
+            l.append(ListedRoom(id: am_ad_id(k), name: cstr(am_ad_info(k, 0)),
+                                owner: cstr(am_ad_info(k, 1)), asked: am_ad_asked(k) != 0))
+        }
+        if l != listed { listed = l }
+        var j: [JoinRequest] = []
+        for i in 0..<am_jr_count() {
+            j.append(JoinRequest(id: i, who: cstr(am_jr_info(i, 0)), room: cstr(am_jr_info(i, 1))))
+        }
+        if j != joinRequests { joinRequests = j }
+    }
+
+    /// Ask the owner of a listed room to let you in
+    func askToJoin(_ room: ListedRoom) {
+        for k in 0..<am_ad_count() where am_ad_id(k) == room.id {
+            _ = am_ad_ask(k)
+            break
+        }
+        listedNow()
+    }
+
+    /// Let In / Not Now
+    func answer(_ req: JoinRequest, letIn: Bool) {
+        _ = am_jr_answer(req.id, letIn ? 1 : 0)
+        listedNow()
     }
 
     func loadServices() {
@@ -269,11 +322,11 @@ final class Mesh: ObservableObject {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         input = ""
-        text.withCString { am_send($0) }
+        coreLater { text.withCString { am_send($0) } }   // a command may ask something
     }
 
     func home(_ command: String) {
-        command.withCString { am_home($0) }
+        coreLater { command.withCString { am_home($0) } }
     }
 
     func setService(_ s: Service, on: Bool) {

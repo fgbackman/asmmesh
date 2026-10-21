@@ -4,6 +4,19 @@
 // starting and the heartbeat
 void am_set_device_name(const char *utf8);
 void am_start(void);
+long am_set_name(const char *utf8);
+
+// listed rooms: ours, other people's, and asks to join ours
+long am_room_listed(long i);
+long am_room_set_listed(long i, long on);
+long am_ad_count(void);
+const char *am_ad_info(long k, long f);
+uint64_t am_ad_id(long k);
+long am_ad_asked(long k);
+long am_ad_ask(long k);
+long am_jr_count(void);
+const char *am_jr_info(long i, long f);
+long am_jr_answer(long i, long let_in);
 void am_tick(void);
 
 // rooms

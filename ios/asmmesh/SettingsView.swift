@@ -17,19 +17,19 @@ struct SettingsView: View {
                 VStack(spacing: 12) {
                     SectionTitle(text: "Connect")
                     VStack(spacing: 0) {
-                        ConnectRow(title: "Hue Bridge", subtitle: "Press its button, then tap", symbol: "lightbulb.fill", color: Theme.orange) { am_pair_hue() }
+                        ConnectRow(title: "Hue Bridge", subtitle: "Press its button, then tap", symbol: "lightbulb.fill", color: Theme.orange) { coreLater { am_pair_hue() } }
                         Divider().overlay(Theme.bg)
-                        ConnectRow(title: "SmartThings", subtitle: "Paste a personal access token", symbol: "square.grid.2x2.fill", color: Theme.blue) { am_connect_st() }
+                        ConnectRow(title: "SmartThings", subtitle: "Paste a personal access token", symbol: "square.grid.2x2.fill", color: Theme.blue) { coreLater { am_connect_st() } }
                         Divider().overlay(Theme.bg)
-                        ConnectRow(title: "Home Assistant", subtitle: "Address and long-lived token", symbol: "house.circle.fill", color: Theme.purple) { am_connect_ha() }
+                        ConnectRow(title: "Home Assistant", subtitle: "Address and long-lived token", symbol: "house.circle.fill", color: Theme.purple) { coreLater { am_connect_ha() } }
                         Divider().overlay(Theme.bg)
-                        ConnectRow(title: "LIFX", subtitle: "Cloud token", symbol: "lightbulb.led.fill", color: Theme.red) { am_connect_lifx() }
+                        ConnectRow(title: "LIFX", subtitle: "Cloud token", symbol: "lightbulb.led.fill", color: Theme.red) { coreLater { am_connect_lifx() } }
                         Divider().overlay(Theme.bg)
-                        ConnectRow(title: "Govee", subtitle: "API key", symbol: "light.strip.2.fill", color: Color(red: 0.39, green: 0.82, blue: 1)) { am_connect_govee() }
+                        ConnectRow(title: "Govee", subtitle: "API key", symbol: "light.strip.2.fill", color: Color(red: 0.39, green: 0.82, blue: 1)) { coreLater { am_connect_govee() } }
                         Divider().overlay(Theme.bg)
-                        ConnectRow(title: "Nanoleaf", subtitle: "Hold its power button 5 s, then tap", symbol: "hexagon.fill", color: Theme.green) { am_pair_nano() }
+                        ConnectRow(title: "Nanoleaf", subtitle: "Hold its power button 5 s, then tap", symbol: "hexagon.fill", color: Theme.green) { coreLater { am_pair_nano() } }
                         Divider().overlay(Theme.bg)
-                        ConnectRow(title: "Refresh home devices", subtitle: "Ask every connected service again", symbol: "arrow.clockwise", color: Theme.grey) { am_refresh_home() }
+                        ConnectRow(title: "Refresh home devices", subtitle: "Ask every connected service again", symbol: "arrow.clockwise", color: Theme.grey) { coreLater { am_refresh_home() } }
                     }
                     .background(Theme.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
 
@@ -53,16 +53,16 @@ struct SettingsView: View {
 
                     SectionTitle(text: "Share")
                     VStack(spacing: 0) {
-                        ConnectRow(title: "Files on Wi-Fi", subtitle: "A web page other phones open: asmmesh's folder in Files", symbol: "folder.fill", color: Theme.blue) { mesh.home("files") }
+                        ConnectRow(title: "Files on Wi-Fi", subtitle: "A web page other phones open: asmmesh's folder in Files", symbol: "folder.fill", color: Theme.blue) { coreLater { mesh.home("files") } }
                         Divider().overlay(Theme.bg)
-                        ConnectRow(title: "AirDrop a file", subtitle: "Pick files, then share them", symbol: "airplayaudio", color: Theme.purple) { am_airdrop() }
+                        ConnectRow(title: "AirDrop a file", subtitle: "Pick files, then share them", symbol: "airplayaudio", color: Theme.purple) { coreLater { am_airdrop() } }
                         Divider().overlay(Theme.bg)
-                        ConnectRow(title: "Webhook", subtitle: "An address Shortcuts or IFTTT can post into a room", symbol: "link", color: Theme.grey) { mesh.home("webhook") }
+                        ConnectRow(title: "Webhook", subtitle: "An address Shortcuts or IFTTT can post into a room", symbol: "link", color: Theme.grey) { coreLater { mesh.home("webhook") } }
                     }
                     .background(Theme.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
 
                     SectionTitle(text: "Privacy")
-                    ConnectRow(title: "Mesh passphrase", subtitle: "Encrypts rooms and commands between devices that share it", symbol: "key.fill", color: Theme.yellow) { am_mesh_pass() }
+                    ConnectRow(title: "Mesh passphrase", subtitle: "Encrypts rooms and commands between devices that share it", symbol: "key.fill", color: Theme.yellow) { coreLater { am_mesh_pass() } }
                         .background(Theme.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
 
                     SectionTitle(text: "Services")

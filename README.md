@@ -9,6 +9,7 @@ Version 0.3 adds:
 - **Your own name.** Click the "You: ..." button (or Mesh › Change Name) and pick from your Mac's name, your full name, your first name, or type one. It is remembered.
 - **People on the mesh.** Every Mac announces itself every 15 seconds, so the sidebar lists everyone reachable, nearby or several hops away.
 - **Rooms.** Main is open to everyone and doubles as the mesh feed (who joined, links coming and going). Click + to make an invite-only room. Rooms are remembered between launches.
+- **Listed rooms.** A room's owner can list it (Mac: Mesh › List This Room for Everyone; iPhone: the room's ⋯ menu › List for Everyone Nearby). Its name then shows up for everyone nearby who isn't in it (Mac: Mesh › Ask to Join a Room…; iPhone: *Rooms you can ask to join* in Rooms). Asking sends the owner a Let In / Not Now prompt; Let In sends the usual invite with the room's key, and it's taken without a second question. Only the owner can list a room (listings are signed), and unlisted rooms stay invisible.
 - **Invites.** Select a person and click Invite to Chat. From a room, it invites them into that room; from Main, it starts a room for the two of you. They get a Join / Not now prompt. Room messages still hop through every Mac, but only members' windows show them.
 - **Mesh Scanner.** A radar of every node (green = in Bluetooth range, placed by signal strength; amber = reached through other Macs, placed by hops) plus a table of name, signal, hops, last seen and messages relayed.
 
@@ -146,6 +147,7 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
     src/cards.s    the Rooms and People lists drawn as cards (Mac), and the round icon buttons
     src/limits.s   flood limits: token buckets per sender, for unverified packets and for relaying
     src/guard.s    radio input runs guarded: a fault drops that packet, logged, and asmmesh keeps going
+    src/listed.s   listed rooms: ROOMAD and JOINREQ, asking to join, letting people in
     src/scan_core.s the scanner's list, details and Connect & Pair / Set Up (Mac window and iPhone)
     src/files_mac.s Files on Wi-Fi's Mac side: folder chooser, AirDrop, the QR window
     src/test.s     `asmmesh --selftest`
@@ -158,6 +160,8 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
     MSG     +12 room id  +20 sender id  +28 flags  +29 nick length n  +30 nick, then UTF-8 text
     HELLO   +12 node id  +20 messages relayed (u32)  +24 n  +25 nick
     INVITE  +12 room id  +20 from id  +28 target id  +36 n  +37 nick, then room-name length and name
+    ROOMAD  +12 room id  +20 owner id  +28 n  +29 nick, then room-name length and name (type 12, after each HELLO)
+    JOINREQ +12 room id  +20 asker id  +28 n  +29 nick, then the owner's id (type 13)
     CMD/RES +12 target id  +20 from id  +28 n  +29 nick, then UTF-8 command text or reply (types 4, 5)
     SEEN    +12 sender id  +20 flags  +21 n  +22 nick, then room, count, (rssi, name) per device (type 6, 2 hops)
     sealed  MSG flag 2 / CMD first byte 1 / SEEN flag 1: ciphertext then an 8-byte tag over id, ids and text

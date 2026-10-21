@@ -206,11 +206,11 @@ struct ScanDetail: View {
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     HStack(spacing: 10) {
-                        Button { am_scan_pair(row.id); reload() } label: {
+                        Button { coreLater { am_scan_pair(row.id); reload() } } label: {
                             Label("Connect & Pair", systemImage: "link")
                         }
                         .buttonStyle(.borderedProminent)
-                        Button { am_scan_setup(row.id); reload() } label: {
+                        Button { coreLater { am_scan_setup(row.id); reload() } } label: {
                             Label("Set Up", systemImage: "gearshape")
                         }
                         .buttonStyle(.bordered)

@@ -1092,6 +1092,203 @@ Llv_main:
     bl   _alert_run
     LEAVE 48
 
+// ---------------------------------------------------------------------------
+// Listed rooms (listed.s): list ours, ask to join someone else's, let people in
+// ---------------------------------------------------------------------------
+
+// - (void)listRoom:(id)sender — list the selected room for everyone nearby, or stop
+.globl _ui_list_room
+_ui_list_room:
+    ENTER 0
+    ADRL x8, _g_cur_room
+    ldr  x19, [x8]
+    mov  x0, x19
+    bl   _room_owned
+    cbz  x0, Llr_notyours
+    mov  x0, x19
+    bl   _room_listed
+    eor  x20, x0, #1
+    mov  x0, x19
+    mov  x1, x20
+    bl   _room_set_listed
+    ADRL x8, _g_rooms
+    add  x8, x8, x19, lsl #ROOM_SHIFT
+    add  x3, x8, #R_NAME
+    ADRL x2, Lj_fmt_listed
+    ADRL x9, Lj_fmt_unlisted
+    cmp  x20, #0
+    csel x2, x9, x2, eq
+    mov  x0, x19
+    mov  x1, #1
+    bl   _room_fmt
+    LEAVE 0
+Llr_notyours:
+    ADRL x0, Lj_list_no
+    ADRL x1, Lj_list_no_info
+    ADRL x2, Ls_ok
+    mov  x3, #0
+    mov  x4, #0
+    bl   _alert_run
+    LEAVE 0
+
+// - (void)joinRoom:(id)sender — pick a listed room, then ask its owner
+.globl _ui_join_room
+_ui_join_room:
+    ENTER 128                         // [96] a label (128)
+    bl   _ad_count
+    cbz  x0, Ljn_none
+    mov  x21, x0
+    CLS  Ls_NSComboBox
+    bl   _accessory
+    mov  x19, x0
+    mov  x20, #0
+Ljn_add:
+    cmp  x20, x21
+    b.hs Ljn_show
+    mov  x0, x20
+    add  x1, sp, #96
+    bl   _jn_label
+    mov  x0, x19
+    add  x1, sp, #96
+    bl   _combo_add
+    add  x20, x20, #1
+    b    Ljn_add
+Ljn_show:
+    mov  x0, #0                       // the first one, ready to go
+    add  x1, sp, #96
+    bl   _jn_label
+    add  x0, sp, #96
+    bl   _nsstr
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_setStringValue
+    ADRL x0, Lj_join_msg
+    ADRL x1, Lj_join_info
+    ADRL x2, Lj_ask
+    mov  x3, x19
+    ADRL x4, Ls_cancel
+    bl   _alert_run
+    cbz  x0, Ljn_release
+    mov  x0, x19
+    MSG0 Ls_stringValue
+    MSG0 Ls_UTF8String
+    cbz  x0, Ljn_release
+    mov  x22, x0
+    mov  x20, #0
+Ljn_find:                             // which one: the list may have changed meanwhile
+    mov  x0, x20
+    bl   _ad_nth
+    cbz  x0, Ljn_release
+    mov  x23, x0
+    mov  x0, x20
+    add  x1, sp, #96
+    bl   _jn_label
+    add  x0, sp, #96
+    mov  x1, x22
+    bl   _strcmp
+    add  x20, x20, #1
+    cbnz w0, Ljn_find
+    mov  x0, x23
+    bl   _join_ask
+    tbz  x0, #63, Ljn_release
+    ADRL x0, Lj_noid
+    bl   _chat_line
+Ljn_release:
+    mov  x0, x19
+    MSG0 Ls_release
+    LEAVE 128
+Ljn_none:
+    ADRL x0, Lj_none_msg
+    ADRL x1, Lj_none_info
+    ADRL x2, Ls_ok
+    mov  x3, #0
+    mov  x4, #0
+    bl   _alert_run
+    LEAVE 128
+
+// void _jn_label(long k, char *buf /*128*/) — "Family — Anna's room"
+_jn_label:
+    ENTER 0
+    mov  x20, x1
+    bl   _ad_nth
+    mov  x19, x0
+    mov  x1, #0
+    bl   _ad_field
+    mov  x21, x0
+    mov  x0, x19
+    mov  x1, #1
+    bl   _ad_field
+    mov  x4, x0
+    mov  x3, x21
+    mov  x0, x20
+    mov  x1, #128
+    ADRL x2, Lj_fmt_label
+    bl   _sfmt
+    LEAVE 0
+
+// void _joinreq_in(uint64 room, uint64 who, const char *nick) — someone asks to join one
+//   of our rooms: ask once the current Bluetooth callback has returned
+.globl _joinreq_in
+_joinreq_in:
+    ENTER 0
+    mov  x19, x0
+    mov  x20, x1
+    mov  x21, x2
+    ADRL x8, _g_window                // selftest: counted, nothing to ask
+    ldr  x8, [x8]
+    cbz  x8, 9f
+    mov  x0, #40                      // +0 room id, +8 who, +16 nick[24]
+    bl   _malloc
+    cbz  x0, 9f
+    mov  x22, x0
+    stp  x19, x20, [x22]
+    add  x0, x22, #16
+    mov  x1, x21
+    mov  x2, #24
+    bl   _strlcpy
+    ADRL x0, _joinreq_cb
+    mov  x1, x22
+    bl   _main_later
+9:  LEAVE 0
+
+// void _joinreq_cb(void *ctx) — Let In / Not Now
+_joinreq_cb:
+    ENTER 160                         // [96] the question
+    mov  x19, x0
+    ldr  x0, [x19]
+    bl   _room_find
+    tbnz x0, #63, Ljc_free            // deleted meanwhile
+    mov  x20, x0
+    bl   _ui_show
+    ADRL x8, _g_rooms
+    add  x8, x8, x20, lsl #ROOM_SHIFT
+    add  x9, x19, #16
+    str  x9, [sp]
+    add  x9, x8, #R_NAME
+    str  x9, [sp, #8]
+    add  x0, sp, #96
+    mov  x1, #160
+    ADRL x2, Lj_req_msg
+    bl   _snprintf
+    add  x0, sp, #96
+    ADRL x1, Lj_req_info
+    ADRL x2, Lj_let_in
+    mov  x3, #0
+    ADRL x4, Lj_notnow
+    bl   _alert_run
+    cbz  x0, Ljc_free
+    ldp  x0, x1, [x19]
+    bl   _joinreq_let_in
+    cmn  x0, #1                       // no key from them yet: say so
+    b.ne Ljc_free
+    ADRL x0, Lj_fmt_nokey
+    add  x1, x19, #16
+    bl   _chat_fmt
+Ljc_free:
+    mov  x0, x19
+    bl   _free
+    LEAVE 160
+
 // void _combo_add(id combo, const char *utf8)
 _combo_add:
     ENTER 0
@@ -1155,6 +1352,10 @@ _invite_cb:
     ldr  x0, [x19]
     bl   _room_find
     tbz  x0, #63, Lic_rekey           // already in it: this invite brings a new key
+    ldr  x0, [x19]                    // we asked its owner to let us in: this is the answer
+    ldr  x1, [x19, #136]
+    bl   _join_asked
+    cbnz x0, Lic_join
     bl   _ui_show
     add  x9, x19, #40
     str  x9, [sp]
@@ -1171,6 +1372,7 @@ _invite_cb:
     ADRL x4, Ls_notnow
     bl   _alert_run
     cbz  x0, Lic_free
+Lic_join:
     ldr  x0, [x19]
     add  x1, x19, #8
     mov  x2, #1
@@ -1365,3 +1567,20 @@ Ls_fmt_invited:       .asciz "\302\267 Invited %s \342\200\224 they'll get a Joi
 Ls_fmt_invited_held:  .asciz "\302\267 Invited %s \342\200\224 nobody in range right now, so the invite waits for the next Mac that appears."
 Ls_fmt_renamed:       .asciz "\302\267 You're now \342\200\234%s\342\200\235."
 Ls_fmt_you_joined:    .asciz "\302\267 You joined #%s \342\200\224 say hello."
+
+Lj_fmt_listed:        .asciz "\302\267 \360\237\232\252 \342\200\234%s\342\200\235 is listed now: anyone nearby can see its name and ask to join, and you decide who gets in. Mesh \342\200\272 List This Room again to stop."
+Lj_fmt_unlisted:      .asciz "\302\267 \360\237\232\252 \342\200\234%s\342\200\235 isn\342\200\231t listed any more."
+Lj_list_no:           .asciz "Only the room\342\200\231s owner can list it"
+Lj_list_no_info:      .asciz "Select a room you made first. Main and Home can\342\200\231t be listed."
+Lj_join_msg:          .asciz "Ask to join a room"
+Lj_join_info:         .asciz "People nearby listed these rooms. Its owner is asked; when they let you in, you join."
+Lj_ask:               .asciz "Ask to Join"
+Lj_none_msg:          .asciz "No rooms to join right now"
+Lj_none_info:         .asciz "When someone nearby lists a room (Mesh \342\200\272 List This Room), it shows up here."
+Lj_fmt_label:         .asciz "%s \342\200\224 %s\342\200\231s room"
+Lj_noid:              .asciz "\302\267 Can\342\200\231t ask yet: your identity key isn\342\200\231t unlocked. Allow the Keychain prompt, then try again."
+Lj_req_msg:           .asciz "%s asks to join \342\200\234%s\342\200\235"
+Lj_req_info:          .asciz "Let them in and they get the room\342\200\231s key: they can read everything said in it from now on."
+Lj_let_in:            .asciz "Let In"
+Lj_notnow:            .asciz "Not Now"
+Lj_fmt_nokey:         .asciz "\302\267 \360\237\232\252 Couldn\342\200\231t let %s in yet: their key hasn\342\200\231t arrived. Ask them to try again in a few seconds."

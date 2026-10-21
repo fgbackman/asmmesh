@@ -4,6 +4,8 @@ import SwiftUI
 
 struct PeopleView: View {
     @EnvironmentObject var mesh: Mesh
+    @State private var renaming = false
+    @State private var newName = ""
 
     var body: some View {
         NavigationStack {
@@ -19,7 +21,9 @@ struct PeopleView: View {
                                     .foregroundStyle(Theme.dim)
                             }
                             Spacer()
-                            Button("Rename") { am_change_name() }
+                            // asked here, not by the core: its prompt waits in place, and a wait
+                            // started from a SwiftUI button left Save unanswerable
+                            Button("Rename") { newName = mesh.nick; renaming = true }
                                 .buttonStyle(.bordered)
                         }
                     }
@@ -33,12 +37,17 @@ struct PeopleView: View {
                     }
                     ForEach(mesh.people) { p in
                         PersonCard(person: p) {
+                            let invited = mesh.invited.contains(p.fingerprint)
                             Button {
-                                am_select_room(0)        // from Main: a room for the two of you
-                                am_invite(p.id)
+                                mesh.invited.insert(p.fingerprint)
+                                coreLater {              // it may ask something
+                                    am_select_room(0)    // from Main: a room for the two of you
+                                    am_invite(p.id)
+                                }
                             } label: {
-                                Image(systemName: "person.badge.plus")
+                                Image(systemName: invited ? "checkmark" : "person.badge.plus")
                                     .font(.system(size: 17, weight: .semibold))
+                                    .foregroundStyle(invited ? Theme.green : Color.accentColor)
                                     .frame(width: 38, height: 38)
                                     .background(Theme.cardHi, in: Circle())
                             }
@@ -50,6 +59,18 @@ struct PeopleView: View {
             }
             .background(Theme.bg)
             .navigationTitle("People")
+            .alert("Your name on the mesh", isPresented: $renaming) {
+                TextField("Name", text: $newName)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                Button("Save") {
+                    let name = newName.trimmingCharacters(in: .whitespaces)
+                    if !name.isEmpty { name.withCString { _ = am_set_name($0) } }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Up to 23 characters. Everyone sees it next to your messages and in their People list.")
+            }
         }
     }
 }

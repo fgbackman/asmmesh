@@ -478,6 +478,196 @@ _am_room_mine:
     cset x0, eq
     ret
 
+// ===========================================================================
+// Listed rooms (listed.s). SwiftUI asks Let In / Not Now, so none of this waits on a prompt.
+// ===========================================================================
+
+.set JR_MAX,        8
+.set JR_SIZE,       72                // +0 room id, +8 who, +16 nick[24], +40 room name[32]
+
+// void _joinreq_in(uint64 room, uint64 who, const char *nick) — queued for SwiftUI
+.globl _joinreq_in
+_joinreq_in:
+    ENTER 0
+    mov  x19, x0
+    mov  x20, x1
+    mov  x21, x2
+    ADRL x8, _g_window
+    ldr  x8, [x8]
+    cbz  x8, 9f
+    ADRL x8, _g_jr_count
+    ldr  x22, [x8]
+    ADRL x10, _g_jr
+    mov  x11, #JR_SIZE
+    mov  x9, #0
+1:  cmp  x9, x22                      // asked already, still waiting for your answer
+    b.hs 2f
+    madd x12, x9, x11, x10
+    ldp  x13, x14, [x12]
+    add  x9, x9, #1
+    cmp  x13, x19
+    b.ne 1b
+    cmp  x14, x20
+    b.ne 1b
+    b    9f
+2:  cmp  x22, #JR_MAX
+    b.hs 9f
+    madd x23, x22, x11, x10
+    mov  x0, x19
+    bl   _room_find
+    tbnz x0, #63, 9f
+    ADRL x8, _g_rooms
+    add  x8, x8, x0, lsl #ROOM_SHIFT
+    add  x1, x8, #R_NAME
+    add  x0, x23, #40
+    mov  x2, #32
+    bl   _strlcpy
+    stp  x19, x20, [x23]
+    add  x0, x23, #16
+    mov  x1, x21
+    mov  x2, #24
+    bl   _strlcpy
+    add  x22, x22, #1
+    ADRL x8, _g_jr_count
+    str  x22, [x8]
+    bl   _ui_lists_changed
+9:  LEAVE 0
+
+// long am_jr_count(void) — asks to join our rooms, waiting for an answer
+.globl _am_jr_count
+_am_jr_count:
+    ADRL x8, _g_jr_count
+    ldr  x0, [x8]
+    ret
+
+// const char *am_jr_info(long i, long f) — 0 who's asking, 1 the room
+.globl _am_jr_info
+_am_jr_info:
+    ADRL x8, _g_jr_count
+    ldr  x9, [x8]
+    cmp  x0, x9
+    b.hs 1f
+    ADRL x10, _g_jr
+    mov  x11, #JR_SIZE
+    madd x10, x0, x11, x10
+    cmp  x1, #1
+    add  x9, x10, #16
+    add  x10, x10, #40
+    csel x0, x10, x9, eq
+    ret
+1:  ADRL x0, Li_empty
+    ret
+
+// long am_jr_answer(long i, long let_in) -> 0 done, -1 no key from them yet, -2 gone
+.globl _am_jr_answer
+_am_jr_answer:
+    ENTER 80                          // [96] the entry, copied out
+    ADRL x8, _g_jr_count
+    ldr  x9, [x8]
+    cmp  x0, x9
+    b.hs Ljr_none
+    mov  x19, x0
+    mov  x20, x1
+    ADRL x10, _g_jr
+    mov  x11, #JR_SIZE
+    madd x21, x19, x11, x10
+    add  x0, sp, #96
+    mov  x1, x21
+    mov  x2, #JR_SIZE
+    bl   _memcpy
+    ADRL x8, _g_jr_count              // out of the queue
+    ldr  x9, [x8]
+    sub  x9, x9, #1
+    str  x9, [x8]
+    sub  x12, x9, x19
+    mov  x11, #JR_SIZE
+    mul  x2, x12, x11
+    mov  x0, x21
+    add  x1, x21, #JR_SIZE
+    bl   _memmove
+    mov  x0, #0
+    cbz  x20, Ljr_done
+    ldp  x0, x1, [sp, #96]
+    bl   _joinreq_let_in
+    cmn  x0, #1
+    b.ne Ljr_done
+    mov  x19, x0
+    ADRL x0, Li_fmt_jr_nokey
+    add  x1, sp, #(96 + 16)
+    bl   _chat_fmt
+    mov  x0, x19
+Ljr_done:
+    LEAVE 80
+Ljr_none:
+    mov  x0, #-2
+    LEAVE 80
+
+// long am_ad_count(void) — other people's listed rooms on offer
+.globl _am_ad_count
+_am_ad_count:
+    b    _ad_count
+
+// const char *am_ad_info(long k, long f) — 0 the room's name, 1 its owner's
+.globl _am_ad_info
+_am_ad_info:
+    ENTER 0
+    mov  x19, x1
+    bl   _ad_nth
+    mov  x1, x19
+    bl   _ad_field
+    LEAVE 0
+
+// uint64 am_ad_id(long k) — the room's id (0: none)
+.globl _am_ad_id
+_am_ad_id:
+    ENTER 0
+    bl   _ad_nth
+    cbz  x0, 1f
+    ldr  x0, [x0]
+1:  LEAVE 0
+
+// long am_ad_asked(long k) -> 1 if we asked to be let in lately
+.globl _am_ad_asked
+_am_ad_asked:
+    ENTER 0
+    bl   _ad_nth
+    bl   _ad_asked
+    LEAVE 0
+
+// long am_ad_ask(long k) -> peers written, -1 not sent (no identity yet, or gone)
+.globl _am_ad_ask
+_am_ad_ask:
+    ENTER 0
+    bl   _ad_nth
+    bl   _join_ask
+    LEAVE 0
+
+// long am_room_listed(long i) / am_room_set_listed(long i, long on) -> 1 done
+.globl _am_room_listed
+_am_room_listed:
+    b    _room_listed
+
+.globl _am_room_set_listed
+_am_room_set_listed:
+    ENTER 0
+    mov  x19, x0
+    mov  x20, x1
+    bl   _room_set_listed
+    cbz  x0, 9f
+    ADRL x8, _g_rooms
+    add  x8, x8, x19, lsl #ROOM_SHIFT
+    add  x3, x8, #R_NAME
+    ADRL x2, Li_fmt_listed
+    ADRL x9, Li_fmt_unlisted
+    cmp  x20, #0
+    csel x2, x9, x2, eq
+    mov  x0, x19
+    mov  x1, #1
+    bl   _room_fmt
+    bl   _ui_rooms_changed
+    mov  x0, #1
+9:  LEAVE 0
+
 // long am_cur_room(void)
 .globl _am_cur_room
 _am_cur_room:
@@ -763,6 +953,23 @@ Ldc_done:
 .globl _am_change_name
 _am_change_name:
     b    _ui_change_name
+
+// long am_set_name(const char *utf8) — Rename, asked in SwiftUI: 1 if the name changed
+.globl _am_set_name
+_am_set_name:
+    ENTER 0
+    bl   _mesh_set_nick
+    cbz  x0, 1f
+    bl   _ui_update_name
+    mov  x0, #0
+    mov  x1, #1
+    ADRL x2, Ls_fmt_renamed
+    ADRL x3, _g_nick
+    bl   _room_fmt
+    bl   _mesh_send_hello
+    bl   _ui_update_status
+    mov  x0, #1
+1:  LEAVE 0
 
 .globl _am_talk
 _am_talk:
@@ -1477,6 +1684,10 @@ _invite_cb:
     ldr  x0, [x19]
     bl   _room_find
     tbz  x0, #63, Lic_rekey           // already in it: this invite brings a new key
+    ldr  x0, [x19]                    // we asked its owner to let us in: this is the answer
+    ldr  x1, [x19, #136]
+    bl   _join_asked
+    cbnz x0, Lic_join
     bl   _ui_show
     add  x9, x19, #40
     str  x9, [sp]
@@ -1493,6 +1704,7 @@ _invite_cb:
     ADRL x4, Ls_notnow
     bl   _alert_run
     cbz  x0, Lic_free
+Lic_join:
     ldr  x0, [x19]
     add  x1, x19, #8
     mov  x2, #1
@@ -1743,3 +1955,13 @@ Li_p_nsb:              .asciz "NSNetServiceBrowserDelegate"
 Li_p_ns:               .asciz "NSNetServiceDelegate"
 Li_p_speech:           .asciz "SFSpeechRecognitionTaskDelegate"
 Li_p_loc:              .asciz "CLLocationManagerDelegate"
+
+.data
+.p2align 3
+_g_jr_count:          .quad 0
+.zerofill __DATA,__bss,_g_jr,576,4
+
+.section __TEXT,__cstring,cstring_literals
+Li_fmt_listed:        .asciz "\302\267 \360\237\232\252 \342\200\234%s\342\200\235 is listed now: anyone nearby can see its name and ask to join, and you decide who gets in."
+Li_fmt_unlisted:      .asciz "\302\267 \360\237\232\252 \342\200\234%s\342\200\235 isn\342\200\231t listed any more."
+Li_fmt_jr_nokey:      .asciz "\302\267 \360\237\232\252 Couldn\342\200\231t let %s in yet: their key hasn\342\200\231t arrived. Ask them to try again in a few seconds."
