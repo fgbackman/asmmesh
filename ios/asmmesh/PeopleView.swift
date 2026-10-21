@@ -38,6 +38,14 @@ struct PeopleView: View {
                     ForEach(mesh.people) { p in
                         PersonCard(person: p) {
                             let invited = mesh.invited.contains(p.fingerprint)
+                            Button {                     // an arrow to them (FindView.swift)
+                                Finder.shared.find(id: am_node_id(p.id), name: p.name)
+                            } label: {
+                                Image(systemName: "location.north.circle")
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .frame(width: 38, height: 38)
+                                    .background(Theme.cardHi, in: Circle())
+                            }
                             Button {
                                 mesh.invited.insert(p.fingerprint)
                                 coreLater {              // it may ask something

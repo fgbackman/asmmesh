@@ -285,6 +285,7 @@ _ui_rooms_changed:
     ldr  x0, [x8]
     cbz  x0, Lrc_done
     MSG0 Ls_reloadData
+    bl   _sidebar_fit                 // every room in view, no scrolling (main.s)
 Lrc_done:
     LEAVE 0
 
@@ -439,14 +440,21 @@ _ds_rows:
     ret
 Ldr_scan:
     b    _scan_rows
-Ldr_rooms:
-    ADRL x8, _g_room_count
-    ldr  x0, [x8]
-    ret
+Ldr_rooms:                            // our rooms, then other people's listed ones
+    b    _rooms_rows
 Ldr_nodes:
     ADRL x8, _g_node_count
     ldr  x0, [x8]
     ret
+
+// long _rooms_rows(void) — rows in Rooms: our rooms, then the listings on offer (listed.s)
+_rooms_rows:
+    ENTER 0
+    bl   _ad_count
+    ADRL x8, _g_room_count
+    ldr  x9, [x8]
+    add  x0, x0, x9
+    LEAVE 0
 
 // - (id)tableView:t objectValueForTableColumn:col row:(NSInteger)row
 .globl _ds_value
@@ -548,7 +556,7 @@ _ds_selchange:
     ADRL x8, _g_room_count
     ldr  x9, [x8]
     cmp  x0, x9
-    b.hs Lds_done
+    b.hs Lds_ad
     ADRL x8, _g_cur_room
     ldr  x9, [x8]
     cmp  x0, x9
@@ -559,6 +567,52 @@ Lds_done:
 Lds_scan:
     bl   _scanner_selected
     LEAVE 0
+Lds_ad:                               // someone else's listed room: ask, once the click is done
+    sub  x0, x0, x9
+    bl   _ad_nth
+    cbz  x0, 1f
+    ldr  x1, [x0]                     // by id: the list may change before the question
+    ADRL x0, _ask_ad_cb
+    bl   _main_later
+1:  ADRL x8, _g_cur_room              // the open room stays selected
+    ldr  x0, [x8]
+    bl   _ui_select_room
+    LEAVE 0
+
+// void _ask_ad_cb(uint64 room id) — "Ask Anna to let you into "den"?"
+_ask_ad_cb:
+    ENTER 160                         // [96] the question
+    bl   _ad_find
+    cbz  x0, Laa_done
+    mov  x19, x0
+    bl   _ad_asked                    // asked already: they've been told
+    cbnz x0, Laa_done
+    mov  x0, x19
+    mov  x1, #1
+    bl   _ad_field
+    str  x0, [sp]
+    mov  x0, x19
+    mov  x1, #0
+    bl   _ad_field
+    str  x0, [sp, #8]
+    add  x0, sp, #96
+    mov  x1, #160
+    ADRL x2, Lj_ask_msg
+    bl   _snprintf
+    add  x0, sp, #96
+    ADRL x1, Lj_join_info
+    ADRL x2, Lj_ask
+    mov  x3, #0
+    ADRL x4, Ls_cancel
+    bl   _alert_run
+    cbz  x0, Laa_done
+    mov  x0, x19
+    bl   _join_ask
+    tbz  x0, #63, Laa_done
+    ADRL x0, Lj_noid
+    bl   _chat_line
+Laa_done:
+    LEAVE 160
 
 // ---------------------------------------------------------------------------
 // Actions
@@ -1289,6 +1343,20 @@ Ljc_free:
     bl   _free
     LEAVE 160
 
+// void _seek_in(uint64 from, const char *nick, const uint8 *data, long len) — someone on the
+//   mesh wants to find this Mac (seek.s): only phones can share where they are
+.globl _seek_in
+_seek_in:
+    ENTER 0
+    cmp  x3, #1
+    b.lo 9f
+    ldrb w9, [x2]
+    cmp  w9, #1                       // 1: may I find you?
+    b.ne 9f
+    ADRL x0, Lj_fmt_seek              // x1: their name
+    bl   _chat_fmt
+9:  LEAVE 0
+
 // void _combo_add(id combo, const char *utf8)
 _combo_add:
     ENTER 0
@@ -1573,8 +1641,9 @@ Lj_fmt_unlisted:      .asciz "\302\267 \360\237\232\252 \342\200\234%s\342\200\2
 Lj_list_no:           .asciz "Only the room\342\200\231s owner can list it"
 Lj_list_no_info:      .asciz "Select a room you made first. Main and Home can\342\200\231t be listed."
 Lj_join_msg:          .asciz "Ask to join a room"
-Lj_join_info:         .asciz "People nearby listed these rooms. Its owner is asked; when they let you in, you join."
+Lj_join_info:         .asciz "The room\342\200\231s owner is asked; when they let you in, you join."
 Lj_ask:               .asciz "Ask to Join"
+Lj_ask_msg:           .asciz "Ask %s to let you into \342\200\234%s\342\200\235?"
 Lj_none_msg:          .asciz "No rooms to join right now"
 Lj_none_info:         .asciz "When someone nearby lists a room (Mesh \342\200\272 List This Room), it shows up here."
 Lj_fmt_label:         .asciz "%s \342\200\224 %s\342\200\231s room"
@@ -1584,3 +1653,6 @@ Lj_req_info:          .asciz "Let them in and they get the room\342\200\231s key
 Lj_let_in:            .asciz "Let In"
 Lj_notnow:            .asciz "Not Now"
 Lj_fmt_nokey:         .asciz "\302\267 \360\237\232\252 Couldn\342\200\231t let %s in yet: their key hasn\342\200\231t arrived. Ask them to try again in a few seconds."
+.globl _g_ask_hint
+_g_ask_hint:          .asciz "Mesh \342\200\272 Ask to Join a Room\342\200\246"
+Lj_fmt_seek:          .asciz "\302\267 \360\237\223\215 %s wants to find you. Only iPhones can share where they are: open asmmesh on your phone and they\342\200\231ll see you there."

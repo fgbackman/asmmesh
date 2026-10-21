@@ -54,14 +54,15 @@ struct RoomList: View {
                             .foregroundStyle(Theme.dim)
                     }
                 }
-                ForEach(mesh.rooms) { room in
-                    roomRow(room)
-                }
-                if !mesh.listed.isEmpty {
+                if !mesh.listed.isEmpty {     // first, so they're seen without scrolling
                     SectionTitle(text: "Rooms you can ask to join")
                     ForEach(mesh.listed) { ad in
                         ListedCard(room: ad) { mesh.askToJoin(ad) }
                     }
+                    SectionTitle(text: "Your rooms")
+                }
+                ForEach(mesh.rooms) { room in
+                    roomRow(room)
                 }
             }
             .padding()
@@ -104,7 +105,7 @@ struct ListedCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(room.name).font(.headline).lineLimit(1)
                     Text(room.asked ? "Asked \(room.owner) \u{2014} you join when they say yes"
-                                    : "\(room.owner)\u{2019}s room")
+                                    : "\(room.owner)\u{2019}s room" + (room.away ? " \u{00B7} away now" : ""))
                         .font(.caption).foregroundStyle(Theme.dim).lineLimit(2)
                 }
                 Spacer()

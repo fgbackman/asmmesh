@@ -85,8 +85,10 @@ _g_warned_clash:  .quad 0
 .globl _g_rooms
 .zerofill __DATA,__bss,_g_rooms,1024,4
 .zerofill __DATA,__bss,_g_roomsave,640,4
+.globl _g_pairkey
 .zerofill __DATA,__bss,_g_pairkey,64,4
 .zerofill __DATA,__bss,_g_invbuf,256,4
+.globl _g_fpbuf
 .zerofill __DATA,__bss,_g_fpbuf,48,4
 .globl _g_last_refused
 _g_last_refused:  .quad 0
@@ -894,6 +896,8 @@ _mesh_receive:
     b.eq Lrx_vcmd
     cmp  w22, #T_JOINREQ
     b.eq Lrx_vcmd
+    cmp  w22, #T_SEEK
+    b.eq Lrx_vcmd
     b    Lrx_bad
 Lrx_vseen:
     cmp  x20, #22
@@ -1029,6 +1033,8 @@ Lrx_go:
     b.eq Lrx_roomad
     cmp  w22, #T_JOINREQ
     b.eq Lrx_joinreq
+    cmp  w22, #T_SEEK
+    b.eq Lrx_seek
     cmp  w22, #T_NEWS
     b.hs Lrx_web
 
@@ -1330,6 +1336,9 @@ Linv_queue:
 
     // ---- ROOMDEL: the room's owner deleted it; only its owner's (signed) word counts ----
 Lrx_roomdel:
+    ldr  x0, [x19, #12]               // offered to us as a listed room? not any more (listed.s)
+    ldr  x1, [x19, #20]
+    bl   _ad_forget
     ldr  x0, [x19, #12]
     bl   _room_find
     tbnz x0, #63, Lrx_relay           // not one of ours: pass it on
@@ -1391,6 +1400,22 @@ Lrx_joinreq:
     mov  x1, x20
     ldr  x2, [sp, #104]
     bl   _joinreq_rx
+    cbnz x0, Lrx_new                  // for us: nobody else needs it
+    b    Lrx_relay
+
+    // ---- SEEK: finding someone (seek.s), sealed for one person ----
+Lrx_seek:
+    add  x0, x19, #29
+    ldr  x1, [sp, #104]
+    bl   _copy_nick
+    ldr  x0, [x19, #20]
+    ADRL x1, _g_nickbuf
+    ldr  x2, [sp, #96]
+    bl   _node_touch_announce
+    mov  x0, x19
+    mov  x1, x20
+    ldr  x2, [sp, #104]
+    bl   _seek_rx
     cbnz x0, Lrx_new                  // for us: nobody else needs it
     b    Lrx_relay
 

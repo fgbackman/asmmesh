@@ -35,6 +35,7 @@ struct AsmmeshApp: App {
 
 struct ContentView: View {
     @EnvironmentObject var mesh: Mesh
+    @ObservedObject private var finder = Finder.shared
     // "-tab 2" on the command line opens on that tab (for screenshots)
     @State private var tab = UserDefaults.standard.integer(forKey: "tab")
 
@@ -66,6 +67,16 @@ struct ContentView: View {
         } message: { _ in
             Text("Let them in and they get the room\u{2019}s key: they can read everything said in it from now on.")
         }
+        // someone wants to find you (FindView.swift)
+        .alert(finder.asking.map { "\($0.name) wants to find you" } ?? "",
+               isPresented: Binding(get: { finder.asking != nil }, set: { _ in }),
+               presenting: finder.asking) { _ in
+            Button("Share for \(Finder.minutes) Minutes") { finder.answer(share: true) }
+            Button("Not Now", role: .cancel) { finder.answer(share: false) }
+        } message: { _ in
+            Text("They\u{2019}ll see an arrow and a distance to you, and you\u{2019}ll see one to them. Sharing stops by itself, or when either of you taps Stop.")
+        }
+        .sheet(isPresented: $finder.showing) { FindView() }
         .sheet(item: $mesh.qrText) { qr in
             QRSheet(text: qr.text)
                 .presentationDetents([.medium, .large])

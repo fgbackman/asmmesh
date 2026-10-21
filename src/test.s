@@ -1211,6 +1211,32 @@ _selftest:
     ccmp x0, #0, #0, eq
     EXPECT_TRUE Ln_ad_asked
 
+    // 124. alice stops listing "den" (a ROOMAD with no name): it isn't offered any more
+    ldr  x0, Lid_den
+    ADRL x1, Ls_den
+    mov  x2, #0
+    bl   _t_roomad
+    bl   _ad_count
+    cmp  x0, #0
+    EXPECT_TRUE Ln_ad_gone
+
+    // 125. finding someone: nothing goes to a stranger we have no key for (seek.s)
+    ldr  x0, Lid_den                      // (a room's id: nobody's key)
+    ADRL x1, Ls_den
+    mov  x2, #3
+    bl   _seek_send
+    cmn  x0, #1
+    EXPECT_TRUE Ln_seek_nokey
+
+    // 126. your key reads as 12 base32 characters in groups of four
+    ldr  x0, Lid_fp
+    ADRL x1, _g_fpbuf
+    bl   _fp
+    ADRL x1, Ls_fp_want
+    bl   _strcmp
+    cmp  x0, #0
+    EXPECT_TRUE Ln_fp_b32
+
     // 122/123. alice asks to join a room of ours: ignored while it isn't listed, passed on
     //   once when it is (the same ask again at once is a resend)
     ldr  x0, Lid_ours
@@ -2089,6 +2115,7 @@ Lid_bob:    .quad 0x0B0B000000000001
 Lid_lab:    .quad 0x1AB0000000000001
 Lid_carol:  .quad 0x0CA2010000000001
 Lid_den:    .quad 0x0DE0000000000001
+Lid_fp:     .quad 0x0123456789ABCDEF
 Lid_cafe:   .quad 0x0CAFE00000000001
 Lid_ours:   .quad 0x0005000000000001
 
@@ -2333,6 +2360,10 @@ Ln_ad_offer:     .asciz "119 a listed room is offered, with its owner's name"
 Ln_ad_member:    .asciz "120 a listed room we're already in isn't offered"
 Ln_ad_asked:     .asciz "121 after asking, only the owner's invite is taken without a question"
 Ln_jr_unlisted:  .asciz "122 asking to join a room that isn't listed is ignored"
+Ln_ad_gone:      .asciz "124 a room its owner stops listing isn't offered any more"
+Ln_seek_nokey:   .asciz "125 finding someone: nothing is sent to a stranger with no key"
+Ln_fp_b32:       .asciz "126 your key: 12 base32 characters, 28T5-CY4T-QKFF"
+Ls_fp_want:      .asciz "28T5-CY4T-QKFF"
 Ln_jr_listed:    .asciz "123 asking to join a listed room reaches its owner once"
 Ls_t_alice:      .asciz "alice"
 Ln_inv_me:       .asciz "invite for us is noticed and waits for Join"

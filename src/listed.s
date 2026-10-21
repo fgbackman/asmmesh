@@ -6,6 +6,10 @@
 // An invite into a room we asked for, from its owner, is taken without asking again.
 //
 //   ROOMAD   +12 room id  +20 owner id  +28 n  +29 owner's nick, then name length and name
+//            (length 0: not listed any more; kept and passed on, like a delete)
+//
+// Listings heard are remembered, also between launches, and stay on offer while the owner is
+// away (their phone locked): an ask waits in the store until they're back.
 //   JOINREQ  +12 room id  +20 asker id  +28 n  +29 asker's nick, then the owner's id (8)
 
 .include "macros.inc"
@@ -18,7 +22,7 @@
 .set AD_ASKED,      24       // when we asked to be let in (0: not asked)
 .set AD_NICK,       32       // the owner's name, 32 bytes
 .set AD_NAME,       64       // the room's name, 32 bytes
-.set AD_FRESH,      120      // seconds a listing is offered without being heard again
+.set AD_FRESH,      120      // not heard from for this long: "away now"
 .set ASK_FOR,       900      // an invite this soon after asking is taken without a question
 
 .data
@@ -135,6 +139,8 @@ Lsl_off:
     ADRL x10, _g_listed
     ldr  x11, [x10, x9, lsl #3]
     str  x11, [x10, x22, lsl #3]
+    mov  x0, x21                      // and say so, for the devices that offered it
+    bl   _room_withdraw
 Lsl_save:
     bl   _listed_save
     cbz  x20, 1f
@@ -186,7 +192,7 @@ _listed_init:
     mov  x2, x0
     mov  x0, x19
     MSG1 Ls_dataForKey
-    cbz  x0, 9f
+    cbz  x0, Lli_ads
     mov  x19, x0
     MSG0 Ls_length
     lsr  x20, x0, #3
@@ -200,6 +206,29 @@ _listed_init:
     lsl  x2, x20, #3
     bl   _memcpy
     ADRL x8, _g_listed_n
+    str  x20, [x8]
+Lli_ads:
+    bl   _defaults                    // and the listings heard
+    mov  x19, x0
+    ADRL x0, Ls_key_ads
+    bl   _nsstr
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_dataForKey
+    cbz  x0, 9f
+    mov  x19, x0
+    MSG0 Ls_length
+    lsr  x20, x0, #AD_SHIFT
+    cmp  x20, #AD_MAX
+    mov  x9, #AD_MAX
+    csel x20, x9, x20, hi
+    mov  x0, x19
+    MSG0 Ls_bytes
+    mov  x1, x0
+    ADRL x0, _g_ads
+    lsl  x2, x20, #AD_SHIFT
+    bl   _memcpy
+    ADRL x8, _g_ad_count
     str  x20, [x8]
 9:  LEAVE 0
 
@@ -259,11 +288,45 @@ Lra_loop:
 Lra_done:
     LEAVE 0
 
+// void _room_withdraw(uint64 room id) — a ROOMAD with no name: not listed any more. Kept, so
+//   a device that's away hears it when it's back.
+_room_withdraw:
+    ENTER 0
+    mov  x19, x0
+    ADRL x8, _g_id_ready
+    ldr  x9, [x8]
+    cbz  x9, 9f
+    ADRL x0, _g_pkt
+    mov  w1, #T_ROOMAD
+    bl   _pkt_begin
+    ADRL x21, _g_pkt
+    str  x19, [x21, #12]
+    ADRL x8, _g_node_id
+    ldr  x9, [x8]
+    str  x9, [x21, #20]
+    add  x0, x21, #28
+    bl   _put_nick
+    strb wzr, [x0]
+    add  x1, x0, #1
+    sub  x1, x1, x21
+    mov  x0, x21
+    bl   _pkt_finish
+    cbz  x0, 9f
+    mov  x22, x0
+    mov  x0, x21
+    mov  x1, x22
+    bl   _store_put
+    mov  x0, x21
+    mov  x1, x22
+    bl   _ble_broadcast
+9:  LEAVE 0
+
 // ---------------------------------------------------------------------------
 // Other people's listed rooms
 // ---------------------------------------------------------------------------
 
 // void *_ad_find(uint64 room id) -> entry or 0
+.globl _ad_find
 _ad_find:
     ADRL x8, _g_ad_count
     ldr  x10, [x8]
@@ -318,7 +381,7 @@ _roomad_rx:
     cmp  x9, x1
     b.hs Lar_done
     ldrb w20, [x19, x9]
-    cbz  w20, Lar_done
+    cbz  w20, Lar_withdrawn
     cmp  w20, #ROOMNAME_MAX
     b.hi Lar_done
     add  x10, x9, #1
@@ -395,17 +458,92 @@ Lar_fill:
     ADRL x0, Lf_listed
     ADRL x1, _g_nickbuf
     add  x2, sp, #96
+    ADRL x3, _g_ask_hint              // where that is, on this device (ui.s, ios_ui.s)
     bl   _chat_fmt
 Lar_redraw:
     cbz  x22, Lar_done
+    bl   _ads_save
     ADRL x8, _g_window
     ldr  x8, [x8]
     cbz  x8, Lar_done
     bl   _ui_rooms_changed
 Lar_done:
     LEAVE 48
+Lar_withdrawn:                        // its owner stopped listing it
+    ldr  x0, [x19, #12]
+    ldr  x1, [x19, #20]
+    bl   _ad_forget
+    LEAVE 48
 
-// void *_ad_nth(long k) -> the k-th listing on offer (heard lately, not a room we're in), or 0
+// void _ad_forget(uint64 room id, uint64 owner) — not listed any more, or deleted: only its
+//   owner's word counts
+.globl _ad_forget
+_ad_forget:
+    ENTER 0
+    mov  x19, x1
+    bl   _ad_find
+    cbz  x0, 9f
+    ldr  x9, [x0, #AD_OWNER]
+    cmp  x9, x19
+    b.ne 9f
+    mov  x20, x0
+    ADRL x8, _g_ad_count              // the last entry takes its place
+    ldr  x9, [x8]
+    sub  x9, x9, #1
+    str  x9, [x8]
+    ADRL x10, _g_ads
+    add  x1, x10, x9, lsl #AD_SHIFT
+    cmp  x1, x20
+    b.eq 1f
+    mov  x0, x20
+    mov  x2, #(1 << AD_SHIFT)
+    bl   _memcpy
+1:  bl   _ads_save
+    ADRL x8, _g_window
+    ldr  x8, [x8]
+    cbz  x8, 9f
+    bl   _ui_rooms_changed
+9:  LEAVE 0
+
+// void _ads_save(void) — the listings heard, for next time
+_ads_save:
+    ENTER 0
+    ADRL x8, _g_no_persist
+    ldr  x8, [x8]
+    cbnz x8, 1f
+    CLS  Ls_NSData
+    ADRL x2, _g_ads
+    ADRL x8, _g_ad_count
+    ldr  x3, [x8]
+    lsl  x3, x3, #AD_SHIFT
+    MSG2 Ls_dataWithBytes
+    mov  x19, x0
+    bl   _defaults
+    mov  x20, x0
+    ADRL x0, Ls_key_ads
+    bl   _nsstr
+    mov  x3, x0
+    mov  x2, x19
+    mov  x0, x20
+    MSG2 Ls_setObjectForKey
+1:  LEAVE 0
+
+// long _ad_away(void *entry) -> 1 if its owner hasn't been heard from lately
+.globl _ad_away
+_ad_away:
+    ENTER 0
+    cbz  x0, 9f
+    ldr  x19, [x0, #AD_SEEN]
+    mov  x0, #0
+    bl   _time
+    sub  x9, x0, x19
+    cmp  x9, #AD_FRESH
+    cset x0, hi
+    LEAVE 0
+9:  mov  x0, #0
+    LEAVE 0
+
+// void *_ad_nth(long k) -> the k-th listing on offer (not a room we're in), or 0
 .globl _ad_nth
 _ad_nth:
     ENTER 0
@@ -422,10 +560,6 @@ Lan_loop:
     ADRL x8, _g_ads
     add  x22, x8, x21, lsl #AD_SHIFT
     add  x21, x21, #1
-    ldr  x9, [x22, #AD_SEEN]
-    sub  x9, x20, x9
-    cmp  x9, #AD_FRESH
-    b.hi Lan_loop
     ldr  x0, [x22, #AD_ID]
     cbz  x0, Lan_loop
     bl   _room_find
@@ -648,10 +782,11 @@ Lli_gone:
     LEAVE 0
 
 .section __TEXT,__cstring,cstring_literals
-Lf_listed:      .asciz "\302\267 \360\237\232\252 %s listed the room \342\200\234%s\342\200\235: you can ask to join it."
+Lf_listed:      .asciz "\302\267 \360\237\232\252 %s listed the room \342\200\234%s\342\200\235. To ask to join: %s."
 Lf_asked:       .asciz "\302\267 \360\237\232\252 Asked %s to let you into \342\200\234%s\342\200\235. You\342\200\231ll join as soon as they say yes."
 Lf_letting_in:  .asciz "\302\267 \360\237\232\252 Let %s in: they join as soon as their device hears the invite."
 Ls_key_listed:  .asciz "listedRooms"
+Ls_key_ads:     .asciz "listings"
 Ls_empty_l:     .asciz ""
 Ls_NSData:      .asciz "NSData"
 Ls_dataWithBytes: .asciz "dataWithBytes:length:"

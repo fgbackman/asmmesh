@@ -171,37 +171,31 @@ Lhd_bad:
     mov  x0, #0
     ret
 
-// char *_fp(uint64 id, char *buf /*12*/) -> "A1B2-C3D4" (the first 4 bytes of the id)
+// char *_fp(uint64 id, char *buf /*15*/) -> "7KQ2-M9XD-4TRW": 60 of the id's 64 bits in
+//   Crockford base32 (no I, L, O or U, so it reads aloud without mix-ups)
 .globl _fp
 _fp:
-    ENTER 16
-    mov  x19, x1
-    str  x0, [sp, #96]
-    add  x0, sp, #96
-    mov  x1, #2
-    mov  x2, x19
-    bl   _hex_enc
-    mov  w9, #'-'
-    strb w9, [x19, #4]
-    add  x0, sp, #98
-    mov  x1, #2
-    add  x2, x19, #5
-    bl   _hex_enc
-    mov  x9, #0                       // upper case reads better
-Lfp_up:
-    ldrb w10, [x19, x9]
-    cbz  w10, Lfp_done
-    sub  w11, w10, #'a'
-    cmp  w11, #5
-    b.hi Lfp_next
-    sub  w10, w10, #0x20
-    strb w10, [x19, x9]
+    ADRL x10, Ls_b32dig
+    mov  x11, x1
+    mov  x9, #55                      // the top 5 of the 60 bits first
+    mov  x12, #0
+Lfp_loop:
+    lsr  x13, x0, x9
+    and  x13, x13, #31
+    ldrb w13, [x10, x13]
+    strb w13, [x11], #1
+    add  x12, x12, #1
+    cmp  x12, #4
+    ccmp x12, #8, #4, ne
+    b.ne Lfp_next
+    mov  w13, #'-'                    // groups of four
+    strb w13, [x11], #1
 Lfp_next:
-    add  x9, x9, #1
-    b    Lfp_up
-Lfp_done:
-    mov  x0, x19
-    LEAVE 16
+    subs x9, x9, #5
+    b.pl Lfp_loop
+    strb wzr, [x11]
+    mov  x0, x1
+    ret
 
 // ---------------------------------------------------------------------------
 // Our identity
@@ -1154,6 +1148,7 @@ Lpr_done:
 .section __TEXT,__cstring,cstring_literals
 Lf_skew:        .asciz "\302\267 \342\217\261 Another Mac\342\200\231s clock is about %ld minutes ahead of this one, so its messages are being turned away. Both Macs should set the time automatically (System Settings \342\200\272 General \342\200\272 Date & Time)."
 Ls_hexdig:      .asciz "0123456789abcdef"
+Ls_b32dig:      .asciz "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 Ls_kc_keys:     .asciz "asmmesh.keys"
 Ls_pair_info:   .asciz "asmmesh v3 pair"
 Ls_NSData:      .asciz "NSData"

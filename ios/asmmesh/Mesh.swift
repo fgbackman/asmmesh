@@ -66,6 +66,7 @@ struct ListedRoom: Identifiable, Equatable {
     let name: String
     let owner: String
     let asked: Bool
+    let away: Bool       // owner not heard from lately (phone locked): an ask waits for them
 }
 
 /// Someone asking to be let into one of your listed rooms
@@ -273,7 +274,8 @@ final class Mesh: ObservableObject {
         var l: [ListedRoom] = []
         for k in 0..<am_ad_count() {
             l.append(ListedRoom(id: am_ad_id(k), name: cstr(am_ad_info(k, 0)),
-                                owner: cstr(am_ad_info(k, 1)), asked: am_ad_asked(k) != 0))
+                                owner: cstr(am_ad_info(k, 1)), asked: am_ad_asked(k) != 0,
+                                away: am_ad_away(k) != 0))
         }
         if l != listed { listed = l }
         var j: [JoinRequest] = []

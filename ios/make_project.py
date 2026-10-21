@@ -10,10 +10,10 @@ import hashlib, os
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 CORE = """mesh ident crypto util ble near home parse rules net hue st cloud lan udp weather
-extras find sens_decode sensors spin spinui alerts voice services handoff bt limits guard web fm_html fm_pack fm_util fm_io files scan_core listed""".split()
+extras find sens_decode sensors spin spinui alerts voice services handoff bt limits guard web fm_html fm_pack fm_util fm_io files scan_core listed seek""".split()
 SWIFT = ["App.swift", "Bridge.swift", "Mesh.swift", "RoomsView.swift", "PeopleView.swift",
-         "NearbyView.swift", "SettingsView.swift", "SpinView.swift"]
-FRAMEWORKS = ["CoreBluetooth", "Security", "CoreLocation", "Speech", "AVFoundation"]
+         "NearbyView.swift", "SettingsView.swift", "SpinView.swift", "FindView.swift"]
+FRAMEWORKS = ["CoreBluetooth", "Security", "CoreLocation", "Speech", "AVFoundation", "NearbyInteraction"]
 BUNDLE_ID = "com.fbackman.asmmesh.ios"
 
 

@@ -198,7 +198,7 @@ Lcv_room:
     ADRL x8, _g_room_count
     ldr  x9, [x8]
     cmp  x20, x9
-    b.hs Lcv_nil
+    b.hs Lcv_ad
     ADRL x8, _g_rooms
     add  x21, x8, x20, lsl #ROOM_SHIFT
     ldr  x9, [x21, #R_ID]
@@ -231,6 +231,46 @@ Lcv_room:
     add  x2, x21, #R_NAME
     mov  x3, x23
     ldr  x4, [x21, #R_UNREAD]
+    ldr  d0, [sp, #96]
+    bl   _cd_card
+    LEAVE 160
+
+Lcv_ad:                               // someone else's listed room (listed.s): click to ask
+    sub  x0, x20, x9
+    bl   _ad_nth
+    cbz  x0, Lcv_nil
+    mov  x21, x0
+    mov  x1, #1
+    bl   _ad_field
+    str  x0, [sp]
+    mov  x0, x21
+    bl   _ad_asked
+    mov  x22, x0
+    mov  x0, x21
+    bl   _ad_away
+    ADRL x2, Ls_ad_ask
+    ADRL x8, Ls_ad_away
+    cmp  x0, #0
+    csel x2, x8, x2, ne
+    ADRL x8, Ls_ad_asked
+    cmp  x22, #0
+    csel x2, x8, x2, ne
+    add  x0, sp, #160
+    mov  x1, #96
+    bl   _snprintf
+    add  x0, sp, #160
+    bl   _nsstr
+    mov  x23, x0
+    mov  x0, x21
+    mov  x1, #0
+    bl   _ad_field
+    mov  x2, x0
+    ADRL x0, Ls_y_door
+    mov  x1, #0xD158                  // green: open to ask
+    movk x1, #0x30, lsl #16
+    mov  x3, x23
+    mov  x4, #0
+    mov  x5, #0
     ldr  d0, [sp, #96]
     bl   _cd_card
     LEAVE 160
@@ -672,6 +712,10 @@ Ls_y_house:          .asciz "house.fill"
 Ls_y_safari:         .asciz "safari.fill"
 Ls_y_news:           .asciz "newspaper.fill"
 Ls_y_lock:           .asciz "lock.fill"
+Ls_y_door:           .asciz "door.left.hand.open"
+Ls_ad_ask:           .asciz "%s\342\200\231s room \302\267 click to ask to join"
+Ls_ad_away:          .asciz "%s\342\200\231s room \302\267 away now \302\267 click to ask to join"
+Ls_ad_asked:         .asciz "Asked %s \302\267 you join when they say yes"
 Ls_y_person:         .asciz "person.fill"
 Ls_k_main:           .asciz "Everyone on the mesh"
 Ls_k_home:           .asciz "Lights, locks and scenes"

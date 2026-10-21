@@ -40,6 +40,7 @@ _g_namebtn:       .quad 0
 _g_rooms_table:   .quad 0
 .globl _g_people_table
 _g_people_table:  .quad 0
+_g_people_lbl:    .quad 0           // "PEOPLE ON THE MESH": moves with the Rooms list's height
 .globl _g_ctl
 _g_ctl:           .quad 0
 .globl _g_font
@@ -83,6 +84,18 @@ Lf_addroom:  .double 206.0, 604.0, 36.0, 28.0
 Lf_rooms:    .double 6.0, 306.0, 240.0, 294.0
 Lf_peoplelbl: .double 16.0, 284.0, 196.0, 16.0
 Lf_people:   .double 6.0, 128.0, 240.0, 152.0
+// _sidebar_fit: Rooms grows to fit its cards; People keeps the rest, at least two cards
+Lc_sb_card:  .double 58.0         // one card's row
+Lc_sb_top:   .double 40.0         // Rooms' top, below the window's top edge
+Lc_sb_low:   .double 270.0        // Rooms' bottom stays above this: People's 128 + 2 cards + label
+Lc_sb_x:     .double 6.0
+Lc_sb_w:     .double 240.0
+Lc_sb_lx:    .double 16.0
+Lc_sb_lgap:  .double 22.0         // label's bottom, below Rooms
+Lc_sb_lw:    .double 196.0
+Lc_sb_lh:    .double 16.0
+Lc_sb_pb:    .double 128.0        // People's bottom (Invite and the buttons are under it)
+Lc_sb_pgap:  .double 4.0
 Lf_invite:   .double 8.0, 88.0, 236.0, 32.0
 Lf_scanner:  .double 8.0, 50.0, 236.0, 32.0
 Lf_services: .double 8.0, 12.0, 236.0, 32.0
@@ -378,6 +391,8 @@ _build_ui:
     LDD  d4, Lc_11
     bl   _mk_label
     bl   _dim_label
+    ADRL x8, _g_people_lbl
+    str  x0, [x8]
 
     mov  x0, #16                      // HeightSizable
     mov  x1, #0
@@ -804,6 +819,79 @@ _dim_label:
     MSG1 Ls_setTextColor
     mov  x0, x19
     LEAVE 0
+
+// void _sidebar_fit(void) — the Rooms list as tall as its cards, so none needs scrolling to
+//   (up to what leaves People two cards); People's label and list move down under it
+.globl _sidebar_fit
+_sidebar_fit:
+    ENTER 32                          // [96] Rooms' height  [104] its y  [112] the label's y
+    ADRL x8, _g_rooms_table
+    ldr  x19, [x8]
+    cbz  x19, Lsf_done
+    ADRL x8, _g_content
+    ldr  x20, [x8]
+    cbz  x20, Lsf_done
+    mov  x0, x19
+    MSG0 Ls_numberOfRows
+    mov  x21, x0
+    SELX1 Ls_bounds
+    mov  x0, x20
+    bl   _objc_msgSend                // d3: the content's height
+    scvtf d0, x21
+    LDD  d1, Lc_sb_card
+    fmul d0, d0, d1
+    fmax d0, d0, d1                   // at least one card
+    LDD  d4, Lc_sb_top
+    fsub d4, d3, d4                   // Rooms' top
+    LDD  d5, Lc_sb_low
+    fsub d6, d4, d5                   // the most it may take
+    fmin d0, d0, d6
+    fmax d0, d0, d1
+    str  d0, [sp, #96]
+    fsub d7, d4, d0
+    str  d7, [sp, #104]
+    LDD  d5, Lc_sb_lgap
+    fsub d7, d7, d5
+    str  d7, [sp, #112]
+    mov  x0, x19
+    MSG0 Ls_enclosingScrollView
+    cbz  x0, Lsf_done
+    mov  x22, x0
+    SELX1 Ls_setFrame
+    mov  x0, x22
+    LDD  d0, Lc_sb_x
+    ldr  d1, [sp, #104]
+    LDD  d2, Lc_sb_w
+    ldr  d3, [sp, #96]
+    bl   _objc_msgSend
+    ADRL x8, _g_people_lbl
+    ldr  x22, [x8]
+    cbz  x22, Lsf_done
+    SELX1 Ls_setFrame
+    mov  x0, x22
+    LDD  d0, Lc_sb_lx
+    ldr  d1, [sp, #112]
+    LDD  d2, Lc_sb_lw
+    LDD  d3, Lc_sb_lh
+    bl   _objc_msgSend
+    ADRL x8, _g_people_table
+    ldr  x0, [x8]
+    cbz  x0, Lsf_done
+    MSG0 Ls_enclosingScrollView
+    cbz  x0, Lsf_done
+    mov  x22, x0
+    SELX1 Ls_setFrame
+    mov  x0, x22
+    LDD  d0, Lc_sb_x
+    LDD  d1, Lc_sb_pb
+    LDD  d2, Lc_sb_w
+    ldr  d3, [sp, #112]
+    LDD  d5, Lc_sb_pgap
+    fsub d3, d3, d5
+    fsub d3, d3, d1
+    bl   _objc_msgSend
+Lsf_done:
+    LEAVE 32
 
 // id _mk_button(const char *title, const char *selname, mask, id parent, frame d0-d3)
 .globl _mk_button
@@ -1610,6 +1698,8 @@ Ls_NSAttributedString: .asciz "NSAttributedString"
 Ls_initWithStringAttributes: .asciz "initWithString:attributes:"
 Ls_setAttributedTitle: .asciz "setAttributedTitle:"
 Ls_enclosingScrollView: .asciz "enclosingScrollView"
+Ls_numberOfRows:       .asciz "numberOfRows"
+Ls_bounds:             .asciz "bounds"
 Ls_setDrawsBackground: .asciz "setDrawsBackground:"
 Ls_setStyle:           .asciz "setStyle:"
 Ls_fontDescriptor:     .asciz "fontDescriptor"

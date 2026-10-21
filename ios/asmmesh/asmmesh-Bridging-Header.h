@@ -13,6 +13,7 @@ long am_ad_count(void);
 const char *am_ad_info(long k, long f);
 uint64_t am_ad_id(long k);
 long am_ad_asked(long k);
+long am_ad_away(long k);
 long am_ad_ask(long k);
 long am_jr_count(void);
 const char *am_jr_info(long i, long f);
@@ -33,6 +34,9 @@ void am_home(const char *text);
 // people on the mesh
 long am_node_count(void);
 const char *am_node_nick(long i);
+uint64_t am_node_id(long i);
+long am_node_index(uint64_t id);
+long am_seek_send(uint64_t to, const uint8_t *data, long len);
 long am_node_info(long i, long k);          // 0 hops, 1 dBm, 2 seconds since heard, 3 relayed
 char *am_node_fp(long i, char *buf);        // i = -1: this phone
 const char *am_nick(void);

@@ -634,6 +634,14 @@ _am_ad_asked:
     bl   _ad_asked
     LEAVE 0
 
+// long am_ad_away(long k) -> 1 if its owner hasn't been heard from lately
+.globl _am_ad_away
+_am_ad_away:
+    ENTER 0
+    bl   _ad_nth
+    bl   _ad_away
+    LEAVE 0
+
 // long am_ad_ask(long k) -> peers written, -1 not sent (no identity yet, or gone)
 .globl _am_ad_ask
 _am_ad_ask:
@@ -713,6 +721,30 @@ _am_node_nick:
     add  x0, x8, x0, lsl #NODE_SHIFT
     b    _node_name
 
+// uint64 am_node_id(long i) — a person's mesh id
+.globl _am_node_id
+_am_node_id:
+    ADRL x8, _g_nodes
+    add  x8, x8, x0, lsl #NODE_SHIFT
+    ldr  x0, [x8, #N_ID]
+    ret
+
+// long am_node_index(uint64 id) -> their place on the list, or -1
+.globl _am_node_index
+_am_node_index:
+    b    _node_find
+
+// long am_seek_send(uint64 to, const uint8 *data, long len) -> peers written, -1 not sent
+.globl _am_seek_send
+_am_seek_send:
+    b    _seek_send
+
+// void _seek_in(uint64 from, const char *nick, const uint8 *data, long len) — finding someone
+//   (seek.s): Finder.swift reads it
+.globl _seek_in
+_seek_in:
+    b    _ios_seek_in
+
 // long am_node_info(long i, long k) — 0 hops, 1 signal dBm (0 unknown), 2 seconds
 //   since last heard, 3 relayed for us
 .globl _am_node_info
@@ -738,7 +770,7 @@ _am_node_info:
 3:  ldr  x0, [x19, #N_RELAYED]
     LEAVE 0
 
-// char *am_node_fp(long i, char *buf /*12*/) — "A1B2-C3D4"; i = -1 for this phone
+// char *am_node_fp(long i, char *buf /*15*/) — "7KQ2-M9XD-4TRW"; i = -1 for this phone
 .globl _am_node_fp
 _am_node_fp:
     tbnz x0, #63, 1f
@@ -1965,3 +1997,5 @@ _g_jr_count:          .quad 0
 Li_fmt_listed:        .asciz "\302\267 \360\237\232\252 \342\200\234%s\342\200\235 is listed now: anyone nearby can see its name and ask to join, and you decide who gets in."
 Li_fmt_unlisted:      .asciz "\302\267 \360\237\232\252 \342\200\234%s\342\200\235 isn\342\200\231t listed any more."
 Li_fmt_jr_nokey:      .asciz "\302\267 \360\237\232\252 Couldn\342\200\231t let %s in yet: their key hasn\342\200\231t arrived. Ask them to try again in a few seconds."
+.globl _g_ask_hint
+_g_ask_hint:          .asciz "the top of Rooms"
