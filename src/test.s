@@ -1287,6 +1287,8 @@ _selftest:
     add  x19, x19, x0
     bl   _sens_selftest               // Bluetooth sensors and their rules (sensors.s)
     add  x19, x19, x0
+    bl   _bc_selftest                 // bitchat's cryptography (bc_crypto.s)
+    add  x19, x19, x0
     bl   _t_hard                      // fuzzing, flood limits, full tables (last: it fills them)
     add  x19, x19, x0
 

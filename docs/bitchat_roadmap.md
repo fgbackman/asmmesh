@@ -95,12 +95,12 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 - Pick the new service number and file names, and add them to `NOTES-for-other-sessions.md` so parallel sessions don't collide. The Settings grid (3 × 8) is full, so it needs another row or page.
 - Pin one bitchat release to test against, and install it on a spare iPhone or Mac.
 
-**Phase 1 — crypto in assembly** (`src/bc_crypto.s`)
-- CommonCrypto already gives SHA-256, SHA-512 and HMAC, and `-lz` is already linked for zlib.
-- Hand-write: **X25519** (RFC 7748), **Ed25519** sign/verify (RFC 8032, uses SHA-512), **ChaCha20-Poly1305** (RFC 8439), and **HKDF-SHA256** on top of HMAC.
-- Keep it constant-time: no secret-dependent branches or table lookups.
-- Self-tests with the RFC test vectors, run under qemu like `sens_decode.s`.
-- Store the two private keys in the Keychain next to the existing identity, following `ident.s` (only regenerate on "not found").
+**Phase 1 — crypto in assembly** (`src/bc_crypto.s`) — **done**
+- Hand-written, with nothing from CommonCrypto, so the same file runs on the Mac, the iPhone and under qemu: SHA-256 and SHA-512, HMAC-SHA256, HKDF-SHA256 (RFC 5869), ChaCha20-Poly1305 (RFC 8439), X25519 (RFC 7748), and Ed25519 sign/verify (RFC 8032, refusing S ≥ L and keys that aren't on the curve).
+- Constant-time: secrets never choose a branch or a memory address.
+- Self-tests 127–144 use the published RFC and FIPS vectors, and run with `make selftest`.
+- `tools/qemu/run.sh` runs them on Linux. `tools/qemu/run.sh diff 300` checks every function against Python's `cryptography` with random inputs and edge cases (Poly1305's reduction limits, X25519 inputs at or above p, low-order points).
+- Keychain storage for the two bitchat keys moved to Milestone 1, where the keys are first needed and the off switch has to keep them unloaded.
 
 **Phase 2 — Bluetooth link** (`src/bc_ble.s`)
 - Advertise bitchat's service as well as asmmesh's, and scan for both.
@@ -114,6 +114,7 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 - Dedup set and relay rules (TTL clamp, never relay back to the link a packet came in on).
 
 **Milestone 1 — "I can see bitchat people"**
+- Make the bitchat Curve25519 and Ed25519 keys (random, from `SecRandomCopyBytes`) and keep them in their own Keychain items, following `ident.s` (only make new ones on "not found"). Load them only while the bitchat switch is on.
 - Send a signed announce (nickname from asmmesh's name, both public keys, capabilities) every few seconds when alone, backing off to 15–30 s.
 - Verify incoming announces and list bitchat peers in People with a "bitchat" tag and their fingerprint. Handle leave (`0x03`).
 - Show bitchat devices in the Mesh Scanner.

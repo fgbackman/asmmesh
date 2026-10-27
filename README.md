@@ -150,9 +150,11 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
     src/listed.s   listed rooms: ROOMAD and JOINREQ, asking to join, letting people in
     src/scan_core.s the scanner's list, details and Connect & Pair / Set Up (Mac window and iPhone)
     src/files_mac.s Files on Wi-Fi's Mac side: folder chooser, AirDrop, the QR window
+    src/bc_crypto.s bitchat's cryptography (not used yet): SHA-256/512, HMAC, HKDF, ChaCha20-Poly1305, X25519, Ed25519
     src/test.s     `asmmesh --selftest`
     src/util.s     objc_msgSend shortcuts, NSString helpers, chat formatting
     src/macros.inc frame and messaging macros
+    tools/qemu/    runs bc_crypto.s's self-tests under qemu on Linux, and checks it against Python's cryptography
 
 ## Packet format (v2)
 

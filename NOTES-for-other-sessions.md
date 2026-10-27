@@ -94,3 +94,13 @@ Numbers now taken:
 - Radio entry points in the method tables are the _g_ble_* guarded versions (guard.s); keep it so.
 - A packet that crashes the guard lands in ~/Library/Logs/asmmesh-guard.log as hex: add it
   to the fuzz templates in test.s.
+
+## bitchat Phase 1 (Oct 27, branch claude/bitchat-roadmap): cryptography only
+- Plan: docs/bitchat_roadmap.md. bitchat stays walled off from asmmesh (see "The wall" there).
+- New file: `src/bc_crypto.s` — SHA-256/512, HMAC/HKDF-SHA256, ChaCha20-Poly1305, X25519, Ed25519.
+  Pure functions, no globals, nothing called yet. In the Makefile and ios/make_project.py.
+- All bitchat code goes in `src/bc_*.s`; please don't put bitchat code anywhere else.
+- Self-tests 127-144 (`_bc_selftest`, called from test.s after _sens_selftest).
+- `tools/qemu/run.sh` runs those tests on Linux under qemu; `tools/qemu/run.sh diff 300` checks
+  every function against Python's `cryptography` with random and edge-case inputs.
+  It turns the file into ELF with sed, so keep bc_*.s to ENTER/LEAVE/ADRL and `.section __TEXT,__const`.
