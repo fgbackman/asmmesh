@@ -104,3 +104,15 @@ Numbers now taken:
 - `tools/qemu/run.sh` runs those tests on Linux under qemu; `tools/qemu/run.sh diff 300` checks
   every function against Python's `cryptography` with random and edge-case inputs.
   It turns the file into ELF with sed, so keep bc_*.s to ENTER/LEAVE/ADRL and `.section __TEXT,__const`.
+
+## bitchat Phase 2 (Oct 27, branch claude/bitchat-roadmap): the Bluetooth link
+- New files: `src/bc_link.s` (pure: frame length, long writes, fragment reassembly, send queue),
+  `src/bc_ble.s` (CoreBluetooth), `src/bc_defs.inc`. In the Makefile (and its include list) and
+  ios/make_project.py.
+- Numbers taken: SVC_BITCHAT 24, NSVC 25. The Mac Settings window is now nine rows (SW_H 794).
+  "enable all" skips bitchat; it can't be switched from the mesh (_g_remote_active).
+- Home words: "bitchat", "bitchat status", "bitchat advertise on/off" (rules.s table).
+- bitchat has its own CBCentralManager, CBPeripheralManager and delegate class (AMeshBitchat):
+  please keep bitchat callbacks out of ble.s and the AMeshController method tables.
+- Self-tests 145-154 (`_bc_link_selftest`, after _bc_selftest in test.s).
+- Not tried on a Mac yet: see the Phase 2 checklist in docs/bitchat_roadmap.md.

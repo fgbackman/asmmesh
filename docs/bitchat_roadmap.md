@@ -92,7 +92,7 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 ### Phases
 
 **Phase 0 — groundwork**
-- Pick the new service number and file names, and add them to `NOTES-for-other-sessions.md` so parallel sessions don't collide. The Settings grid (3 × 8) is full, so it needs another row or page.
+- Pick the new service number and file names, and add them to `NOTES-for-other-sessions.md` so parallel sessions don't collide. *(Done: service 24, `src/bc_*.s`, a ninth Settings row.)*
 - Pin one bitchat release to test against, and install it on a spare iPhone or Mac.
 
 **Phase 1 — crypto in assembly** (`src/bc_crypto.s`) — **done**
@@ -102,11 +102,23 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 - `tools/qemu/run.sh` runs them on Linux. `tools/qemu/run.sh diff 300` checks every function against Python's `cryptography` with random inputs and edge cases (Poly1305's reduction limits, X25519 inputs at or above p, low-order points).
 - Keychain storage for the two bitchat keys moved to Milestone 1, where the keys are first needed and the off switch has to keep them unloaded.
 
-**Phase 2 — Bluetooth link** (`src/bc_ble.s`)
-- Advertise bitchat's service as well as asmmesh's, and scan for both.
-- Central role: connect, subscribe to notify, write packets. Peripheral role: accept writes, and send to subscribers by notify.
-- Handle MTU, chunking and reassembly, plus fragment packets (`0x20`, ~469-byte pieces).
-- iOS: check background advertising with two services; iOS moves background service UUIDs into an overflow area.
+**Phase 2 — Bluetooth link** (`src/bc_link.s`, `src/bc_ble.s`) — **written; to be tried on a Mac**
+- The **bitchat** switch is service 24, off by default. It's a new row in Settings (the Mac window grew to nine rows). "enable all" leaves it off, and it can't be switched from the mesh.
+- bitchat gets its own CBCentralManager, CBPeripheralManager and delegate class, so its callbacks never pass through asmmesh's controller. Each of its three entry points for outside bytes runs under the guard.
+- Central: scans for bitchat's service only, connects (up to 8 links), subscribes to notifications, and writes without response when the radio has room.
+- Peripheral: publishes the same service and characteristic, takes writes (long writes in pieces too), and notifies subscribers.
+- Advertising bitchat's service waits for **"bitchat advertise on"**: two peripheral managers advertising at once has to be tried first, so asmmesh's own advert keeps working. Without it the Mac still links by connecting to the phones.
+- Pure link layer, tested under qemu: packet length from the header, long writes per link (512-byte cap), fragment reassembly (8 sets, 64 pieces, 8 KiB, 30 s), bitchat's fragment layout and chunk size, and send queues.
+- Incoming packets are only counted for now. **"bitchat"** in Home shows links and what was heard: hellos, public, private, fragments, refused.
+- Self-tests 145–154. `tools/qemu/run.sh diff` also checks the link layer against `tools/qemu/bcwire.py`, a Python copy of bitchat's wire format.
+
+*Checklist for the first Mac test:*
+1. `make selftest`: 127–154 all PASS.
+2. Settings: the bitchat row is there, off. Type "enable bitchat".
+3. With bitchat open on a phone nearby, "bitchat" shows 1 linked and hellos counting up.
+4. Another Mac running asmmesh still links as before (`ble.s` is unchanged).
+5. "bitchat advertise on": the phone links to this Mac too ("found this Mac"), and step 4 still works. If asmmesh's own linking breaks, turn it off and note it here.
+6. "disable bitchat": links drop, and "bitchat" says it's off.
 
 **Phase 3 — packet codec** (`src/bc_packet.s`)
 - Encode and decode v1 and v2 headers, flags, zlib, padding, and signatures.

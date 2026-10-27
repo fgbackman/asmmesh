@@ -142,6 +142,10 @@ Lsimple:
     .quad Lw_spin_controls,  3, _h_spin_target, 0
     .quad Lw_spin_drives,    3, _h_spin_target, 0
     .quad Lw_services,       2, _h_services, 0
+    .quad Lw_bitchat,        2, _h_bitchat, 0
+    .quad Lw_bitchat_status, 2, _h_bitchat, 0
+    .quad Lw_bc_adv_on,      2, _h_bitchat_adv, 1
+    .quad Lw_bc_adv_off,     2, _h_bitchat_adv, 0
     .quad Lw_settings,       2, _h_services, 0
     .quad Lw_service_list,   2, _h_services, 0
     .quad Lw_enable,         1, _h_svc_switch, 1
@@ -2814,6 +2818,10 @@ Lw_spin_controls: .asciz "spin controls"
 Lw_spin_drives:  .asciz "spin drives"
 Lw_spin_groups:  .asciz "spin groups"
 Lw_services:     .asciz "services"
+Lw_bitchat:      .asciz "bitchat"
+Lw_bitchat_status: .asciz "bitchat status"
+Lw_bc_adv_on:    .asciz "bitchat advertise on"
+Lw_bc_adv_off:   .asciz "bitchat advertise off"
 Lw_settings:     .asciz "settings"
 Lw_service_list: .asciz "list services"
 Lw_enable:       .asciz "enable"

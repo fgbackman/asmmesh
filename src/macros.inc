@@ -308,7 +308,7 @@
 // ---------------------------------------------------------------------------
 // Services (services.s): every integration has its own switch; all start off
 // ---------------------------------------------------------------------------
-.set NSVC,          24
+.set NSVC,          25
 .set SVC_HUE,       0
 .set SVC_ST,        1        // SmartThings (Lutron and friends ride on it)
 .set SVC_HOME,      2        // Apple Home via Shortcuts
@@ -333,6 +333,7 @@
 .set SVC_HOOK,      21       // incoming webhook on port 8787
 .set SVC_FILES,     22       // the files page for your phone, port 8788 (files.s)
 .set SVC_SENSORS,   23       // Bluetooth sensors and the battery board (sensors.s)
+.set SVC_BITCHAT,   24       // the walled-off link to bitchat's mesh (bc_ble.s); never on with "enable all"
 
 // one reading from a sensor's advertisement (sens_decode.s); values in hundredths
 .set RD_HAVE,       0        // H_* bits: which numbers came

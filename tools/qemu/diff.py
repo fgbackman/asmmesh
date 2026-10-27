@@ -1,6 +1,8 @@
 # diff.py — random cases through the assembly (via the qemu harness), checked
 # against Python's `cryptography` and hashlib. Usage: diff.py harness N
 import hashlib, hmac, os, random, subprocess, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import bcwire
 from cryptography.hazmat.primitives.asymmetric import ed25519, x25519
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms
 from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
@@ -104,6 +106,61 @@ for i in range(4):
         if pow(x2, (P - 1) // 2, P) == P - 1: break
     cases.append(('edverify %s %s %s' % (yy.to_bytes(32, 'little').hex(), m.hex(), sig.hex()), '0', 'ed25519 not a point'))
 cases.append(('edverify %s %s %s' % ('01' + '00' * 31, '-', '00' * 64), '0', 'ed25519 identity key, zero sig'))
+
+# the link layer (bc_link.s) against bcwire.py, bitchat's format written in Python
+def rpacket():
+    v = rnd.choice([1, 2])
+    route = [rb(8) for _ in range(rnd.randrange(4))] if v == 2 and rnd.random() < .5 else None
+    return bcwire.encode(version=v, type=rnd.choice([1, 2, 0x11, 0x20]), sender=rb(8),
+                         recipient=rb(8) if rnd.random() < .5 else None, payload=rb(rnd.randrange(400)),
+                         signature=rb(64) if rnd.random() < .6 else None, route=route, rsr=rnd.random() < .1)
+for i in range(n):
+    p = rpacket()
+    for cut in [len(p), rnd.randrange(len(p) + 1), rnd.randrange(20)]:
+        q = p[:cut]
+        cases.append(('framelen ' + h(q), str(bcwire.frame_len_ref(q)), 'frame length'))
+    q = bytearray(p); q[rnd.randrange(min(len(q), 30))] = rnd.getrandbits(8); q = bytes(q)
+    cases.append(('framelen ' + h(q), str(bcwire.frame_len_ref(q)), 'frame length (changed byte)'))
+    q = rb(rnd.randrange(40))
+    cases.append(('framelen ' + h(q), str(bcwire.frame_len_ref(q)), 'frame length (noise)'))
+    # a long write in random pieces
+    if rnd.random() < .5: p = bcwire.pad(p)
+    want = bcwire.frame_len_ref(p)
+    cuts = sorted(set([0] + [rnd.randrange(1, len(p)) for _ in range(rnd.randrange(4))])) + [len(p)]
+    got_final = None
+    for a, b in zip(cuts, cuts[1:]):
+        piece_end = b
+        so_far = p[:b]
+        fl = bcwire.frame_len_ref(so_far)
+        if b > 512 or fl > 512 or fl < 0: exp = '-1'
+        elif fl == 0 or fl > b: exp = '0'
+        else: exp = '%d %s' % (b, so_far.hex())
+        cases.append(('inbox %04x %s' % (a, h(p[a:b])), exp, 'long write'))
+        if exp != '0': break
+cases.append(('fragreset', 'ok', 'fragments'))
+now = 1000
+for i in range(n):
+    # two senders' sets at once, shuffled, some pieces twice
+    sets = []
+    for k in range(2):
+        p = rpacket(); chunk = rnd.choice([64, 100, 143, 200, 469])
+        sender = rb(8); fid = rb(8)
+        fr = bcwire.fragments(p, chunk, fid, p[1], sender)
+        if len(fr) > 64 or len(p) > 8192: continue
+        sets.append((p, sender, [pl for pl, _ in fr]))
+    pieces = [(si, j) for si, s3 in enumerate(sets) for j in range(len(s3[2]))]
+    pieces += [rnd.choice(pieces) for _ in range(rnd.randrange(3))] if pieces else []
+    rnd.shuffle(pieces)
+    seen = [set() for _ in sets]
+    for si, j in pieces:
+        p, sender, pls = sets[si]
+        now += rnd.randrange(50)
+        if j in seen[si]: exp = '0'
+        else:
+            seen[si].add(j)
+            exp = ('%d %s' % (len(p), p.hex())) if len(seen[si]) == len(pls) else '0'
+        cases.append(('frag %08x %s %s' % (now, sender.hex(), pls[j].hex()), exp, 'fragments'))
+        if exp != '0': seen[si] = set()   # done: a later repeat starts a new set
 
 inp = '\n'.join(c[0] for c in cases) + '\n'
 res = subprocess.run(['qemu-aarch64', harness], input=inp, capture_output=True, text=True).stdout.split('\n')

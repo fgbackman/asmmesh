@@ -11,3 +11,4 @@ ios/build/
 ios/build.log
 ios/build-full.log
 xcuserdata/
+__pycache__/

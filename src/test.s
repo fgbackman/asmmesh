@@ -1289,6 +1289,8 @@ _selftest:
     add  x19, x19, x0
     bl   _bc_selftest                 // bitchat's cryptography (bc_crypto.s)
     add  x19, x19, x0
+    bl   _bc_link_selftest            // bitchat's link layer (bc_link.s)
+    add  x19, x19, x0
     bl   _t_hard                      // fuzzing, flood limits, full tables (last: it fills them)
     add  x19, x19, x0
 

@@ -26,6 +26,10 @@ extern void bc_ed25519_pub(const void *, void *) F(bc_ed25519_pub);
 extern void bc_ed25519_sign(const void *, const void *, long, void *) F(bc_ed25519_sign);
 extern long bc_ed25519_verify(const void *, const void *, long, const void *) F(bc_ed25519_verify);
 extern long bc_selftest(void) F(bc_selftest) __attribute__((weak));
+extern long bc_link_selftest(void) F(bc_link_selftest) __attribute__((weak));
+extern long bc_frame_len(const void *, long) F(bc_frame_len);
+extern long bc_inbox_put(void *, long, const void *, long) F(bc_inbox_put);
+extern long bc_frag_put(void *, long, const void *, const void *, long, void *) F(bc_frag_put);
 
 // what test.s provides inside the app
 long t_report(const char *name, int pass) F(t_report);
@@ -52,12 +56,13 @@ static long unhex(const char *s, unsigned char *p) {
 
 int main(int argc, char **argv) {
     if (argc > 1 && !strcmp(argv[1], "selftest")) {
-        long f = bc_selftest();
+        long f = bc_selftest() + bc_link_selftest();
         printf("%ld failed\n", f);
         return f != 0;
     }
     static char line[300000];
     unsigned char ctx[208];
+    static unsigned char ib[528], fa[8 * 8520], fout[16384];
     while (fgets(line, sizeof line, stdin)) {
         char *cmd = strtok(line, " \n");
         if (!cmd) continue;
@@ -103,6 +108,21 @@ int main(int argc, char **argv) {
         else if (!strcmp(cmd, "edpub")) { bc_ed25519_pub(A[0], out); hex(out, 32); }
         else if (!strcmp(cmd, "edsign")) { bc_ed25519_sign(A[0], A[1], N[1], out); hex(out, 64); }
         else if (!strcmp(cmd, "edverify")) { printf("%ld", bc_ed25519_verify(A[0], A[1], N[1], A[2])); }
+        else if (!strcmp(cmd, "framelen")) printf("%ld", bc_frame_len(A[0], N[0]));
+        else if (!strcmp(cmd, "inbox")) {
+            // inbox <offset as 2 bytes> <bytes>: prints the result, and the packet when complete
+            long r = bc_inbox_put(ib, A[0][0] << 8 | A[0][1], A[1], N[1]);
+            printf("%ld", r);
+            if (r > 0) { printf(" "); hex(ib + 8, r); }
+        }
+        else if (!strcmp(cmd, "fragreset")) { memset(fa, 0, sizeof fa); printf("ok"); }
+        else if (!strcmp(cmd, "frag")) {
+            // frag <now as 4 bytes> <sender 8> <payload>
+            long now = (long)A[0][0] << 24 | A[0][1] << 16 | A[0][2] << 8 | A[0][3];
+            long r = bc_frag_put(fa, now, A[1], A[2], N[2], fout);
+            printf("%ld", r);
+            if (r > 0) { printf(" "); hex(fout, r); }
+        }
         else printf("?");
         printf("\n");
         fflush(stdout);

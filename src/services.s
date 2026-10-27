@@ -18,7 +18,7 @@
 
 // window geometry
 .set SW_W,      964
-.set SW_H,      720                   // three columns, eight rows of cards
+.set SW_H,      794                   // three columns, nine rows of cards
 .set SW_TOP,    (SW_H - 118 - 64)     // y of the first row of cards
 
 .data
@@ -61,6 +61,7 @@ Lsvc:
     .quad Lk_hook,  Lt_hook,  Ld_hook,  Lsy_hook,  0xBF5AF2, 0
     .quad Lk_files, Lt_files, Ld_files, Lsy_files, 0x64D2FF, 0
     .quad Lk_sens,  Lt_sens,  Ld_sens,  Lsy_sens,  0x30D158, 0x40000
+    .quad Lk_bc,    Lt_bc,    Ld_bc,    Lsy_bc,    0xFF9500, 0
 
 .section __TEXT,__const
 .p2align 3
@@ -68,7 +69,7 @@ Lc0:        .double 0.0
 Lc1:        .double 1.0
 Lc255:      .double 255.0
 Lc_W:       .double 964.0
-Lc_H:       .double 720.0
+Lc_H:       .double 794.0
 Lc_cw:      .double 300.0
 Lc_ch:      .double 64.0
 Lc_r16:     .double 16.0
@@ -78,8 +79,8 @@ Lc_s14:     .double 14.0
 Lc_s13:     .double 13.0
 Lc_s11:     .double 11.0
 // frames inside the window / a card: x, y, w, h
-Lf_title:   .double 24.0, 646.0, 420.0, 34.0
-Lf_sub:     .double 24.0, 622.0, 900.0, 18.0
+Lf_title:   .double 24.0, 720.0, 420.0, 34.0
+Lf_sub:     .double 24.0, 696.0, 900.0, 18.0
 Lf_icon:    .double 14.0, 14.0, 36.0, 36.0
 Lf_glyph:   .double 8.0, 8.0, 20.0, 20.0
 Lf_name:    .double 62.0, 33.0, 170.0, 18.0
@@ -288,6 +289,11 @@ _svc_start:
     b.eq Lss_hook
     cmp  x19, #SVC_FILES
     b.eq Lss_files
+    cmp  x19, #SVC_BITCHAT
+    b.eq Lss_bitchat
+    b    Lss_done
+Lss_bitchat:
+    bl   _bc_ble_start
     b    Lss_done
 Lss_files:
     bl   _files_start
@@ -472,6 +478,15 @@ Lsv_nofiles:
     bl   _hook_stop
     b    Lsv_done
 Lsv_notalerts:
+    cmp  x19, #SVC_BITCHAT            // bitchat off: links dropped; it may start again later
+    b.ne Lsv_notbc
+    bl   _bc_ble_stop
+    ADRL x8, _g_svc_started
+    ldr  x9, [x8]
+    bic  x9, x9, #(1 << SVC_BITCHAT)
+    str  x9, [x8]
+    b    Lsv_done
+Lsv_notbc:
     cmp  x19, #SVC_FM                 // FM off: stop the radio; it may start again later
     b.ne Lsv_done
     bl   _fm_stop
@@ -593,7 +608,15 @@ Lhw_find:
     add  x21, x21, #1
     b    Lhw_find
 Lhw_hit:
-    mov  x0, x21
+    cmp  x21, #SVC_BITCHAT            // bitchat: only by name, only on this Mac
+    b.ne 1f
+    ADRL x8, _g_remote_active
+    ldr  x9, [x8]
+    cbz  x9, 1f
+    ADRL x0, Ls_bc_here
+    bl   _home_say0
+    LEAVE 0
+1:  mov  x0, x21
     mov  x1, x19
     bl   _svc_set
     LEAVE 0
@@ -602,10 +625,12 @@ Lhw_all:
 Lhw_all_loop:
     cmp  x21, #NSVC
     b.hs Lhw_done
+    cmp  x21, #SVC_BITCHAT
+    b.eq 1f
     mov  x0, x21
     mov  x1, x19
     bl   _svc_set
-    add  x21, x21, #1
+1:  add  x21, x21, #1
     b    Lhw_all_loop
 Lhw_usage:
     ADRL x0, Ls_sw_usage
@@ -928,6 +953,7 @@ Lk_nws:     .asciz "alerts"
 Lk_hook:    .asciz "webhook"
 Lk_files:   .asciz "files"
 Lk_sens:    .asciz "sensors"
+Lk_bc:      .asciz "bitchat"
 Lt_hue:     .asciz "Philips Hue"
 Lt_st:      .asciz "SmartThings"
 Lt_home:    .asciz "Apple Home"
@@ -952,6 +978,7 @@ Lt_nws:     .asciz "Weather alerts"
 Lt_hook:    .asciz "Webhook"
 Lt_files:   .asciz "Files on Wi-Fi"
 Lt_sens:    .asciz "Bluetooth Sensors"
+Lt_bc:      .asciz "bitchat"
 Ld_hue:     .asciz "Bridge and Bluetooth bulbs"
 Ld_st:      .asciz "Lutron, Samsung and more"
 Ld_home:    .asciz "Scenes and devices via Shortcuts"
@@ -976,6 +1003,7 @@ Ld_nws:     .asciz "US National Weather Service"
 Ld_hook:    .asciz "Shortcuts and IFTTT post in"
 Ld_files:   .asciz "Your phone browses and uploads"
 Ld_sens:    .asciz "Thermometers, buttons, batteries"
+Ld_bc:      .asciz "Link to bitchat phones, walled off"
 Lsy_hue:    .asciz "lightbulb.fill"
 Lsy_st:     .asciz "square.grid.2x2.fill"
 Lsy_home:   .asciz "house.fill"
@@ -1000,6 +1028,7 @@ Lsy_nws:    .asciz "exclamationmark.triangle.fill"
 Lsy_hook:   .asciz "link"
 Lsy_files:  .asciz "folder.fill"
 Lsy_sens:   .asciz "thermometer"
+Lsy_bc:     .asciz "bubble.left.and.bubble.right"
 
 Lf_key:        .asciz "svc_%s"
 Ls_one:        .asciz "1"
@@ -1012,7 +1041,8 @@ Lf_now_on:     .asciz "\302\267 \342\234\205 %s is on."
 Lf_now_off:    .asciz "\302\267 \342\217\270 %s is off \342\200\224 asmmesh won\342\200\231t use it until you turn it back on."
 Ls_all_off:    .asciz "\302\267 \342\217\270 Every service is switched off. Open Settings (\342\214\230,) or the Services button to turn on the ones you use."
 Lf_some_on:    .asciz "\302\267 Services on: %s. Everything else is off (Settings: \342\214\230,)."
-Ls_sw_usage:   .asciz "\302\267 Say \342\200\234enable\342\200\235 or \342\200\234disable\342\200\235 and a service: hue, smartthings, home, wifi, tv, lifx, govee, homeassistant, spin, weather, mesh, rules, find, web, voice, fm, gateway, location, ntfy, pushover, alerts, webhook, files \342\200\224 or \342\200\234all\342\200\235."
+Ls_sw_usage:   .asciz "\302\267 Say \342\200\234enable\342\200\235 or \342\200\234disable\342\200\235 and a service: hue, smartthings, home, wifi, tv, lifx, govee, homeassistant, spin, weather, mesh, rules, find, web, voice, fm, gateway, location, ntfy, pushover, alerts, webhook, files, sensors, bitchat \342\200\224 or \342\200\234all\342\200\235 (everything but bitchat)."
+Ls_bc_here:    .asciz "\302\267 bitchat can only be switched on or off on this Mac, not from the mesh."
 Ls_win_title:  .asciz "Services"
 Ls_win_sub:    .asciz "Everything starts off. Switch on only what you use \342\200\224 each one is independent."
 Ls_m_toggled:  .asciz "serviceToggled:"
