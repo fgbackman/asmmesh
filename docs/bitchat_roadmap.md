@@ -28,9 +28,44 @@ Things to know: announcements (nickname and public keys) go out unencrypted, so 
 
 asmmesh and bitchat share almost no wire format, so this is a **second protocol stack beside asmmesh's own**. It should not be a change to asmmesh's packets.
 
-- asmmesh stays exactly as it is (its own service UUID, P-256 signatures, protocol v3).
+- asmmesh stays exactly as it is (its own service UUID, P-256 signatures, protocol v3), and is walled off from bitchat (see below).
 - A new **bitchat service** (its own Settings switch, off by default like every other service) advertises bitchat's GATT service, speaks bitchat's packets, and shows bitchat people and chat in asmmesh's UI.
 - The mesh core (`ble.s`, `mesh.s`, `crypto.s`, …) is shared by the Mac and iPhone builds (`ios/make_project.py` lists the core `.s` files). New assembly files therefore serve both, and the iPhone only needs SwiftUI changes.
+
+### The wall: integrated, but walled off
+
+bitchat shows up inside asmmesh (People, Scanner, its own rooms), but nothing from bitchat can reach asmmesh's own mesh, keys, rooms or devices. Everything bitchat sends is treated as untrusted text from strangers.
+
+**1. One narrow door.** All bitchat code lives in `src/bc_*.s`. The only way in is the bitchat Bluetooth characteristic. The only way out to the rest of asmmesh is a small set of UI events: *peer seen/gone* (ID, nickname, fingerprint), *message* (room, sender, text), and *delivery ack*. bitchat code never calls `mesh.s`, `ble.s`'s broadcast, FM, the web gateway, Home, rules or invites. asmmesh code never hands bitchat anything except text the user typed into a bitchat room.
+
+**2. Separate packets.** bitchat packets are never relayed on asmmesh's mesh (Bluetooth or FM), never go into asmmesh's last-32 history, and are never parsed by asmmesh's packet decoder. asmmesh packets never go out on the bitchat characteristic. Each side has its own queues, dedup set and buffers.
+
+**3. Separate keys.** bitchat's Curve25519 and Ed25519 keys are new, random, and stored in their own Keychain items. They are never derived from, signed by, or linked to the asmmesh P-256 identity, so nobody can connect your asmmesh identity to your bitchat one. The mesh passphrase and room keys are never used on the bitchat side.
+
+**4. No authority.** Nothing that arrives over bitchat can:
+- control devices, run Shortcuts or scenes, or trigger the `@name` remote commands
+- set off rules ("when Anna arrives…"), reminders, alerts or SOS
+- create, join or invite to asmmesh rooms, or move a message into one
+- send files, fetch web pages, or open links automatically
+
+bitchat rooms are display-only: incoming text is never parsed as a command, even if it says "kitchen lights off". Typing a command into a bitchat room sends it as chat text, never as a command.
+
+**5. No impersonation.** bitchat people always carry a **bitchat** badge and their bitchat fingerprint, everywhere they appear. They are never merged with an asmmesh person who has the same name. If a bitchat nickname matches someone in your asmmesh People list, show a warning, as asmmesh already does for two people with the same name.
+
+**6. Can't drown asmmesh.** bitchat gets fixed memory and rate limits: caps on peers, reassembly buffers (bitchat's own: 128 assemblies, 30 s, 1 MiB), dedup entries, and packets per second per link. asmmesh traffic has priority for Bluetooth writes. When a limit is hit, bitchat traffic is dropped and asmmesh carries on.
+
+**7. Hardened parser.** The bitchat decoder is the main attack surface: it's assembly reading bytes from strangers. Every length is checked before it's used, zlib output is capped before inflating, and unknown types and TLVs are dropped. It's fuzzed under qemu with random and corrupted packets before it ships.
+
+**8. Off really means off.** With the switch off, the bitchat service isn't advertised, nothing is scanned, the bitchat keys aren't loaded from the Keychain, and bitchat rooms are hidden. A **Forget bitchat** button deletes the bitchat keys, peers and history.
+
+**9. Tests for the wall.** Self-tests check that the wall holds, for example:
+- a bitchat message containing a Home command changes nothing
+- a bitchat packet fed to asmmesh's decoder is rejected, and the other way round
+- a bitchat nickname that matches an asmmesh person gets the badge and the warning
+- a flood of bitchat packets doesn't delay asmmesh messages
+- with the switch off, nothing is advertised and the Keychain isn't touched
+
+A stronger option for later on the Mac: run the bitchat stack in a separate helper process that talks to asmmesh only through those UI events, so a bug in it can't touch asmmesh's memory. iOS doesn't allow this, so the in-process wall above is the baseline on both.
 
 ### What bitchat speaks (summary)
 
@@ -85,7 +120,7 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 
 **Milestone 2 — public chat both ways**
 - New **bitchat** room. Incoming `0x02` messages appear there with the sender's nickname. Messages typed there go out signed.
-- Keep it separate from Main: bitchat messages are verified with bitchat's Ed25519 keys, not asmmesh's P-256 identities, so they shouldn't look like asmmesh traffic.
+- Keep it separate from Main and behind the wall: the bitchat room is display-only, and nothing in it is ever treated as a command.
 - Relay bitchat packets for other bitchat users like any bitchat node does.
 - Optional: answer sync requests (`0x21`, GCS filters) so late arrivals get recent history.
 
@@ -98,7 +133,7 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 **Later / maybe**
 - Favourites and courier mail (`0x04`), source routing, files (`0x22`), group messages (`0x25`), voice (`0x29`).
 - Peer ID rotation (`0x2C`). It's still a draft in bitchat, so wait until it ships.
-- A **bridge** that carries messages between asmmesh rooms and bitchat. Only add it with clear labels and the user's consent, because the two trust models differ.
+- **No automatic bridge.** Messages never cross between asmmesh rooms and bitchat on their own. If one is ever added, it's per message: the user picks a message and chooses to share it, and it arrives labelled as coming from the other network.
 
 ### Risks and open questions
 - **Moving target.** bitchat's protocol is active (v2 headers, routing and rotation are all recent). Write the codec to be tolerant (skip unknown TLVs and types), and re-test against each new bitchat release.
