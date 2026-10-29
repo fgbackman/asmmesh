@@ -1948,7 +1948,7 @@ Li_pick_info:          .asciz "Open People, tap someone, then Invite. From Main 
 Li_files_folder:       .asciz "\302\267 \360\237\223\202 On iPhone and iPad the shared folder is asmmesh\342\200\231s own: in the Files app, On My iPhone (or iPad) \342\200\272 asmmesh. Put files there; uploads from other phones land there too."
 .globl _fs_default_dir
 _fs_default_dir:       .asciz "%s/Documents"
-Li_mac_only:           .asciz "\302\267 That one is Mac-only (files page, AirDrop, FM radio)."
+Li_mac_only:           .asciz "\302\267 That one is Mac-only (FM radio)."
 Li_m_cmState:          .asciz "centralManagerDidUpdateState:"
 Li_m_cmDiscover:       .asciz "centralManager:didDiscoverPeripheral:advertisementData:RSSI:"
 Li_m_cmConnect:        .asciz "centralManager:didConnectPeripheral:"

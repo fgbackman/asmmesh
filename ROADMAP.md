@@ -26,11 +26,7 @@ Written Oct 28, 2026, from the top-of-file notes in every source file, the iPhon
 
 ## Docs and cleanup
 
-- The README says the Web and News rooms, Files and AirDrop aren't on iPhone, but they are now. FM radio and the web gateway still aren't.
-- `src/home.s` says mesh identities "aren't authenticated yet", which changed with protocol v3.
-- The README's packet-format section still describes v2 instead of v3.
-- "Find someone on the mesh" and the iPad layout aren't in the README.
-- `_to_delete/` holds two leftover archives.
+- `_to_delete/` on the Mac mini holds two leftover archives (the folder is in `.gitignore`, so it isn't in the repository).
 
 ## bitchat (Jack Dorsey's Bluetooth mesh app)
 

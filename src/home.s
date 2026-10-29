@@ -7,8 +7,9 @@
 // "devices", "pair hue", "@Anna hallway on".
 //
 // Safety: unlocking always asks on screen first, and is never accepted from
-// the mesh (mesh identities aren't authenticated yet). Any other remote command
-// asks the owner of this Mac to Allow / Allow for 10 minutes / Deny.
+// the mesh, even though remote commands are signed by their sender (protocol v3)
+// and usually sealed for this Mac alone. Any other remote command asks the owner
+// of this Mac to Allow / Allow for 10 minutes / Deny.
 
 .include "macros.inc"
 
@@ -1453,7 +1454,7 @@ Ls_asked_held:       .asciz "\302\267 Asked %s: \342\200\234%s\342\200\235 \342\
 Ls_nobody:           .asciz "\302\267 Nobody on the mesh has that name. Use a name from People, like \342\200\234@Anna kitchen off\342\200\235."
 Ls_say_what:         .asciz "\302\267 Add what they should do, like \342\200\234@Anna kitchen off\342\200\235."
 Ls_remote_q:         .asciz "%s wants to use this Mac's devices"
-Ls_remote_info:      .asciz "They asked: \342\200\234%s\342\200\235\n\nIt came over the mesh, which isn't encrypted yet \342\200\224 only allow people you're with. Unlocking doors and opening garages are never allowed this way."
+Ls_remote_info:      .asciz "They asked: \342\200\234%s\342\200\235\n\nIt came over the mesh, signed by them \342\200\224 only allow people you trust. Unlocking doors and opening garages are never allowed this way."
 Ls_allow:            .asciz "Allow"
 Ls_allow10:          .asciz "Allow for 10 Minutes"
 Ls_deny:             .asciz "Deny"

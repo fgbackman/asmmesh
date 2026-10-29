@@ -87,7 +87,11 @@ The same assembly core (`src/*.s`) runs on iPhone. `ios/asm/ios_ui.s` takes the 
 
 To install: plug in the iPhone or iPad, then run `cd ~/Developer/asmmesh/ios && bash "Install on iPhone.command"`. It signs with your free Apple ID, then installs and opens the app on every paired iPhone and iPad. The first time, turn on Settings > Privacy & Security > Developer Mode, and trust your certificate under Settings > General > VPN & Device Management. With a free Apple ID the app stops opening after 7 days; run the script again to renew it.
 
-Not on iPhone (yet): the Web and News rooms, FM radio, the files page, AirDrop and the web gateway. iOS only scans for Bluetooth while the app is open, and Hue/Sonos discovery by SSDP needs an entitlement free accounts can't get (Bonjour discovery still works). After adding a source file, run `python3 ios/make_project.py`.
+The Web and News rooms, Files on Wi-Fi and AirDrop (through the share sheet) work on iPhone too; the shared folder is asmmesh's own, under On My iPhone › asmmesh in the Files app. Not on iPhone (yet): FM radio, the web gateway, the device's own battery level and the SPIN window. iOS only scans for Bluetooth while the app is open, and Hue/Sonos discovery by SSDP needs an entitlement free accounts can't get (Bonjour discovery still works). After adding a source file, run `python3 ios/make_project.py`.
+
+**On iPad** the Rooms tab keeps the room list in a sidebar beside the open room, the radar in Nearby is larger, and the card lists stay at a readable width instead of running edge to edge.
+
+**Find someone on the mesh** — in People, tap the arrow next to someone to get an arrow and a distance to them. They're asked first, and nothing is shared until they say yes; sharing stops by itself after 15 minutes. It uses Ultra Wideband when both phones have it (iPhone 11 and later, within about 10 m), then GPS and the compass outdoors, then a Bluetooth sweep for the last stretch (turn slowly; the signal is strongest facing them). The requests and locations travel as SEEK packets sealed for the two of you, so the Macs and phones in between pass them on without reading them; a Mac someone asks to find says so in Main.
 
 ## Build and run
 
@@ -154,21 +158,31 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
     src/util.s     objc_msgSend shortcuts, NSString helpers, chat formatting
     src/macros.inc frame and messaging macros
 
-## Packet format (v2)
+## Packet format (v3)
 
-    header  +0 'M'  +1 version 2  +2 hops left (starts at 7)  +3 type  +4 8-byte random packet id
+    header  +0 'M'  +1 version 3  +2 hops left (starts at 7)  +3 type  +4 8-byte random packet id
     MSG     +12 room id  +20 sender id  +28 flags  +29 nick length n  +30 nick, then UTF-8 text
-    HELLO   +12 node id  +20 messages relayed (u32)  +24 n  +25 nick
-    INVITE  +12 room id  +20 from id  +28 target id  +36 n  +37 nick, then room-name length and name
-    ROOMAD  +12 room id  +20 owner id  +28 n  +29 nick, then room-name length and name (type 12, after each HELLO)
-    JOINREQ +12 room id  +20 asker id  +28 n  +29 nick, then the owner's id (type 13)
-    CMD/RES +12 target id  +20 from id  +28 n  +29 nick, then UTF-8 command text or reply (types 4, 5)
+            (sealed with the room's key in a private room, with the mesh passphrase in Main if one is set)
+    HELLO   +12 node id  +20 messages relayed (u32)  +24 n  +25 nick, then the 65-byte public key (type 2)
+    INVITE  +12 room id  +20 from id  +28 target id  +36 n  +37 nick, then sealed for the target alone:
+            room-name length, name, the room's 64-byte key and the owner's id (type 3)
+    CMD/RES +12 target id  +20 from id  +28 n  +29 nick, then a mode byte (0 plain, 1 mesh passphrase,
+            2 sealed for the target alone) and the command text or reply (types 4, 5)
     SEEN    +12 sender id  +20 flags  +21 n  +22 nick, then room, count, (rssi, name) per device (type 6, 2 hops)
-    sealed  MSG flag 2 / CMD first byte 1 / SEEN flag 1: ciphertext then an 8-byte tag over id, ids and text
     NEWS    +12 zero  +20 gateway id  +28 n  +29 nick, then flags (1 sealed) and the headline (type 7)
     WEBREQ  +12 gateway id (0 = any)  +20 asker id  +28 n  +29 nick, then request id u32, flags (1 sealed,
             2 resend), then seq, total, offset u16 and a piece of the address — or, for a resend,
             the page's piece count u16 and a bitmap of the pieces still missing (type 8)
     WEBPART +12 asker id  +20 gateway id  +28 0  +29 request id u32  +33 piece u16  +35 pieces u16
             +37 flags (1 sealed)  +38 up to 120 bytes of the zlib-packed page (type 9)
-    at most 240 bytes; Main is room id 0; Web (2) and News (3), like Home (1), are local rooms
+    ROOMDEL +12 room id  +20 owner id  +28 n  +29 nick: only the owner's packet counts (type 10)
+    HP      +12 target id (0 = any)  +20 sender id  +28 n  +29 nick, then op and the headphones'
+            16-byte fingerprint (type 11)
+    ROOMAD  +12 room id  +20 owner id  +28 n  +29 nick, then room-name length and name; length 0 means
+            no longer listed (type 12, after each HELLO)
+    JOINREQ +12 room id  +20 asker id  +28 n  +29 nick, then the owner's id (type 13)
+    SEEK    +12 target id  +20 sender id  +28 n  +29 nick, then a payload sealed for the target (type 14)
+    sealed  ciphertext (AES-256-CTR), then an 8-byte HMAC-SHA256 tag
+    trailer every packet ends with the time it was made (u32 seconds) and a 64-byte P-256 signature over
+            the whole packet with the hop count zeroed; a mesh id is the first 8 bytes of SHA-256(public key)
+    at most 240 bytes, trailer included; Main is room id 0; Web (2) and News (3), like Home (1), are local rooms
