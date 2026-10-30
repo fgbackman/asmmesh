@@ -126,3 +126,13 @@ Numbers now taken:
   `tools/qemu/run.sh diff` checks everything against bcwire.py.
 - bc_ble.s reads each packet with _bc_decode and counts it by type (_g_bc_types); "bitchat" lists
   the kinds it doesn't name.
+
+## bitchat Milestone 1 (Oct 30, branch claude/bitchat-roadmap): bitchat people
+- New file: `src/bc_peer.s` (pure: announces, the people table, leaves, UTF-8). In the Makefile
+  and ios/make_project.py. Layouts AN_*, BT_* in bc_defs.inc. Self-tests 165-172.
+- bc_ble.s: our bitchat keys (Keychain item "asmmesh.bitchat", separate from asmmesh's identity),
+  announces, people. `_bc_tick` runs once a second from scanner.s and ios_ui.s.
+- net.s: new `_kc_del(service)`. rules.s: "bitchat people", "bitchat forget".
+- People: rows past _g_node_count are bitchat people (`_people_rows` in ui.s, `Lcv_bitchat` in
+  cards.s; iPhone: `am_bc_*` and Mesh.bitchatPeople). Code that takes a People row as an index
+  into _g_nodes must check it against _g_node_count first (Invite already does).

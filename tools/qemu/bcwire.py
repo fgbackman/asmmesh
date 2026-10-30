@@ -159,3 +159,87 @@ def relay(t, ttl, has_rcpt, self_sent, to_self, degree):  # RelayController.deci
     return (lim - 1, lo, hi)
 def dedup_key(d):                                        # BLEReceivedPacketContext.messageID
     return (d['sender'], d['ts'], d['type'], hashlib.sha256(d['payload']).digest()[:4])
+
+# ---- Milestone 1: announces (AnnouncementPacket in Packets.swift) and who's around
+# (BLEAnnouncePreflightPolicy, BLEAnnounceTrustPolicy, handleLeave), for bc_peer.s
+STALE_MS, KEEP_MS, PEERS, NICK_MAX = 900000, 60000, 32, 47
+def utf8_ok(b):
+    try: b.decode('utf-8'); return True
+    except UnicodeDecodeError: return False
+def utf8_cut(b, mx):
+    m = min(len(b), mx)
+    while 0 < m < len(b) and b[m] & 0xc0 == 0x80: m -= 1
+    return m
+def ann_make(nick, xpub, edpub):
+    n = nick[:utf8_cut(nick, 26)]        # the packet fits one 182-byte write; never compressed
+    return bytes([1, len(n)]) + n + bytes([2, 32]) + xpub + bytes([3, 32]) + edpub
+def ann_read(p):
+    o, nick, x, e = 0, None, None, None
+    while o + 2 <= len(p):
+        t, L = p[o], p[o + 1]; o += 2
+        if o + L > len(p): return None
+        v = p[o:o + L]; o += L
+        if t == 1: nick = v if utf8_ok(v) else None
+        elif t == 2: x = v
+        elif t == 3: e = v
+    if nick is None or x is None or e is None or len(x) != 32 or len(e) != 32: return None
+    return nick, x, e
+def peer_id(xpub): return hashlib.sha256(xpub).digest()[:8]
+def ed_ok(pub, sig, msg):
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    try: ed25519.Ed25519PublicKey.from_public_bytes(pub).verify(sig, msg); return True
+    except Exception: return False
+class Peers:
+    def __init__(self): self.t = [None] * PEERS        # dict(id, heard, first, hops, x, e, nick)
+    def find(self, i):
+        for k, p in enumerate(self.t):
+            if p and p['id'] == i: return k
+        return -1
+    def heard(self, now, own, d):
+        # -> (slot, new) or (code, 0): -1 not an announce, -2 id not from its key, -3 us,
+        #    -4 stale, -5 signature, -6 a different signing key than before
+        if d['type'] != 1: return (-1, 0)
+        a = ann_read(d['payload'])
+        if a is None: return (-1, 0)
+        nick, x, e = a
+        if peer_id(x) != d['sender']: return (-2, 0)
+        if d['sender'] == own: return (-3, 0)
+        if now >= STALE_MS and d['ts'] < now - STALE_MS: return (-4, 0)
+        k = self.find(d['sender'])
+        if k >= 0 and self.t[k]['e'] != e: return (-6, 0)
+        if d['sig'] is None or not ed_ok(e, d['sig'], signing_bytes(d)): return (-5, 0)
+        new = 0
+        if k < 0:
+            new = 1
+            free = [j for j, p in enumerate(self.t) if p is None]
+            k = free[0] if free else min(range(PEERS), key=lambda j: (self.t[j]['heard'], j))
+            self.t[k] = dict(id=d['sender'], first=now)
+        p = self.t[k]
+        p.update(heard=now, hops=7 - min(d['ttl'], 7), x=x, e=e, nick=nick[:utf8_cut(nick, NICK_MAX)])
+        return (k, new)
+    def leave(self, d):
+        if d['type'] != 3: return -1
+        k = self.find(d['sender'])
+        if k < 0 or d['sig'] is None or not ed_ok(self.t[k]['e'], d['sig'], signing_bytes(d)): return -1
+        self.t[k] = None
+        return k
+    def expire(self, now):
+        gone = 0
+        for k, p in enumerate(self.t):
+            if p and now >= p['heard'] and now - p['heard'] >= KEEP_MS: self.t[k] = None; gone += 1
+        return gone
+    def dump(self, k):
+        p = self.t[k]
+        if p is None: return '-'
+        return '%s %x %x %d %s %s %s' % (p['id'].hex(), p['heard'], p['first'], p['hops'], p['x'].hex(), p['e'].hex(), p['nick'].hex() or '-')
+def announce_packet(xseed, edseed, nick, ts, ttl=7, sender=None, sign_with=None, version=1):
+    from cryptography.hazmat.primitives.asymmetric import ed25519, x25519
+    from cryptography.hazmat.primitives import serialization as S
+    raw = lambda k: k.public_bytes(S.Encoding.Raw, S.PublicFormat.Raw)
+    xpub = raw(x25519.X25519PrivateKey.from_private_bytes(xseed).public_key())
+    epub = raw(ed25519.Ed25519PrivateKey.from_private_bytes(edseed).public_key())
+    pay = ann_make(nick, xpub, epub)
+    snd = sender if sender is not None else peer_id(xpub)
+    if sign_with is False: return encode(version=version, type=1, ttl=ttl, ts=ts, sender=snd, payload=pay)
+    p = build(version, 1, ttl, ts, snd, None, pay, sign_with or edseed)
+    return p

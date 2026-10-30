@@ -61,6 +61,21 @@ struct PeopleView: View {
                             }
                         }
                     }
+                    if !mesh.bitchatPeople.isEmpty {
+                        SectionTitle(text: "On bitchat")
+                        ForEach(mesh.bitchatPeople) { b in
+                            Card {
+                                HStack(spacing: 14) {
+                                    IconBadge(symbol: "antenna.radiowaves.left.and.right", color: Theme.orange, size: 40)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(b.name.isEmpty ? "bitchat user" : b.name).font(.headline)
+                                        Text(b.line).font(.footnote).foregroundStyle(Theme.dim)
+                                    }
+                                    Spacer()
+                                }
+                            }
+                        }
+                    }
                 }
                 .padding()
                 .readableWidth()

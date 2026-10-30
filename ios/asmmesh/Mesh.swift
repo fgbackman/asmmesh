@@ -76,6 +76,13 @@ struct JoinRequest: Identifiable, Equatable {
     let room: String
 }
 
+/// Someone heard on bitchat (bc_ble.s): only shown, never invited, found or messaged.
+struct BitchatPerson: Identifiable, Equatable {
+    let id: Int
+    let name: String
+    let line: String         // "bitchat · 1a2b 3c4d 5e6f 7a8b · nearby", with a warning if needed
+}
+
 struct Person: Identifiable, Equatable {
     let id: Int          // index on the core's list
     let name: String
@@ -143,6 +150,7 @@ final class Mesh: ObservableObject {
     @Published var current = 0
     @Published var lines: [UInt64: [Line]] = [:]
     @Published var people: [Person] = []
+    @Published var bitchatPeople: [BitchatPerson] = []
     @Published var status = ""
     @Published var nick = ""
     @Published var myFingerprint = ""
@@ -239,6 +247,13 @@ final class Mesh: ObservableObject {
                             age: am_node_info(i, 2)))
         }
         if p != people { people = p }
+        var b: [BitchatPerson] = []
+        var line = [CChar](repeating: 0, count: 128)
+        for k in 0..<am_bc_count() {
+            am_bc_line(k, &line)
+            b.append(BitchatPerson(id: k, name: cstr(am_bc_nick(k)), line: String(cString: line)))
+        }
+        if b != bitchatPeople { bitchatPeople = b }
         var s: [Sensor] = []
         for i in 0..<am_sensor_count() {
             let label = cstr(am_sensor_info(i, 0))

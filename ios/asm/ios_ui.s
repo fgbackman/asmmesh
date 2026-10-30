@@ -150,6 +150,7 @@ _am_tick:
     mov  x0, x20
     bl   _udp_tick
     bl   _near_tick
+    bl   _bc_tick                     // bitchat: announce, forget people gone quiet
     bl   _ios_alert_open              // a rule may ask something: not on top of another prompt
     cbnz x0, Lat_hello
     mov  x0, x20

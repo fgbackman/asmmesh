@@ -257,6 +257,53 @@ for i in range(n * 6):
         if len(ring) > 1000: ring.pop(0)
     cases.append(('seen %08x %s' % (now, h(p)), exp, 'duplicate filter'))
 
+# ---- Milestone 1: announces and the table of bitchat people, against bcwire.Peers
+def rutf8(k):
+    s = ''.join(rnd.choice(['a', 'Z', ' ', '\'', '\u00e9', '\u2615', '\U0001F4E1', '\u4e2d']) for _ in range(k))
+    return s.encode('utf-8')
+for i in range(n):
+    b = rutf8(rnd.randrange(12)) if rnd.random() < .6 else rb(rnd.randrange(8))
+    cases.append(('utf8 ' + h(b), '1' if bcwire.utf8_ok(b) else '0', 'utf-8 check'))
+    nick, x, e = rutf8(rnd.randrange(40)), rb(32), rb(32)
+    a = bcwire.ann_make(nick, x, e)
+    cases.append(('annmake %s %s %s' % (h(nick), x.hex(), e.hex()), a.hex(), 'announce make'))
+    q = bytearray(a)
+    if rnd.random() < .5:
+        for _ in range(rnd.randrange(1, 3)): q[rnd.randrange(len(q))] = rnd.getrandbits(8)
+    if rnd.random() < .3: q += bytes([rnd.choice([4, 5, 6, 9, 1]), 2, 1, 2])
+    if rnd.random() < .2: q = q[:rnd.randrange(len(q) + 1)]
+    r = bcwire.ann_read(bytes(q))
+    cases.append(('annread ' + h(bytes(q)), '-1' if r is None else '%s %s %s' % (h(r[0]), r[1].hex(), r[2].hex()), 'announce read'))
+# people coming and going: a few identities announcing, sometimes forged, leaving, time passing
+T = bcwire.Peers()
+cases.append(('peerreset', 'ok', 'bitchat people'))
+own = rb(8)
+ids = [(rb(32), rb(32), rutf8(rnd.randrange(1, 50))) for _ in range(40)]
+now = 1_760_000_000_000
+for i in range(n * 4):
+    now += rnd.choice([10, 500, 5000, 30000, 70000])
+    xs, es, nick = rnd.choice(ids)
+    roll = rnd.random()
+    ts = now - rnd.choice([0, 0, 0, 1000, 899000, 901000])
+    if roll < .6:
+        kw = {}
+        if rnd.random() < .1: kw['sign_with'] = rb(32)                 # someone else's key
+        if rnd.random() < .05: kw['sign_with'] = False
+        if rnd.random() < .05: kw['sender'] = rb(8)
+        if rnd.random() < .05: es2 = rb(32); p = bcwire.announce_packet(xs, es2, nick, ts, ttl=rnd.randrange(9))
+        else: p = bcwire.announce_packet(xs, es, nick, ts, ttl=rnd.randrange(9), **kw)
+        d = bcwire.decode(p)
+        k, new = T.heard(now, own, d)
+        exp = '%d %d' % (k, new) + ((' ' + T.dump(k)) if k >= 0 else '')
+        cases.append(('heard %s %s %s' % (now.to_bytes(8, 'big').hex(), own.hex(), h(p)), exp, 'bitchat people'))
+    elif roll < .75:
+        from cryptography.hazmat.primitives.asymmetric import x25519
+        xpub = raw(x25519.X25519PrivateKey.from_private_bytes(xs).public_key())
+        p = bcwire.build(1, 3, 7, ts, bcwire.peer_id(xpub), None, b'', es if rnd.random() < .7 else rb(32))
+        cases.append(('leave ' + h(p), str(T.leave(bcwire.decode(p))), 'bitchat people'))
+    else:
+        cases.append(('expire ' + now.to_bytes(8, 'big').hex(), str(T.expire(now)), 'bitchat people'))
+
 inp = '\n'.join(c[0] for c in cases) + '\n'
 res = subprocess.run(['qemu-aarch64', harness], input=inp, capture_output=True, text=True).stdout.split('\n')
 fails = {}

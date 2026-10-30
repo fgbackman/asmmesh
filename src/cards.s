@@ -8,6 +8,7 @@
 // buttons (Talk, Send) under the transcript.
 
 .include "macros.inc"
+.include "bc_defs.inc"
 
 .section __DATA,__data
 .p2align 3
@@ -279,7 +280,7 @@ Lcv_person:
     ADRL x8, _g_node_count
     ldr  x9, [x8]
     cmp  x20, x9
-    b.hs Lcv_nil
+    b.hs Lcv_bitchat
     ADRL x8, _g_nodes
     add  x21, x8, x20, lsl #NODE_SHIFT
     ldr  x0, [x21, #N_ID]
@@ -328,6 +329,28 @@ Lcv_pfmt:
     mov  x3, x23
     mov  x4, #0
     mov  x5, x24
+    ldr  d0, [sp, #96]
+    bl   _cd_card
+    LEAVE 160
+
+Lcv_bitchat:                          // someone on bitchat (bc_ble.s): orange, walled off,
+    sub  x0, x20, x9                  //   nothing to click
+    bl   _bc_person
+    cbz  x0, Lcv_nil
+    mov  x21, x0
+    add  x1, sp, #160
+    mov  x2, #96
+    bl   _bc_person_line
+    add  x0, sp, #160
+    bl   _nsstr
+    mov  x23, x0
+    add  x2, x21, #BT_NICK
+    ADRL x0, Ls_y_bitchat
+    mov  x1, #0x9500                  // bitchat's switch colour
+    movk x1, #0xFF, lsl #16
+    mov  x3, x23
+    mov  x4, #0
+    mov  x5, #0
     ldr  d0, [sp, #96]
     bl   _cd_card
     LEAVE 160
@@ -717,6 +740,7 @@ Ls_ad_ask:           .asciz "%s\342\200\231s room \302\267 click to ask to join"
 Ls_ad_away:          .asciz "%s\342\200\231s room \302\267 away now \302\267 click to ask to join"
 Ls_ad_asked:         .asciz "Asked %s \302\267 you join when they say yes"
 Ls_y_person:         .asciz "person.fill"
+Ls_y_bitchat:        .asciz "antenna.radiowaves.left.and.right"
 Ls_k_main:           .asciz "Everyone on the mesh"
 Ls_k_home:           .asciz "Lights, locks and scenes"
 Ls_k_web:            .asciz "Pages through a Mac with internet"

@@ -693,6 +693,14 @@ _kc_set:
     bl   _SecItemAdd
     LEAVE 0
 
+// void _kc_del(const char *service) — removes it, if there is one
+.globl _kc_del
+_kc_del:
+    ENTER 0
+    bl   _kc_query
+    bl   _SecItemDelete
+    LEAVE 0
+
 // ---------------------------------------------------------------------------
 .section __TEXT,__cstring,cstring_literals
 Ls_NSURLSessionConfiguration: .asciz "NSURLSessionConfiguration"

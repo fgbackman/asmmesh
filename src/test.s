@@ -1293,6 +1293,8 @@ _selftest:
     add  x19, x19, x0
     bl   _bc_packet_selftest          // bitchat's packets (bc_packet.s)
     add  x19, x19, x0
+    bl   _bc_peer_selftest            // bitchat people (bc_peer.s)
+    add  x19, x19, x0
     bl   _t_hard                      // fuzzing, flood limits, full tables (last: it fills them)
     add  x19, x19, x0
 

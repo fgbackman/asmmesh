@@ -442,10 +442,17 @@ Ldr_scan:
     b    _scan_rows
 Ldr_rooms:                            // our rooms, then other people's listed ones
     b    _rooms_rows
-Ldr_nodes:
+Ldr_nodes:                            // asmmesh people, then bitchat's (bc_ble.s)
+    b    _people_rows
+
+// long _people_rows(void) — rows in People
+_people_rows:
+    ENTER 0
+    bl   _bc_people_n
     ADRL x8, _g_node_count
-    ldr  x0, [x8]
-    ret
+    ldr  x9, [x8]
+    add  x0, x0, x9
+    LEAVE 0
 
 // long _rooms_rows(void) — rows in Rooms: our rooms, then the listings on offer (listed.s)
 _rooms_rows:

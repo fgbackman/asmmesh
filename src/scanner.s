@@ -171,6 +171,7 @@ Ltk_second:
     bl   _scanner_update_details
     mov  x0, x20
     bl   _rules_tick                  // schedules, rules, sharing what we hear
+    bl   _bc_tick                     // bitchat: announce, forget people gone quiet
 Ltk_hello:
     mov  x9, #150
     udiv x10, x19, x9

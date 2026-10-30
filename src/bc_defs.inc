@@ -67,3 +67,29 @@
 .set DD_POS,        0
 .set DD_ENT,        8           // DD_N x 32: sender, time, type << 32 | digest, when seen + 1
 .set DD_SIZE,       (DD_ENT + DD_N * 32)
+
+// an announce's contents (bc_peer.s _bc_ann_read): pointers into the payload
+.set AN_NICK,       0
+.set AN_NLEN,       8
+.set AN_XPUB,       16          // Noise static key (X25519), 32 bytes
+.set AN_EDPUB,      24          // signing key (Ed25519), 32 bytes
+.set AN_SIZE,       32
+
+// bitchat people we've heard announce (bc_peer.s): BT_N slots of 256 bytes
+.set BT_N,          32
+.set BT_SHIFT,      8
+.set BT_ID,         0           // peer id: first 8 bytes of SHA-256 of the Noise key
+.set BT_HEARD,      8           // ms since 1970 of the last good announce; 0: a free slot
+.set BT_FIRST,      16
+.set BT_HOPS,       24          // 7 - the TTL it reached us with
+.set BT_XPUB,       32
+.set BT_EDPUB,      64          // pinned: a later announce with another key is refused
+.set BT_NLEN,       96
+.set BT_NICK,       104         // up to BT_NICK_MAX bytes of UTF-8, then 0
+.set BT_NICK_MAX,   47
+.set BT_SIZE,       (BT_N << BT_SHIFT)
+.set BT_KEEP,       60000       // forgotten a minute after the last announce (as bitchat)
+.set BT_STALE,      900000      // announces older than 15 minutes are ignored (as bitchat)
+.set BT_NICK_SEND,  26          // our name in announces: the signed packet stays within 182
+                                // bytes (one write on most phone links), and under 100 bytes
+                                // of payload, which bitchat never compresses

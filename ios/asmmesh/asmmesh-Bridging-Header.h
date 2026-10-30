@@ -40,6 +40,11 @@ long am_seek_send(uint64_t to, const uint8_t *data, long len);
 long am_node_info(long i, long k);          // 0 hops, 1 dBm, 2 seconds since heard, 3 relayed
 char *am_node_fp(long i, char *buf);        // i = -1: this phone
 const char *am_nick(void);
+
+// bitchat people (bc_ble.s): walled off, a name and a line to show, nothing to act on
+long am_bc_count(void);
+const char *am_bc_nick(long k);
+char *am_bc_line(long k, char *buf);       // buf: 128 bytes
 char *am_status(void);
 
 // actions; each shows its own prompt
