@@ -102,6 +102,7 @@ _g_bc_keys:     .quad 0         // KS_*
 _g_bc_kcst:     .quad 0         // what the Keychain said when they were read
 _g_bc_kclen:    .quad 0
 _g_bc_ann_at:   .quad 0         // when the next announce goes (ms, _fm_now_ms); 0: next tick
+_g_bc_quiet:    .quad 0         // 1: "bitchat announce off", for testing (listen only)
 .zerofill __DATA,__bss,_g_bc_sk,64,4                      // X25519 secret, Ed25519 seed
 .zerofill __DATA,__bss,_g_bc_xpub,32,4
 .zerofill __DATA,__bss,_g_bc_edpub,32,4
@@ -851,6 +852,9 @@ _bc_tick:
     ldr  x9, [x8]
     cmp  x19, x9
     b.lo 9f
+    ADRL x8, _g_bc_quiet
+    ldr  x9, [x8]
+    cbnz x9, 9f
     bl   Lbc_announce
     mov  w0, #4000                        // the next in 15 to 19 s, as bitchat does
     bl   _arc4random_uniform
@@ -1698,6 +1702,12 @@ Lbc_say_me:
     add  x2, sp, #96
     ldr  x3, [x8, #C_SENT]
     bl   _home_say
+    ADRL x8, _g_bc_quiet
+    ldr  x9, [x8]
+    cbz  x9, 2f
+    ADRL x0, Ls_bc_ann_off
+    bl   _home_say0
+2:
     bl   _bc_people_n
     mov  x1, x0
     ADRL x8, _g_bc_cnt
@@ -1712,6 +1722,27 @@ Lbc_say_me:
     csel x0, x10, x0, eq
     bl   _home_say0
     LEAVE 32
+
+// "bitchat announce on" (0) / "off" (1) — for testing: listen without announcing
+.globl _h_bitchat_quiet
+_h_bitchat_quiet:
+    ENTER 0
+    ADRL x8, _g_remote_active
+    ldr  x9, [x8]
+    cbnz x9, 1f
+    ADRL x8, _g_bc_quiet
+    str  x0, [x8]
+    ADRL x8, _g_bc_ann_at
+    str  xzr, [x8]
+    ADRL x1, Ls_bc_ann_on
+    ADRL x2, Ls_bc_ann_off
+    cmp  x0, #0
+    csel x0, x2, x1, ne
+    bl   _home_say0
+    LEAVE 0
+1:  ADRL x0, Ls_only_here
+    bl   _home_say0
+    LEAVE 0
 
 // "bitchat people" — everyone heard, with their fingerprint
 .globl _h_bitchat_people
@@ -1941,6 +1972,8 @@ Lf_links:     .asciz "\302\267 bitchat: %ld linked (%ld this Mac found, %ld foun
 Lf_heard:     .asciz "\302\267 heard %ld packets: %ld hellos, %ld public messages"
 Lf_heard2:    .asciz "\302\267 %ld private (sealed), %ld fragments, %ld put back together"
 Ls_bc_kc:     .asciz "asmmesh.bitchat"
+Ls_bc_ann_on: .asciz "\302\267 bitchat: this Mac announces itself again"
+Ls_bc_ann_off: .asciz "\302\267 bitchat: this Mac only listens for now, without announcing itself (\342\200\234bitchat announce on\342\200\235 to undo)"
 Ls_bc_newkeys: .asciz "\302\267 bitchat: this Mac has its own bitchat keys now, kept apart from its asmmesh identity"
 Ls_bc_norandom: .asciz "\302\267 bitchat: couldn't make keys, so this Mac stays quiet on bitchat"
 Lf_bc_kc_no:  .asciz "\302\267 bitchat: the Keychain didn't hand over this Mac's bitchat keys (error %ld), so it stays quiet on bitchat. Switch bitchat off and on to ask again."
