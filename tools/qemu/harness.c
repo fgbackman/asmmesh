@@ -1,4 +1,4 @@
-// harness.c — drives src/bc_crypto.s under qemu-aarch64 (see run.sh).
+// harness.c — drives src/bc_crypto.s, bc_link.s and bc_packet.s under qemu-aarch64 (see run.sh).
 //   harness selftest      runs _bc_selftest, as `asmmesh --selftest` does
 //   harness < commands    one command per line, hex arguments ("-" = empty), prints hex
 #include <stdio.h>
@@ -30,6 +30,31 @@ extern long bc_link_selftest(void) F(bc_link_selftest) __attribute__((weak));
 extern long bc_frame_len(const void *, long) F(bc_frame_len);
 extern long bc_inbox_put(void *, long, const void *, long) F(bc_inbox_put);
 extern long bc_frag_put(void *, long, const void *, const void *, long, void *) F(bc_frag_put);
+extern long bc_packet_selftest(void) F(bc_packet_selftest) __attribute__((weak));
+extern long bc_decode(const void *, long, void *, void *, long) F(bc_decode);
+extern long bc_sign_data(const void *, void *, long) F(bc_sign_data);
+extern long bc_verify(const void *, const void *, void *, long) F(bc_verify);
+extern long bc_would_compress(const void *, long) F(bc_would_compress);
+extern long bc_build(const void *, const void *, void *, long) F(bc_build);
+extern long bc_seen(void *, long, const void *) F(bc_seen);
+// _bc_relay answers in x0, x1 and x2, which C can't take as one return value
+static void bc_relay3(const void *dp, long a, long b, long c, long r[3]) {
+    register long x0 __asm__("x0") = (long)dp, x1 __asm__("x1") = a, x2 __asm__("x2") = b, x3 __asm__("x3") = c;
+    __asm__ volatile("bl _bc_relay" : "+r"(x0), "+r"(x1), "+r"(x2), "+r"(x3) :
+                     : "x9", "x10", "x11", "x12", "x13", "x30", "cc", "memory");
+    r[0] = x0; r[1] = x1; r[2] = x2;
+}
+
+// a decoded packet, as bc_defs.inc lays it out
+typedef struct {
+    long ver, type, ttl, ts, flags;
+    const unsigned char *sender, *rcpt;
+    long hops;
+    const unsigned char *route, *pay;
+    long plen;
+    const unsigned char *sig, *wire;
+    long sigat;
+} Dp;
 
 // what test.s provides inside the app
 long t_report(const char *name, int pass) F(t_report);
@@ -56,13 +81,14 @@ static long unhex(const char *s, unsigned char *p) {
 
 int main(int argc, char **argv) {
     if (argc > 1 && !strcmp(argv[1], "selftest")) {
-        long f = bc_selftest() + bc_link_selftest();
+        long f = bc_selftest() + bc_link_selftest() + bc_packet_selftest();
         printf("%ld failed\n", f);
         return f != 0;
     }
     static char line[300000];
     unsigned char ctx[208];
-    static unsigned char ib[528], fa[8 * 8520], fout[16384];
+    static unsigned char ib[528], fa[8 * 8520], fout[16384], pay[8192], dd[8 + 1000 * 32];
+    Dp dp;
     while (fgets(line, sizeof line, stdin)) {
         char *cmd = strtok(line, " \n");
         if (!cmd) continue;
@@ -122,6 +148,53 @@ int main(int argc, char **argv) {
             long r = bc_frag_put(fa, now, A[1], A[2], N[2], fout);
             printf("%ld", r);
             if (r > 0) { printf(" "); hex(fout, r); }
+        }
+        else if (!strcmp(cmd, "decode")) {
+            // decode <frame>: the fields, or -1
+            if (bc_decode(A[0], N[0], &dp, pay, sizeof pay)) printf("-1");
+            else {
+                printf("%ld %ld %ld %lx %ld ", dp.ver, dp.type, dp.ttl, dp.ts, dp.flags);
+                hex(dp.sender, 8); printf(" ");
+                hex(dp.rcpt, dp.rcpt ? 8 : 0); printf(" %ld ", dp.hops);
+                hex(dp.route, dp.hops * 8); printf(" ");
+                hex(dp.pay, dp.plen); printf(" ");
+                hex(dp.sig, dp.sig ? 64 : 0); printf(" %ld", dp.sigat);
+            }
+        }
+        else if (!strcmp(cmd, "signdata")) {
+            long r = bc_decode(A[0], N[0], &dp, pay, sizeof pay);
+            if (!r) r = bc_sign_data(&dp, out, 4096);
+            if (r < 0) printf("-1"); else hex(out, r);
+        }
+        else if (!strcmp(cmd, "verify")) {
+            // verify <pub> <frame>
+            if (bc_decode(A[1], N[1], &dp, pay, sizeof pay)) printf("-1");
+            else printf("%ld", bc_verify(&dp, A[0], out, 4096));
+        }
+        else if (!strcmp(cmd, "wouldc")) printf("%ld", bc_would_compress(A[0], N[0]));
+        else if (!strcmp(cmd, "build")) {
+            // build <version type ttl time(8)> <sender> <recipient or -> <payload> <seed or ->
+            memset(&dp, 0, sizeof dp);
+            dp.ver = A[0][0]; dp.type = A[0][1]; dp.ttl = A[0][2];
+            for (int i = 0; i < 8; i++) dp.ts = dp.ts << 8 | A[0][3 + i];
+            dp.sender = A[1]; dp.rcpt = N[2] ? A[2] : 0; dp.pay = A[3]; dp.plen = N[3];
+            long r = bc_build(&dp, N[4] ? A[4] : 0, out, 4096);
+            if (r < 0) printf("%ld", r); else hex(out, r);
+        }
+        else if (!strcmp(cmd, "relay")) {
+            // relay <type ttl to-someone sent-by-us to-us links>
+            memset(&dp, 0, sizeof dp);
+            dp.type = A[0][0]; dp.ttl = A[0][1]; dp.rcpt = A[0][2] ? A[0] : 0;
+            long r[3];
+            bc_relay3(&dp, A[0][3], A[0][4], A[0][5], r);
+            printf("%ld %ld %ld", r[0], r[1], r[2]);
+        }
+        else if (!strcmp(cmd, "dedupreset")) { memset(dd, 0, sizeof dd); printf("ok"); }
+        else if (!strcmp(cmd, "seen")) {
+            // seen <now as 4 bytes> <frame>
+            long now = (long)A[0][0] << 24 | A[0][1] << 16 | A[0][2] << 8 | A[0][3];
+            if (bc_decode(A[1], N[1], &dp, pay, sizeof pay)) printf("-1");
+            else printf("%ld", bc_seen(dd, now, &dp));
         }
         else printf("?");
         printf("\n");

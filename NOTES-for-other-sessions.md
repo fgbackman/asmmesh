@@ -116,3 +116,13 @@ Numbers now taken:
   please keep bitchat callbacks out of ble.s and the AMeshController method tables.
 - Self-tests 145-154 (`_bc_link_selftest`, after _bc_selftest in test.s).
 - Not tried on a Mac yet: see the Phase 2 checklist in docs/bitchat_roadmap.md.
+
+## bitchat Phase 3 (Oct 30, branch claude/bitchat-roadmap): reading and writing packets
+- New files: `src/bc_packet.s` (pure: decode, signing bytes, verify, build, duplicate filter,
+  relay rule) and `src/bc_zlib.s` (_bc_inflate through libz). In the Makefile and ios/make_project.py.
+  Decoded-packet layout DP_* and the filter's DD_* are in bc_defs.inc.
+- Self-tests 155-164 (`_bc_packet_selftest`, after _bc_link_selftest in test.s).
+- tools/qemu: bcvectors.py makes the test packets; inflate.c stands in for libz under qemu;
+  `tools/qemu/run.sh diff` checks everything against bcwire.py.
+- bc_ble.s reads each packet with _bc_decode and counts it by type (_g_bc_types); "bitchat" lists
+  the kinds it doesn't name.

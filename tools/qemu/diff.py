@@ -162,6 +162,101 @@ for i in range(n):
         cases.append(('frag %08x %s %s' % (now, sender.hex(), pls[j].hex()), exp, 'fragments'))
         if exp != '0': seen[si] = set()   # done: a later repeat starts a new set
 
+# ---- Phase 3: packets, against bcwire.py's copy of bitchat's rules
+def fmt(d):
+    if d is None: return '-1'
+    return '%d %d %d %x %d %s %s %d %s %s %s %d' % (d['v'], d['type'], d['ttl'], d['ts'], d['flags'], h(d['sender']),
+        h(d['rcpt']), len(d['route']), h(b''.join(d['route'])), h(d['payload']), h(d['sig']), d['sigat'])
+def rtext(k):
+    words = [b'hi', b'bitchat', b'mesh', b'the', b'radio', b'asmmesh', b' ', b'\xf0\x9f\x93\xa1']
+    out = b''
+    while len(out) < k: out += rnd.choice(words)
+    return out[:k]
+def rpkt():
+    v = rnd.choice([1, 1, 2])
+    t = rnd.choice([0x01, 0x02, 0x03, 0x10, 0x11, 0x20, 0x21, 0x22, 0x26, 0x29, 0x2c, 0x05, 0x99])
+    pay = rtext(rnd.choice([0, 1, 13, 99, 100, 300, 1000, 1500])) if rnd.random() < .7 else rb(rnd.choice([0, 5, 64, 200]))
+    kw = dict(version=v, type=t, ttl=rnd.randrange(10), ts=rnd.getrandbits(48), sender=rb(8))
+    if rnd.random() < .4: kw['recipient'] = rb(8)
+    if v == 2 and rnd.random() < .5: kw['route'] = [rb(8) for _ in range(rnd.randrange(4))]
+    if rnd.random() < .3: kw['rsr'] = True
+    seed = rb(32) if rnd.random() < .5 else None
+    if pay and rnd.random() < .4:
+        z = bcwire.raw_deflate(pay, rnd.choice([1, 6, 9]))
+        kw['payload'], kw['compressed_orig'] = z, len(pay)
+    else:
+        kw['payload'] = pay
+    if seed:
+        unsigned = bcwire.encode(**kw)
+        d = bcwire.decode(unsigned)
+        if d: kw['signature'] = ed25519.Ed25519PrivateKey.from_private_bytes(seed).sign(bcwire.signing_bytes(d))
+    elif rnd.random() < .2: kw['signature'] = rb(64)
+    p = bcwire.encode(**kw)
+    if v == 2 and not kw.get('route') and rnd.random() < .3:
+        # the route flag with no hops: bitchat reads it, and leaves it out of what's signed
+        o = 16 + 8 + (8 if 'recipient' in kw else 0)
+        p = bytearray(p[:o] + b'\x00' + p[o:]); p[11] |= 8; p = bytes(p)
+    return (bcwire.pad(p) if rnd.random() < .5 else p), seed, kw.get('ttl')
+def py_verify(d, pub):
+    if d is None: return '-1'
+    if d['sig'] is None: return '0'
+    try:
+        ed25519.Ed25519PublicKey.from_public_bytes(pub).verify(d['sig'], bcwire.signing_bytes(d)); return '1'
+    except Exception: return '0'
+for i in range(n):
+    p, seed, _ = rpkt()
+    d = bcwire.decode(p)
+    cases.append(('decode ' + h(p), fmt(d), 'packet decode'))
+    if d: cases.append(('signdata ' + h(p), h(bcwire.signing_bytes(d)) if len(bcwire.signing_bytes(d)) <= 4096 else '-1', 'packet signing bytes'))
+    if seed:
+        pub = raw(ed25519.Ed25519PrivateKey.from_private_bytes(seed).public_key())
+        q = bytearray(p); q[2] = rnd.randrange(8); q[11] |= 0x10 if rnd.random() < .5 else 0; q = bytes(q)
+        cases.append(('verify %s %s' % (pub.hex(), h(q)), py_verify(bcwire.decode(q), pub), 'packet verify (relayed)'))
+        q = bytearray(p); q[rnd.randrange(len(q))] ^= 1 << rnd.randrange(8); q = bytes(q)
+        cases.append(('verify %s %s' % (pub.hex(), h(q)), py_verify(bcwire.decode(q), pub), 'packet verify (changed)'))
+    for _ in range(3):
+        q = bytearray(p)
+        for _ in range(rnd.randrange(1, 4)): q[rnd.randrange(len(q))] = rnd.getrandbits(8)
+        q = bytes(q)
+        cases.append(('decode ' + h(q), fmt(bcwire.decode(q)), 'packet decode (changed bytes)'))
+    q = p[:rnd.randrange(len(p) + 1)]
+    cases.append(('decode ' + h(q), fmt(bcwire.decode(q)), 'packet decode (cut short)'))
+    q = rb(rnd.randrange(80))
+    cases.append(('decode ' + h(q), fmt(bcwire.decode(q)), 'packet decode (noise)'))
+    # building
+    v, t, ttl, ts = rnd.choice([1, 2]), rnd.choice([0x01, 0x02, 0x11]), rnd.randrange(8), rnd.getrandbits(48)
+    sender, rcpt = rb(8), (rb(8) if rnd.random() < .4 else None)
+    pay = rtext(rnd.choice([0, 13, 99, 100, 150, 400])) if rnd.random() < .6 else rb(rnd.choice([0, 13, 120, 300]))
+    seed = rb(32) if rnd.random() < .7 else None
+    want = bcwire.build(v, t, ttl, ts, sender, rcpt, pay, seed)
+    want = '-2' if want is None else ('-1' if len(want) > 4096 else want.hex())
+    hdr = bytes([v, t, ttl]) + ts.to_bytes(8, 'big')
+    cases.append(('build %s %s %s %s %s' % (hdr.hex(), sender.hex(), h(rcpt), h(pay), h(seed)), want, 'packet build'))
+    cases.append(('wouldc ' + h(pay), '1' if bcwire.would_compress(pay) else '0', 'would compress'))
+    # relaying
+    for _ in range(5):
+        t = rnd.choice([0x01, 0x02, 0x03, 0x04, 0x10, 0x11, 0x20, 0x21, 0x22, 0x23, 0x26, 0x27, 0x28, 0x29, 0x2c, 0x77])
+        a = [t, rnd.randrange(12), rnd.random() < .4, rnd.random() < .1, rnd.random() < .1, rnd.randrange(14)]
+        r = bcwire.relay(t, a[1], a[2], a[3], a[4], a[5])
+        cases.append(('relay ' + bytes(int(x) for x in a).hex(), '%d %d %d' % r, 'relay rule'))
+# the duplicate filter: a stream of packets, some again, time moving on
+cases.append(('dedupreset', 'ok', 'duplicate filter'))
+pool, seen_at, ring, now = [], {}, [], 1000
+for i in range(n * 6):
+    if pool and rnd.random() < .4: p = rnd.choice(pool)
+    else:
+        p, _, _ = rpkt()
+        if bcwire.decode(p) is None: continue
+        pool.append(p)
+    now += rnd.choice([1, 10, 1000, 20000])
+    d = bcwire.decode(p); k = bcwire.dedup_key(d)
+    live = [e for e in ring if e[0] == k and now - e[1] < 300000]
+    if live: exp = '1'
+    else:
+        exp = '0'; ring.append((k, now))
+        if len(ring) > 1000: ring.pop(0)
+    cases.append(('seen %08x %s' % (now, h(p)), exp, 'duplicate filter'))
+
 inp = '\n'.join(c[0] for c in cases) + '\n'
 res = subprocess.run(['qemu-aarch64', harness], input=inp, capture_output=True, text=True).stdout.split('\n')
 fails = {}
@@ -170,11 +265,13 @@ for (cmd, exp, label), got in zip(cases, res):
     count[label] = count.get(label, 0) + 1
     if got.strip() != exp:
         fails.setdefault(label, []).append((cmd[:120], exp[:80], got[:80]))
+        if os.environ.get('BCDIFF_DUMP'):                # every failing command in full
+            open(os.environ['BCDIFF_DUMP'], 'a').write(cmd + '\n')
 if len(res) - 1 < len(cases):
     print('harness stopped after %d of %d cases' % (len(res) - 1, len(cases)))
 for label in count:
     print('%-30s %5d cases  %s' % (label, count[label], 'FAIL %d' % len(fails[label]) if label in fails else 'ok'))
 for label, f in fails.items():
-    for c, e, g in f[:2]:
+    for c, e, g in f[:5]:
         print('  %s\n    want %s\n    got  %s' % (c, e, g))
 sys.exit(1 if fails or len(res) - 1 < len(cases) else 0)

@@ -123,13 +123,25 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 *Results of the first Mac test (Oct 30, 2026, the App Store bitchat on an iPhone):*
 - Steps 1–3 passed. With bitchat open on the iPhone, "bitchat" showed 1 linked (this Mac found it), and 11 packets heard: 6 hellos, 5 "other", none refused.
 - Step 5 passed. After "bitchat advertise on", "found this Mac" went to 1, and asmmesh's own links stayed up while both services were advertised.
-- Still to do: step 6 (switching off); the bitchat build on iPhone (installed, not tried yet).
+- Step 6 passed: "disable bitchat" drops the links and "bitchat" says it's off.
+- Still to do: the bitchat build on iPhone (installed, not tried yet).
 - The 5 "other" packets are types the link layer doesn't name yet. Find out which in Phase 3 (likely sync requests `0x21` or a newer type).
 
-**Phase 3 — packet codec** (`src/bc_packet.s`)
-- Encode and decode v1 and v2 headers, flags, zlib, padding, and signatures.
-- Copy bitchat's own test packets from `bitchatTests` as self-tests, so the codec is byte-for-byte identical.
-- Dedup set and relay rules (TTL clamp, never relay back to the link a packet came in on).
+**Phase 3 — packet codec** (`src/bc_packet.s`, `src/bc_zlib.s`) — **written and tested under qemu (Oct 30); to be tried on a Mac**
+- Ported from bitchat `04995f6` (still its latest commit on Oct 30): `BinaryProtocol.decode`, `toBinaryDataForSigning`, `PacketPayloadLimits`, `CompressionUtil.shouldCompress`, `MessagePadding`, `RelayController` and the receive pipeline's message id.
+- `_bc_decode`: v1 and v2 headers, recipient, source route, signature, padding (tried as it is, then unpadded, as bitchat does), and bitchat's payload cap per type. Compressed payloads are raw DEFLATE (Apple's `COMPRESSION_ZLIB`), unpacked by libz (`bc_zlib.s`) into the caller's buffer, never past the declared size and with bitchat's 1032:1 ratio limit. The stream must end properly; that's stricter than Apple's decoder, but real senders' streams always do.
+- `_bc_sign_data` / `_bc_verify`: what a signature covers is the packet re-encoded with TTL 0, no signature, no RSR flag, an empty route left out, and padded. It's rebuilt from the wire bytes, so compressed packets check out too. Relays lowering the TTL or setting RSR don't break it.
+- `_bc_build`: our own packets (v1, like bitchat's ordinary traffic), signed with Ed25519. **A payload bitchat would compress can't be signed (-2):** bitchat compresses any payload of 100+ bytes with under 90% different byte values, and does it again when it checks a signature, so our signature would only match if our DEFLATE output were byte-identical to Apple's. Milestone 2 has to keep public messages under that rule (short, or split).
+- `_bc_seen`: bitchat's duplicate filter (sender, time, type and 4 bytes of SHA-256 of the payload; 1000 entries, 5 minutes). `_bc_relay`: its TTL clamp and relay delay by type and number of links. Not used yet: relaying is Milestone 2, and not sending a packet back over the link it came in on belongs there (bc_ble.s).
+- `bc_ble.s` now reads every packet it gets: a broken one counts as refused, and **"bitchat"** lists the types it doesn't name ("other kinds: 3 × sync request (0x21)"), which answers what the 5 "other" packets were.
+- Self-tests 155–164 (`_bc_packet_selftest`): vectors from `tools/qemu/bcvectors.py`, including a packet we sign that matches the Python model byte for byte.
+- `tools/qemu/run.sh diff` cross-checks decode, signing bytes, verify, build, the compression rule, relay and the duplicate filter against `tools/qemu/bcwire.py`, a Python copy of the Swift above (1000 random cases each, plus corrupted and cut-short packets): all agree. Under qemu, `tools/qemu/inflate.c` stands in for libz.
+- Checked against a Python model, not against bitchat itself: the Mac test below is the real check.
+
+*Checklist for the Mac:*
+1. `make selftest`: 127–164 all PASS (157 is the one that uses libz).
+2. With bitchat open on a phone: "bitchat" shows packets heard and **0 refused**, and an "other kinds" line if any arrive. Note which kinds here.
+3. Send a public message from the phone: "public messages" goes up.
 
 **Milestone 1 — "I can see bitchat people"**
 - Make the bitchat Curve25519 and Ed25519 keys (random, from `SecRandomCopyBytes`) and keep them in their own Keychain items, following `ident.s` (only make new ones on "not found"). Load them only while the bitchat switch is on.
@@ -159,4 +171,4 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 - **Assembly crypto** is the hardest and riskiest part. RFC vectors plus cross-checks against real bitchat packets are a must.
 - **Privacy.** Joining bitchat means advertising its service and sending your nickname and keys in the clear, as bitchat itself does. The switch must be off by default, with that explained next to it.
 - **Battery and radio time** go up with two services advertising and scanning.
-- Which header version current bitchat clients send by default, and whether v1-only clients are still accepted. Check before Phase 3.
+- Header version: bitchat sends v1 for ordinary packets and v2 for files and source-routed packets (`BLEService.swift`), and reads both. asmmesh sends v1.

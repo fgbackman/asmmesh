@@ -46,3 +46,116 @@ def fragments(frame, chunk, fid, otype, sender, recipient=None, version=1, ts=0x
         pl = fid + i.to_bytes(2, 'big') + len(chunks).to_bytes(2, 'big') + bytes([otype]) + c
         out.append((pl, encode(version=version, type=0x20, ttl=ttl, ts=ts, sender=sender, recipient=recipient, payload=pl)))
     return out
+
+# ---- Phase 3: what BinaryProtocol.decode, toBinaryDataForSigning, RelayController and the
+# dedup id do (bitchat 04995f6), as plain Python, for bc_packet.s's vectors and checks
+import hashlib, zlib
+FRAMED = 1048576 + 18 + 2 * 65535 + 16 + 8 + 8 + 64     # FileTransferLimits.maxFramedFileBytes
+def type_cap(t):                                         # PacketPayloadLimits.maxPayloadBytes
+    if t in (0x22, 0x11): return FRAMED
+    if t in (0x02, 0x25): return 128 * 1024
+    if t in (0x04, 0x28): return 64 * 1024
+    if t == 0x21: return 8 * 1024
+    if t == 0x20: return 1280
+    if t in (0x01, 0x2c, 0x03, 0x23, 0x24, 0x29, 0x10, 0x26, 0x27): return 4096
+    return 128 * 1024
+def raw_deflate(b, level=6):
+    c = zlib.compressobj(level, zlib.DEFLATED, -15)
+    return c.compress(b) + c.flush()
+def inflate_upto(c, n):
+    # the stream must end, within n bytes (stricter than Apple's decoder, which stops at n)
+    d = zlib.decompressobj(-15)
+    try: out = d.decompress(c, n + 1)
+    except zlib.error: return None
+    return out if d.eof and len(out) <= n else None
+def unpad(b):
+    if not b: return b
+    L = b[-1]
+    if L == 0 or L > len(b) or any(x != L for x in b[-L:]): return b
+    return b[:-L]
+def decode_core(b, bufcap=8192):
+    if len(b) < 22 or b[0] not in (1, 2): return None
+    v = b[0]; hs = 16 if v == 2 else 14; lf = hs - 12
+    if len(b) < hs + 8: return None
+    t, ttl, ts, fl = b[1], b[2], int.from_bytes(b[3:11], 'big'), b[11]
+    plen = int.from_bytes(b[12:hs], 'big')
+    if plen > FRAMED: return None
+    o = hs; sender = b[o:o + 8]; o += 8
+    rcpt = None
+    if fl & 1:
+        if len(b) < o + 8: return None
+        rcpt = b[o:o + 8]; o += 8
+    route = []
+    if v == 2 and fl & 8:
+        if len(b) < o + 1: return None
+        k = b[o]; o += 1
+        if len(b) < o + 8 * k: return None
+        route = [b[o + 8 * i:o + 8 * i + 8] for i in range(k)]; o += 8 * k
+    cap = type_cap(t)
+    if fl & 4:
+        if plen < lf or len(b) < o + lf: return None
+        orig = int.from_bytes(b[o:o + lf], 'big'); o += lf
+        if orig > cap or orig > bufcap: return None      # bufcap: asmmesh's own limit
+        cs = plen - lf
+        if cs <= 0 or len(b) < o + cs or orig > cs * 1032: return None
+        pay = inflate_upto(b[o:o + cs], orig)
+        if pay is None or orig == 0 or len(pay) != orig: return None
+        o += cs
+    else:
+        if plen > cap or len(b) < o + plen: return None
+        pay = b[o:o + plen]; o += plen
+    sig = None
+    if fl & 2:
+        if len(b) < o + 64: return None
+        sig = b[o:o + 64]
+    return dict(v=v, type=t, ttl=ttl, ts=ts, flags=fl, sender=sender, rcpt=rcpt, route=route,
+                payload=pay, sig=sig, wire=b, sigat=o)
+def decode(b, bufcap=8192):
+    d = decode_core(b, bufcap)
+    if d: return d
+    u = unpad(b)
+    return decode_core(u, bufcap) if len(u) != len(b) else None
+def block_pad(d):                                        # MessagePadding.optimalBlockSize + pad
+    for size in (256, 512, 1024, 2048):
+        if len(d) + 16 <= size:
+            n = size - len(d)
+            return d + bytes([n]) * n if 0 < n <= 255 else d
+    return d
+def signing_bytes(d):
+    # toBinaryDataForSigning: TTL 0, no signature, no RSR, padded; an empty route drops out
+    w = d['wire']; v = d['v']; hs = 16 if v == 2 else 14
+    o = hs + 8 + (8 if d['rcpt'] else 0)
+    out = bytearray(w[:o]); out[2] = 0
+    f = (1 if d['rcpt'] else 0) | (d['flags'] & 4)
+    if v == 2 and d['flags'] & 8:
+        k = w[o]
+        if k: f |= 8; out += w[o:o + 1 + 8 * k]
+        o += 1 + 8 * k
+    out += w[o:d['sigat']]; out[11] = f
+    return block_pad(bytes(out))
+def would_compress(p):                                   # CompressionUtil.shouldCompress
+    return len(p) >= 100 and len(set(p)) * 10 < 9 * min(len(p), 256)
+def build(v, t, ttl, ts, sender, rcpt, payload, seed=None, pad=True):
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    if seed is not None and would_compress(payload): return None
+    sig = None
+    if seed is not None:
+        unsigned = encode(version=v, type=t, ttl=0, ts=ts, sender=sender, recipient=rcpt, payload=payload)
+        sig = ed25519.Ed25519PrivateKey.from_private_bytes(seed).sign(block_pad(unsigned))
+    d = encode(version=v, type=t, ttl=ttl, ts=ts, sender=sender, recipient=rcpt, payload=payload, signature=sig)
+    return block_pad(d) if pad else d
+def relay(t, ttl, has_rcpt, self_sent, to_self, degree):  # RelayController.decide -> (ttl, lo, hi)
+    cap = min(ttl, 7)
+    if t == 0x21 or cap <= 1 or self_sent or to_self: return (0, 0, 0)
+    if t == 0x10 or (has_rcpt and t in (0x20, 0x11, 0x04, 0x26, 0x27, 0x28)):
+        return (cap - 1, 10, 35) if t == 0x10 else (cap - 1, 20, 60)
+    if t in (0x20, 0x29):
+        lim = min(cap, 5 if degree >= 6 else 7)
+        return (lim - 1, 8, 25) if lim > 1 else (0, 0, 0)
+    if degree >= 6: lim = max(2, min(cap, 5))
+    elif degree <= 2: lim = cap
+    else: lim = max(2, min(cap, 7 if t == 0x01 else 6))
+    lo, hi = (10, 40) if degree <= 2 else (60, 150) if degree <= 5 else (80, 180) if degree <= 9 else (100, 220)
+    return (lim - 1, lo, hi)
+def dedup_key(d):                                        # BLEReceivedPacketContext.messageID
+    return (d['sender'], d['ts'], d['type'], hashlib.sha256(d['payload']).digest()[:4])

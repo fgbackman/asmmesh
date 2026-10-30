@@ -78,6 +78,9 @@ _g_bc_adv:      .quad 0         // 1: advertise bitchat's service too
 .zerofill __DATA,__bss,_g_bc_cnt,C_SIZE,4
 .zerofill __DATA,__bss,_g_bc_fa,FA_SIZE,4
 .zerofill __DATA,__bss,_g_bc_joined,FA_BYTES,4
+.zerofill __DATA,__bss,_g_bc_dp,DP_SIZE,4                 // the packet just read (bc_packet.s)
+.zerofill __DATA,__bss,_g_bc_pay,8192,4                   // its payload, if it came compressed
+.zerofill __DATA,__bss,_g_bc_types,2048,4                 // packets read, by type
 
 .section __DATA,__const
 .p2align 3
@@ -102,6 +105,12 @@ Lbc_methods:
     .quad 0
 Lbc_protos:
     .quad Lp_cm, Lp_p, Lp_pm, 0
+// bitchat's packet types (MessageType.swift), for "bitchat"
+Lbc_kind_tab:
+    .quad 0x03, Lk_leave,   0x04, Lk_courier, 0x21, Lk_sync,   0x22, Lk_file
+    .quad 0x23, Lk_board,   0x24, Lk_prekeys, 0x25, Lk_group,  0x26, Lk_ping
+    .quad 0x27, Lk_pong,    0x28, Lk_nostr,   0x29, Lk_voice,  0x2c, Lk_presence
+    .quad 0x100, Lk_unknown
 
 .text
 .p2align 2
@@ -441,8 +450,9 @@ Lrx_done:
     LEAVE 0
 
 // void _bc_frame_in(long i, const uint8 *p, long n) — one whole bitchat packet arrived.
-//   Phase 2 counts it by type, and puts fragments back together. Reading, checking
-//   and relaying packets is Phase 3: until then nothing else sees them.
+//   It's read (bc_packet.s; a broken one is refused), counted by type, and fragments are
+//   put back together. Checking signatures and relaying need bitchat peers' keys
+//   (Milestone 1): until then nothing else sees them.
 _bc_frame_in:
     ENTER 0
     mov  x19, x0
@@ -462,6 +472,10 @@ _bc_frame_in:
     ldr  x9, [x23, #C_BYTES]
     add  x9, x9, x21
     str  x9, [x23, #C_BYTES]
+    mov  x0, x20                          // read it (bc_packet.s): a broken one goes no further
+    mov  x1, x21
+    bl   Lbc_read
+    tbnz x0, #63, Lfi_refused
     ldrb w10, [x20, #1]                   // type
     mov  x11, #C_OTHER
     cmp  w10, #0x01
@@ -505,9 +519,12 @@ _bc_frame_in:
     cmp  x0, #0
     b.eq Lfi_done
     b.lt Lfi_refused
+    mov  x1, x0
     ldr  x9, [x23, #C_JOINED]
     add  x9, x9, #1
     str  x9, [x23, #C_JOINED]
+    ADRL x0, _g_bc_joined                 // what it was: read that too
+    bl   Lbc_read
     b    Lfi_done
 Lfi_refused:
     ldr  x9, [x23, #C_REFUSED]
@@ -515,6 +532,24 @@ Lfi_refused:
     str  x9, [x23, #C_REFUSED]
 Lfi_done:
     LEAVE 0
+
+// long Lbc_read(const uint8 *p, long n) -> 0, counted by type in _g_bc_types, or -1 if
+//   bc_packet.s refuses it. Nothing else is done with it yet (Milestone 1).
+Lbc_read:
+    ENTER 0
+    ADRL x2, _g_bc_dp
+    ADRL x3, _g_bc_pay
+    mov  x4, #8192
+    bl   _bc_decode
+    tbnz x0, #63, 1f
+    ADRL x8, _g_bc_dp
+    ldr  x9, [x8, #DP_TYPE]
+    ADRL x8, _g_bc_types
+    ldr  x10, [x8, x9, lsl #3]
+    add  x10, x10, #1
+    str  x10, [x8, x9, lsl #3]
+    mov  x0, #0
+1:  LEAVE 0
 
 // ---------------------------------------------------------------------------
 // bytes out (used from Phase 3 on: announces, messages)
@@ -1115,6 +1150,7 @@ _h_bitchat:
     ldr  x3, [x19, #C_LINKS]
     ADRL x0, Lf_heard3
     bl   _home_say
+    bl   Lbc_kinds
     ADRL x0, Ls_adv_off
     ADRL x8, _g_bc_adv
     ldr  x9, [x8]
@@ -1125,6 +1161,58 @@ _h_bitchat:
     ADRL x0, Ls_wall
     bl   _home_say0
 1:  LEAVE 0
+
+// void Lbc_kinds(void) — "· other kinds: 3 × sync request (0x21), ..." for the types the
+//   lines above don't name
+Lbc_kinds:
+    ENTER 272                             // [96] the line
+    add  x19, sp, #96
+    strb wzr, [x19]
+    mov  x20, #0                          // its length
+    mov  x21, #0                          // type
+    mov  x22, #0                          // how many listed
+1:  cmp  x21, #256
+    b.hs 4f
+    cmp  x21, #0x01                       // the ones already counted above
+    b.eq 3f
+    cmp  x21, #0x02
+    b.eq 3f
+    cmp  x21, #0x10
+    b.eq 3f
+    cmp  x21, #0x11
+    b.eq 3f
+    cmp  x21, #0x20
+    b.eq 3f
+    ADRL x8, _g_bc_types
+    ldr  x23, [x8, x21, lsl #3]
+    cbz  x23, 3f
+    ADRL x9, Lbc_kind_tab                 // its name
+2:  ldp  x10, x11, [x9], #16
+    cmp  x10, #0x100
+    b.eq 21f
+    cmp  x10, x21
+    b.ne 2b
+21: ADRL x10, Ls_kinds_first
+    ADRL x12, Ls_kinds_sep
+    cmp  x22, #0
+    csel x10, x10, x12, eq
+    stp  x10, x23, [sp]
+    stp  x11, x21, [sp, #16]
+    add  x0, x19, x20
+    mov  x1, #256
+    sub  x1, x1, x20
+    ADRL x2, Lf_kind
+    bl   _snprintf
+    add  x20, x20, x0
+    add  x22, x22, #1
+    cmp  x20, #255
+    b.hs 4f
+3:  add  x21, x21, #1
+    b    1b
+4:  cbz  x22, 5f
+    mov  x0, x19
+    bl   _home_say0
+5:  LEAVE 272
 
 // "bitchat advertise on" (1) / "off" (0) — this Mac only, never from the mesh
 .globl _h_bitchat_adv
@@ -1239,6 +1327,22 @@ Ls_stopAdvertising:    .asciz "stopAdvertising"
 Lf_links:     .asciz "\302\267 bitchat: %ld linked (%ld this Mac found, %ld found this Mac)"
 Lf_heard:     .asciz "\302\267 heard %ld packets: %ld hellos, %ld public messages"
 Lf_heard2:    .asciz "\302\267 %ld private (sealed), %ld fragments, %ld put back together"
+Ls_kinds_first: .asciz "\302\267 other kinds: "
+Ls_kinds_sep: .asciz ", "
+Lf_kind:      .asciz "%s%ld \303\227 %s (0x%02lx)"
+Lk_leave:     .asciz "leave"
+Lk_courier:   .asciz "courier mail"
+Lk_sync:      .asciz "sync request"
+Lk_file:      .asciz "file"
+Lk_board:     .asciz "board post"
+Lk_prekeys:   .asciz "prekeys"
+Lk_group:     .asciz "group message"
+Lk_ping:      .asciz "ping"
+Lk_pong:      .asciz "pong"
+Lk_nostr:     .asciz "Nostr"
+Lk_voice:     .asciz "voice"
+Lk_presence:  .asciz "presence"
+Lk_unknown:   .asciz "unknown"
 Lf_heard3:    .asciz "\302\267 %ld other, %ld refused (broken or too big), %ld links made since it was switched on"
 Ls_adv_on:    .asciz "\302\267 advertising bitchat's service: on (say \342\200\234bitchat advertise off\342\200\235 to stop)"
 Ls_adv_off:   .asciz "\302\267 advertising bitchat's service: off. This Mac still links to bitchat phones it finds; \342\200\234bitchat advertise on\342\200\235 lets them find it too"
