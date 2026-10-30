@@ -620,7 +620,9 @@ _kc_query:
     mov  x0, x20
     LEAVE 0
 
-// size_t _kc_get(const char *service, char *buf, size_t max) -> length (0 = none)
+// size_t _kc_get(const char *service, char *buf, size_t max) -> length (0 = none), and in
+//   x1 what the Keychain said (0, or -25300 when there's none): _g_kc_status keeps it too,
+//   but that one is shared by every reader on every thread
 .globl _kc_get
 _kc_get:
     ENTER 16
@@ -647,6 +649,7 @@ _kc_get:
     bl   _SecItemCopyMatching
     ADRL x8, _g_kc_status             // why a read came back empty (-25300: there's none)
     str  w0, [x8]
+    str  w0, [sp, #104]
     cbnz w0, Lkg_none
     ldr  x23, [sp, #96]
     cbz  x23, Lkg_none
@@ -666,9 +669,11 @@ _kc_get:
     mov  x0, x23
     bl   _CFRelease
     mov  x0, x24
+    ldrsw x1, [sp, #104]
     LEAVE 16
 Lkg_none:
     mov  x0, #0
+    ldrsw x1, [sp, #104]
     LEAVE 16
 
 // void _kc_set(const char *service, const char *secret) — replaces any old one

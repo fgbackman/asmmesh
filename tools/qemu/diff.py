@@ -127,16 +127,17 @@ for i in range(n):
     if rnd.random() < .5: p = bcwire.pad(p)
     want = bcwire.frame_len_ref(p)
     cuts = sorted(set([0] + [rnd.randrange(1, len(p)) for _ in range(rnd.randrange(4))])) + [len(p)]
-    got_final = None
+    done = False
     for a, b in zip(cuts, cuts[1:]):
-        piece_end = b
         so_far = p[:b]
         fl = bcwire.frame_len_ref(so_far)
-        if b > 512 or fl > 512 or fl < 0: exp = '-1'
+        if b > 512: exp = '-1'            # too far in: always dropped
+        elif done: exp = '0'              # the rest of a finished (or dropped) write: ignored
+        elif fl > 512 or fl < 0: exp = '-1'
         elif fl == 0 or fl > b: exp = '0'
         else: exp = '%d %s' % (b, so_far.hex())
         cases.append(('inbox %04x %s' % (a, h(p[a:b])), exp, 'long write'))
-        if exp != '0': break
+        if exp != '0': done = True
 cases.append(('fragreset', 'ok', 'fragments'))
 now = 1000
 for i in range(n):
@@ -300,7 +301,7 @@ for i in range(n * 4):
         from cryptography.hazmat.primitives.asymmetric import x25519
         xpub = raw(x25519.X25519PrivateKey.from_private_bytes(xs).public_key())
         p = bcwire.build(1, 3, 7, ts, bcwire.peer_id(xpub), None, b'', es if rnd.random() < .7 else rb(32))
-        cases.append(('leave ' + h(p), str(T.leave(bcwire.decode(p))), 'bitchat people'))
+        cases.append(('leave %s %s' % (now.to_bytes(8, 'big').hex(), h(p)), str(T.leave(now, bcwire.decode(p))), 'bitchat people'))
     else:
         cases.append(('expire ' + now.to_bytes(8, 'big').hex(), str(T.expire(now)), 'bitchat people'))
 
@@ -331,6 +332,13 @@ R = bcwire.RelayLimit(); t = 1_760_000_000_000
 for i in range(n * 3):
     t += rnd.choice([0, 0, 10, 300, 1000])
     cases.append(('relayok ' + t.to_bytes(8, 'big').hex(), str(R.ok(t)), 'relay limit'))
+
+# ---- hardening: cleaning names and messages
+tricky = [b'\n', b'\r', b'\x7f', b'\x00', b'\xc2\x85', b'\xe2\x80\xa8', b'\xe2\x80\xae', b'\xe2\x81\xa6',
+          b'\xe2\x80\x8f', b'\xe2\x80\xa7', b'\xe2\x80', b'\xc2', b'\xe2\x98\x95', b'ok', b' ']
+for i in range(n * 2):
+    b = b''.join(rnd.choice(tricky) for _ in range(rnd.randrange(12))) if rnd.random() < .8 else rb(rnd.randrange(20))
+    cases.append(('clean ' + h(b), h(bcwire.text_clean(b)), 'text clean'))
 
 inp = '\n'.join(c[0] for c in cases) + '\n'
 res = subprocess.run(['qemu-aarch64', harness], input=inp, capture_output=True, text=True).stdout.split('\n')

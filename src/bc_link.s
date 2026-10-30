@@ -77,7 +77,9 @@ Lfl_bad:
 // long _bc_inbox_put(ib, long offset, const uint8 *p, long n) -> the packet's length
 //   when it is complete (it is at ib + IB_DATA, padding and all), 0 while waiting
 //   for more, -1 if the write was dropped (too big, or not a bitchat packet).
-//   A piece at offset 0 starts a new write.
+//   A piece at offset 0 starts a new write. A later piece with nothing waiting (the rest
+//   of a write whose packet is already complete, or one whose start was lost or dropped)
+//   is ignored: the old bytes must never be read as a packet again.
 .globl _bc_inbox_put
 _bc_inbox_put:
     ENTER 0
@@ -91,7 +93,10 @@ _bc_inbox_put:
     add  x9, x1, x3
     cmp  x9, #BC_WRITE_MAX
     b.hi Lib_drop
-    add  x10, x19, #IB_DATA
+    cbz  x1, 4f                           // a later piece with nothing waiting: ignored
+    ldr  x10, [x19, #IB_LEN]
+    cbz  x10, Lib_wait
+4:  add  x10, x19, #IB_DATA
     add  x10, x10, x1
     mov  x11, #0
 2:  cmp  x11, x3
@@ -744,6 +749,38 @@ _bc_link_selftest:
     cmn  x0, #1
     BL_AND
     BL_REPORT Ln_bl154
+    // 177. after a packet completes, the rest of the write (its padding) is ignored,
+    //      not read as the same packet again
+    mov  x0, x21
+    mov  x1, #0
+    ADRL x2, Lv_p1
+    mov  x3, #100
+    bl   _bc_inbox_put
+    cmp  x0, #0
+    cset x20, eq
+    mov  x0, x21
+    mov  x1, #100
+    ADRL x2, Lv_p1
+    add  x2, x2, #100
+    mov  x3, #54
+    bl   _bc_inbox_put
+    cmp  x0, #154
+    BL_AND
+    mov  x0, x21
+    mov  x1, #154
+    ADRL x2, Lv_p1
+    mov  x3, #20
+    bl   _bc_inbox_put
+    cmp  x0, #0
+    BL_AND
+    mov  x0, x21                          // nor a piece whose write never started
+    mov  x1, #50
+    ADRL x2, Lv_p1
+    mov  x3, #20
+    bl   _bc_inbox_put
+    cmp  x0, #0
+    BL_AND
+    BL_REPORT Ln_bl177
     mov  x0, x21
     bl   _free
     mov  x0, x22
@@ -766,6 +803,7 @@ Ln_bl150:   .asciz "150 bitchat link: impossible fragments are refused"
 Ln_bl151:   .asciz "151 bitchat link: a fragment set left for 30 s is forgotten"
 Ln_bl152:   .asciz "152 bitchat link: fragments are made the way bitchat makes them"
 Ln_bl153:   .asciz "153 bitchat link: the send queue keeps 8, oldest first"
+Ln_bl177:   .asciz "177 bitchat link: the rest of a write after its packet is ignored"
 Ln_bl154:   .asciz "154 bitchat link: a fragment's payload is found; a compressed one waits"
 // a v1 packet with recipient and signature (154 bytes)
 Lv_p1:

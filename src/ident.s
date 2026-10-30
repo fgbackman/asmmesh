@@ -59,7 +59,7 @@ _g_time_override: .quad 0              // tests: sign as if at this time
 .zerofill __DATA,__bss,_g_hash,32,4
 .zerofill __DATA,__bss,_g_kcblob,2400,4
 .globl _g_room_keys
-.zerofill __DATA,__bss,_g_room_keys,1152,4
+.zerofill __DATA,__bss,_g_room_keys,(ROOM_MAX * RK_SIZE),4
 
 .text
 .p2align 2

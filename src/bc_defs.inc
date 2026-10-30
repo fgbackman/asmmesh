@@ -87,6 +87,8 @@
 .set BT_NLEN,       96
 .set BT_NICK,       104         // up to BT_NICK_MAX bytes of UTF-8, then 0
 .set BT_NICK_MAX,   47
+.set BT_TS,         152         // the time on their last announce taken (a leave must be later)
+.set BT_FRESH,      30000       // a full table never gives up someone heard this recently
 .set BT_SIZE,       (BT_N << BT_SHIFT)
 .set BT_KEEP,       60000       // forgotten a minute after the last announce (as bitchat)
 .set BT_STALE,      900000      // announces older than 15 minutes are ignored (as bitchat)
@@ -98,6 +100,7 @@
 .set BT_MSG_MAX,    96          // bytes per message we send: one write, never compressed
 .set BT_MSG_STALE,  21600000    // older than 6 hours: not shown (as bitchat)
 .set BT_RELAY_PS,   20          // packets relayed for bitchat per second, at most
+.set BT_VERIFY_PS,  30          // signatures checked for bitchat per second, at most
 .set RL_SEC,        0           // the relay limit: which second, and how many in it
 .set RL_N,          8
 .set RL_SIZE,       16

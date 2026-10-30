@@ -247,8 +247,10 @@ _selftest:
     ADRL x8, _g_rooms
     add  x8, x8, x20, lsl #ROOM_SHIFT
     ldr  x9, [x8, #R_UNREAD]
-    cmp  x20, #LOCAL_ROOMS                // after Main and the local rooms (Home, Web,
-                                          //   News, bitchat)
+    ADRL x8, _g_room_count                // added last, after Main and the local rooms
+    ldr  x10, [x8]
+    sub  x10, x10, #1
+    cmp  x20, x10
     ccmp x9, #1, #0, eq
     EXPECT_TRUE Ln_unread
 
@@ -1668,7 +1670,7 @@ Lfr_done:
     bl   _t_report
     add  x19, x19, x0
 
-    // 112. a full room list: the 17th room is refused, not written past the end
+    // 112. a full room list: one more room is refused, not written past the end
 1:  ldr  x0, Lt_roombase
     ADRL x8, _g_room_count
     ldr  x9, [x8]
@@ -2562,7 +2564,7 @@ Ln_rate_one:    .asciz "108 limits: one sender flooding 200 messages gets about 
 Ln_rate_unver:  .asciz "109 limits: 80 packets from unknown senders share one small budget"
 Ln_nodes_reuse: .asciz "110 a full people list makes room for a newcomer when someone has gone quiet"
 Ln_nodes_busy:  .asciz "111 a full people list of people all heard just now keeps them"
-Ln_rooms_full:  .asciz "112 the 17th room is refused, not written past the end"
+Ln_rooms_full:  .asciz "112 a room past the last is refused, not written past the end"
 Ln_t113:        .asciz "113 a long transcript is trimmed to under 200,000 characters"
 Ln_t114:        .asciz "114 limits: 200 made-up identities don't push out a key in use"
 Ln_t118:        .asciz "118 SPIN screen: 9 profiles, 19 gestures, 18 actions (self-tests: not locked)"

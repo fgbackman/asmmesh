@@ -162,7 +162,7 @@ def dedup_key(d):                                        # BLEReceivedPacketCont
 
 # ---- Milestone 1: announces (AnnouncementPacket in Packets.swift) and who's around
 # (BLEAnnouncePreflightPolicy, BLEAnnounceTrustPolicy, handleLeave), for bc_peer.s
-STALE_MS, KEEP_MS, PEERS, NICK_MAX = 900000, 60000, 32, 47
+STALE_MS, KEEP_MS, PEERS, NICK_MAX, FRESH_MS = 900000, 60000, 32, 47, 30000
 def utf8_ok(b):
     try: b.decode('utf-8'); return True
     except UnicodeDecodeError: return False
@@ -197,7 +197,8 @@ class Peers:
         return -1
     def heard(self, now, own, d):
         # -> (slot, new) or (code, 0): -1 not an announce, -2 id not from its key, -3 us,
-        #    -4 stale, -5 signature, -6 a different signing key than before
+        #    -4 stale, -5 signature, -6 a different signing key than before, -9 table full
+        #    of people heard in the last 30 s
         if d['type'] != 1: return (-1, 0)
         a = ann_read(d['payload'])
         if a is None: return (-1, 0)
@@ -213,14 +214,19 @@ class Peers:
             new = 1
             free = [j for j, p in enumerate(self.t) if p is None]
             k = free[0] if free else min(range(PEERS), key=lambda j: (self.t[j]['heard'], j))
+            if not free and now - self.t[k]['heard'] < FRESH_MS: return (-9, 0)
             self.t[k] = dict(id=d['sender'], first=now)
         p = self.t[k]
-        p.update(heard=now, hops=7 - min(d['ttl'], 7), x=x, e=e, nick=nick[:utf8_cut(nick, NICK_MAX)])
+        p.update(ts=d['ts'], heard=now, hops=7 - min(d['ttl'], 7), x=x, e=e, nick=text_clean(nick[:utf8_cut(nick, NICK_MAX)]))
         return (k, new)
-    def leave(self, d):
+    def leave(self, now, d):
+        # only a fresh leave, later than their last announce, signed with their key
         if d['type'] != 3: return -1
         k = self.find(d['sender'])
-        if k < 0 or d['sig'] is None or not ed_ok(self.t[k]['e'], d['sig'], signing_bytes(d)): return -1
+        if k < 0: return -1
+        if now >= STALE_MS and d['ts'] < now - STALE_MS: return -1
+        if d['ts'] < self.t[k]['ts']: return -1
+        if d['sig'] is None or not ed_ok(self.t[k]['e'], d['sig'], signing_bytes(d)): return -1
         self.t[k] = None
         return k
     def expire(self, now):
@@ -231,7 +237,7 @@ class Peers:
     def dump(self, k):
         p = self.t[k]
         if p is None: return '-'
-        return '%s %x %x %d %s %s %s' % (p['id'].hex(), p['heard'], p['first'], p['hops'], p['x'].hex(), p['e'].hex(), p['nick'].hex() or '-')
+        return '%s %x %x %d %s %s %s %x' % (p['id'].hex(), p['heard'], p['first'], p['hops'], p['x'].hex(), p['e'].hex(), p['nick'].hex() or '-', p['ts'])
 def announce_packet(xseed, edseed, nick, ts, ttl=7, sender=None, sign_with=None, version=1):
     from cryptography.hazmat.primitives.asymmetric import ed25519, x25519
     from cryptography.hazmat.primitives import serialization as S
@@ -265,7 +271,7 @@ def msg_split(b, mx=MSG_MAX):
     if len(b) <= mx: return len(b)
     m = utf8_cut(b, mx)
     s = b.rfind(b' ', 0, m)
-    return s if s > 0 else m
+    return s if s > 0 else (m if m > 0 else mx)
 class RelayLimit:
     def __init__(self): self.sec, self.n = -1, 0
     def ok(self, now):
@@ -273,3 +279,19 @@ class RelayLimit:
         if s != self.sec: self.sec, self.n = s, 0
         if self.n >= RELAY_PER_S: return 0
         self.n += 1; return 1
+
+# ---- hardening: what a bitchat name or message may not do on our screen
+def text_clean(b):
+    # control characters (C0, DEL, U+0085), line and paragraph separators (U+2028/9), and
+    # direction marks, overrides and isolates (U+200E/F, U+202A-E, U+2066-9) become spaces,
+    # byte for byte, so the length stays the same
+    out, i = bytearray(b), 0
+    while i < len(b):
+        c = b[i]
+        if c < 0x20 or c == 0x7f: out[i] = 0x20; i += 1; continue
+        if c == 0xc2 and i + 1 < len(b) and b[i + 1] == 0x85: out[i:i + 2] = b'  '; i += 2; continue
+        if c == 0xe2 and i + 2 < len(b) and ((b[i + 1] == 0x80 and (0xa8 <= b[i + 2] <= 0xae or b[i + 2] in (0x8e, 0x8f)))
+                                             or (b[i + 1] == 0x81 and 0xa6 <= b[i + 2] <= 0xa9)):
+            out[i:i + 3] = b'   '; i += 3; continue
+        i += 1
+    return bytes(out)

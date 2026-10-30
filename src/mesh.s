@@ -83,7 +83,7 @@ _g_warned_clash:  .quad 0
 .globl _g_nodes
 .zerofill __DATA,__bss,_g_nodes,2048,4
 .globl _g_rooms
-.zerofill __DATA,__bss,_g_rooms,1024,4
+.zerofill __DATA,__bss,_g_rooms,(ROOM_MAX << ROOM_SHIFT),4
 .zerofill __DATA,__bss,_g_roomsave,640,4
 .globl _g_pairkey
 .zerofill __DATA,__bss,_g_pairkey,64,4
@@ -1897,10 +1897,6 @@ _rooms_init:
     ADRL x1, Ls_newsroom
     mov  x2, #0
     bl   _room_add
-    mov  x0, #BITCHAT_ID              // local: bitchat's public chat, walled off (bc_ble.s)
-    ADRL x1, Ls_bitchatroom
-    mov  x2, #0
-    bl   _room_add
     ADRL x8, _g_no_persist
     ldr  x8, [x8]
     cbnz x8, Lri_done
@@ -2064,7 +2060,6 @@ Ls_main:              .asciz "Main"
 Ls_home:              .asciz "Home"
 Ls_webroom:           .asciz "Web"
 Ls_newsroom:          .asciz "News"
-Ls_bitchatroom:       .asciz "bitchat"
 Ls_key_node:          .asciz "nodeId"
 Ls_key_nick:          .asciz "nick"
 Ls_key_rooms:         .asciz "rooms"

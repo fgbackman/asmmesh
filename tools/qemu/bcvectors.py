@@ -82,7 +82,7 @@ def peer_vectors():
     assert T.heard(TS + 1000, bytes(8), w.decode(unsigned))[0] == -5
     assert T.heard(TS + 1000, bytes(8), w.decode(other_sig))[0] == -5
     assert T.heard(TS + 1000, bytes(8), w.decode(pinned))[0] == -6
-    assert T.leave(w.decode(leave_forged)) == -1 and T.leave(w.decode(leave)) == 0
+    assert T.leave(TS + 1000, w.decode(leave_forged)) == -1 and T.leave(TS + 1000, w.decode(leave)) == 0
     out('Lp_ann1', a1, '167: an announce from "Anna\'s phone ☕", TTL 6')
     out('Lp_bad_sender', bad_sender, '168: the same, from a sender id that isn\'t its key\'s')
     out('Lp_unsigned', unsigned, '168: the same, not signed')

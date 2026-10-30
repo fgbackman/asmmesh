@@ -138,7 +138,10 @@ Numbers now taken:
   into _g_nodes must check it against _g_node_count first (Invite already does).
 
 ## bitchat Milestone 2 (Oct 30, branch claude/bitchat-roadmap): public chat
-- Room id 4 is the local bitchat room (BITCHAT_ID); LOCAL_ROOMS is 5 (ids 1-4 local). New
-  private rooms start at index 5. mesh.s routes text typed there to `_bc_say` (bc_ble.s) only.
+- Room id 4 is the local bitchat room (BITCHAT_ID); LOCAL_ROOMS is 5 (ids 1-4 local). It exists
+  only while bitchat is on (bc_ble.s adds and removes it), so find it with _room_find, never by
+  index. ROOM_MAX is 17. mesh.s routes text typed there to `_bc_say` (bc_ble.s) only.
+- `_kc_get` (net.s) now also returns the Keychain status in x1; prefer it to _g_kc_status, which
+  every thread shares. Self-tests 176 (bc_peer.s) and 177 (bc_link.s).
 - bc_peer.s: `_bc_msg_read`, `_bc_msg_split`, `_bc_relay_ok`; self-tests 173-175.
 - bc_ble.s: duplicate filter, messages into the room, relaying between bitchat links.

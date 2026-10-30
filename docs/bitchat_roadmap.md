@@ -171,7 +171,7 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 - Still to try: steps 5–7 (the phone leaving, switching off, the iPhone build).
 
 **Milestone 2 — public chat both ways** (`src/bc_peer.s`, `src/bc_ble.s`, the bitchat room) — **written and tested under qemu (Oct 30); to be tried on a Mac**
-- **The bitchat room** (local room id 4, after Home, Web and News; `LOCAL_ROOMS` is now 5, so there's room for 11 private rooms instead of 12). Mac and iPhone, orange, "Public chat with bitchat phones".
+- **The bitchat room** (local room id 4; `LOCAL_ROOMS` is now 5). It's there only while bitchat is on: switching on adds it, switching off removes it with its transcript. `ROOM_MAX` is now 17, so 12 private rooms still fit beside it. Mac and iPhone, orange, "Public chat with bitchat phones".
 - **Messages in:** a public message (`0x02`: plain UTF-8, signed) shows as "Anna: text" only if it's from someone whose announce we took, signed with their pinned key, under 6 hours old, and real UTF-8; the rest is dropped (bitchat's rules, `BLEPublicMessageHandler`). At most 600 bytes are shown, control characters as spaces. If the name matches an asmmesh person's, the line starts with a warning. It's only shown: nothing in it is ever run as a command.
 - **Messages out:** what you type in the bitchat room goes to bitchat as signed public messages, never as a command (it doesn't pass through the Home or chat-command paths). Long text goes in pieces of at most 96 bytes, cut at a space: each fits one write and stays under the 100 bytes bitchat would compress (a compressed payload couldn't carry our signature). With bitchat off, no keys yet or no phone linked, the room says so and nothing is sent.
 - **Duplicates:** every packet but fragments goes through bitchat's duplicate filter (sender, time, type, payload digest; 1000, 5 minutes) before it's acted on or passed on.
@@ -186,6 +186,16 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 4. Type in the bitchat room on the Mac: the phone's bitchat public chat shows it from "CC". Try a long message (over 96 bytes): it arrives in pieces.
 5. Type "kitchen lights off" in the bitchat room: it goes to bitchat as text, and nothing happens to any light. A phone sending the same changes nothing either.
 6. "bitchat" in Home: the "bitchat room" line counts messages shown and sent.
+
+**Hardening after a deep review (Oct 31)** — tested under qemu; to be tried on a Mac
+- **The wall:** "bitchat" and "bitchat people" refuse to answer remote asmmesh commands (they would link this Mac's two identities and carry strangers' names onto the mesh). Lines bitchat writes to Home from its own callbacks go straight to Home, never into a remote command's reply.
+- **Names and messages** can't fake a line or turn text around: control characters, U+0085, U+2028/9 and direction marks, overrides and isolates become spaces (`_bc_text_clean`, test 176).
+- **Link slots:** a link we started that hasn't come up in 15 s is cancelled; a central that connects but never subscribes gives its slot back after 30 s.
+- **Long writes:** once a packet is complete, the rest of that write (its padding) is ignored instead of being read as the same packet again (test 177).
+- **Fragments** are put back together from the decoded packet, so compressed ones work.
+- **Keychain:** every read, write and delete for the bitchat keys runs in order on one serial queue, off the main thread. Each read carries a generation number, so an answer to an older read is ignored, and each read gets its own status (`_kc_get` now also returns it in x1). New keys are made only when the Keychain says there are none; an entry that's there but unreadable is left alone, and the Mac stays quiet on bitchat.
+- **Floods:** signatures are checked 30 a second at most; a full table of people never gives up someone heard in the last 30 s; a leave counts only if it's under 15 minutes old and later than the person's last announce (tests 170, 171).
+- **Smaller:** a message no link took is shown as "not sent"; hop counts start at 2 for one relay; splitting text never returns 0; the "other kinds" counts reset with the rest.
 
 **Milestone 3 — private chat** (`src/bc_noise.s`)
 - Noise XX handshake over `0x10`, sessions keyed by peer ID, rekeying, and replay protection.

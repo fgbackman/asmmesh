@@ -36,7 +36,7 @@ _g_joinreqs_for_me: .quad 0  // asks to join one of our rooms (self-tests count 
 _g_jr_who:       .quad 0     // the last ask passed on: the same again within 30 s is a resend
 _g_jr_room:      .quad 0
 _g_jr_time:      .quad 0
-.zerofill __DATA,__bss,_g_listed,128,4
+.zerofill __DATA,__bss,_g_listed,(ROOM_MAX * 8),4
 .zerofill __DATA,__bss,_g_ads,2048,4
 
 .text

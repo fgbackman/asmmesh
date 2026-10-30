@@ -30,7 +30,7 @@
 //   +32  bytes per write or notification
 //   +40  frames in   +48 bytes in   +56 writes refused   +64 frames out
 //   +72  inbound write buffer (bc_defs.inc IB_*)
-//   +600 send queue (Q_*)
+//   +600 send queue (Q_*), then when it was made and (kind 2) whether it subscribed
 //
 // Both managers use queue:nil, so every callback runs on the main thread.
 
@@ -49,7 +49,9 @@
 .set L_OUT,         64
 .set L_IB,          72
 .set L_Q,           600
-.set L_SIZE,        (L_Q + Q_SIZE)
+.set L_SINCE,       (L_Q + Q_SIZE)          // when it was made (ms, _fm_now_ms)
+.set L_SUB,         (L_SINCE + 8)           // 1: the central subscribed (kind 2)
+.set L_SIZE,        (L_SUB + 8)
 
 .set K_THEY_PERIPH, 1
 .set K_THEY_CENTRAL, 2
@@ -75,7 +77,8 @@
 .set C_RELAYED,     104         // packets passed on for other bitchat users
 .set C_SHOWN,       112         // public messages shown in the bitchat room
 .set C_SAID,        120         // public messages we sent
-.set C_SIZE,        128
+.set C_LIMITED,     128         // packets not checked: over the 30-a-second limit
+.set C_SIZE,        136
 
 // our bitchat keys (_g_bc_keys)
 .set KS_NONE,       0
@@ -106,11 +109,14 @@ _g_bc_kcst:     .quad 0         // what the Keychain said when they were read
 _g_bc_kclen:    .quad 0
 _g_bc_ann_at:   .quad 0         // when the next announce goes (ms, _fm_now_ms); 0: next tick
 _g_bc_quiet:    .quad 0         // 1: "bitchat announce off", for testing (listen only)
+_g_bc_kcq:      .quad 0         // the Keychain queue (serial)
+_g_bc_kcgen:    .quad 0         // which read is the current one
 .zerofill __DATA,__bss,_g_bc_sk,64,4                      // X25519 secret, Ed25519 seed
 .zerofill __DATA,__bss,_g_bc_xpub,32,4
 .zerofill __DATA,__bss,_g_bc_edpub,32,4
 .zerofill __DATA,__bss,_g_bc_myid,8,4                     // first 8 bytes of SHA-256(xpub)
-.zerofill __DATA,__bss,_g_bc_kcbuf,160,4                  // the keys as hex, briefly
+.zerofill __DATA,__bss,_g_bc_kcbuf,160,4                  // the keys as hex, briefly (read)
+.zerofill __DATA,__bss,_g_bc_kcw,160,4                    // the same, being saved
 .globl _g_bc_peers
 .zerofill __DATA,__bss,_g_bc_peers,BT_SIZE,4              // bitchat people (bc_peer.s)
 .zerofill __DATA,__bss,_g_bc_scr,4096,4                   // what a signature covers
@@ -119,6 +125,7 @@ _g_bc_quiet:    .quad 0         // 1: "bitchat announce off", for testing (liste
 .zerofill __DATA,__bss,_g_bc_out,512,4                    // and its bytes
 .zerofill __DATA,__bss,_g_bc_dd,DD_SIZE,4                 // the duplicate filter (bc_packet.s)
 .zerofill __DATA,__bss,_g_bc_rl,RL_SIZE,4                 // the relay limit (bc_peer.s)
+.zerofill __DATA,__bss,_g_bc_vl,RL_SIZE,4                 // and the one for checking signatures
 .zerofill __DATA,__bss,_g_bc_fwd,512,4                    // a packet being passed on
 .zerofill __DATA,__bss,_g_bc_line,720,4                   // a line for the bitchat room
 
@@ -239,6 +246,7 @@ Lbs_managers:
     mov  x1, #C_SIZE
     bl   _bc_wipe
     bl   Lbc_keys_load
+    bl   Lbc_room_on
 Lbs_done:
     LEAVE 0
 
@@ -301,8 +309,66 @@ Lbt_links:
     mov  x1, #FA_BYTES
     bl   _bc_wipe
     bl   Lbc_keys_wipe
+    bl   Lbc_room_off
     bl   _ui_lists_changed
     LEAVE 0
+
+// void Lbc_room_on(void) — the bitchat room comes with the switch
+Lbc_room_on:
+    ENTER 0
+    mov  x0, #BITCHAT_ID
+    bl   _room_find
+    tbz  x0, #63, 1f                      // there already
+    mov  x0, #BITCHAT_ID
+    ADRL x1, Ls_bc_room
+    mov  x2, #0
+    bl   _room_add
+    tbz  x0, #63, 2f
+    ADRL x0, Ls_bc_noroom
+    bl   Lbc_note0
+    b    1f
+2:  bl   _ui_rooms_changed
+1:  LEAVE 0
+
+// void Lbc_room_off(void) — and goes with it, transcript and all. It's local and never
+//   saved, so nothing else is touched (no Keychain write, unlike _room_remove).
+Lbc_room_off:
+    ENTER 0
+    mov  x0, #BITCHAT_ID
+    bl   _room_find
+    tbnz x0, #63, 9f
+    mov  x19, x0
+    ADRL x8, _g_cur_room                  // looking at it, or a room after it: go to Main
+    ldr  x9, [x8]
+    cmp  x9, x19
+    b.lo 1f
+    mov  x0, #0
+    bl   _ui_select_room
+1:  ADRL x8, _g_room_count
+    ldr  x20, [x8]
+    ADRL x8, _g_rooms
+    add  x21, x8, x19, lsl #ROOM_SHIFT
+    ldr  x0, [x21, #R_STORE]
+    cbz  x0, 2f
+    MSG0 Ls_release
+2:  mov  x0, x19
+    mov  x1, x20
+    bl   _room_keys_remove
+    sub  x9, x20, x19
+    sub  x9, x9, #1
+    lsl  x2, x9, #ROOM_SHIFT
+    mov  x0, x21
+    add  x1, x21, #(1 << ROOM_SHIFT)
+    bl   _memmove
+    sub  x20, x20, #1
+    ADRL x8, _g_room_count
+    str  x20, [x8]
+    ADRL x8, _g_rooms
+    add  x0, x8, x20, lsl #ROOM_SHIFT
+    mov  x1, #(1 << ROOM_SHIFT)
+    bl   _bzero
+    bl   _ui_rooms_changed
+9:  LEAVE 0
 
 // id _bc_make_delegate(void) — registers AMeshBitchat and returns a new one
 _bc_make_delegate:
@@ -386,6 +452,8 @@ _bc_link_new:
     str  x21, [x23, #L_STATE]
     mov  x9, #20                          // until we learn better: the smallest ATT payload
     str  x9, [x23, #L_MAX]
+    bl   _fm_now_ms
+    str  x0, [x23, #L_SINCE]
     ADRL x8, _g_bc_cnt
     ldr  x9, [x8, #C_LINKS]
     add  x9, x9, #1
@@ -545,21 +613,14 @@ _bc_frame_in:
     str  x9, [x23, x11]
     cmp  w10, #0x20
     b.ne Lfi_done
-    mov  x0, x20                          // a fragment: its payload
-    mov  x1, x21
-    bl   _bc_frame_payload
-    tbnz x0, #63, Lfi_done                // compressed: Phase 3
-    mov  x24, x1
-    add  x22, x20, x0                     // payload
+    ADRL x8, _g_bc_dp                     // a fragment: its sender and payload, as Lbc_read
+    ldr  x22, [x8, #DP_PAY]               //   read them (a compressed one already unpacked)
+    ldr  x24, [x8, #DP_PLEN]
+    ldr  x21, [x8, #DP_SENDER]
     bl   _fm_now_ms
     mov  x1, x0
     ADRL x0, _g_bc_fa
-    ldrb w9, [x20]                        // the sender id follows the header
-    mov  x10, #14
-    cmp  w9, #2
-    mov  x11, #16
-    csel x10, x11, x10, eq
-    add  x2, x20, x10
+    mov  x2, x21
     mov  x3, x22
     mov  x4, x24
     ADRL x5, _g_bc_joined
@@ -614,7 +675,18 @@ Lbc_read:
     ADRL x2, _g_bc_dp
     bl   _bc_seen
     cbnz x0, 8f                           // heard it already, by another way
-    cmp  x22, #0x01
+    bl   Lbc_wall_ms                      // signatures are checked 30 a second at most: a
+    mov  x1, x0                           //   flood can't tie up the main thread
+    ADRL x0, _g_bc_vl
+    mov  x2, #BT_VERIFY_PS
+    bl   _bc_rate_ok
+    cbnz x0, 1f
+    ADRL x8, _g_bc_cnt
+    ldr  x9, [x8, #C_LIMITED]
+    add  x9, x9, #1
+    str  x9, [x8, #C_LIMITED]
+    b    4f
+1:  cmp  x22, #0x01
     b.ne 2f
     bl   Lbc_heard
     b    4f
@@ -711,7 +783,8 @@ Lbc_forward:
 9:  LEAVE 0
 
 // void Lbc_message(void) — a public message was read into _g_bc_dp: into the bitchat room,
-//   as "Anna: text", if it's from someone whose announce we took and signed by them.
+//   as "Anna: text" (cleaned: _bc_text_clean), if it's from someone whose announce we took
+//   and signed by them.
 //   Only shown: never read as a command, whatever it says.
 Lbc_message:
     ENTER 800                             // [96] the text [720] room
@@ -730,27 +803,19 @@ Lbc_message:
     bl   _room_find
     tbnz x0, #63, 9f
     str  x0, [sp, #720]
-    ADRL x8, _g_bc_dp                     // the text: at most 600 bytes, between characters,
-    ldr  x20, [x8, #DP_PAY]               //   control characters as spaces
+    ADRL x8, _g_bc_dp                     // the text: at most 600 bytes, between characters
+    ldr  x20, [x8, #DP_PAY]
     ldr  x1, [x8, #DP_PLEN]
     mov  x0, x20
     mov  x2, #600
     bl   _bc_utf8_cut
     mov  x21, x0
     add  x22, sp, #96
-    mov  x9, #0
-1:  cmp  x9, x21
-    b.hs 2f
-    ldrb w10, [x20, x9]
-    cmp  w10, #0x20
-    mov  w11, #0x20
-    csel w10, w11, w10, lo
-    cmp  w10, #0x7f
-    csel w10, w11, w10, eq
-    strb w10, [x22, x9]
-    add  x9, x9, #1
-    b    1b
-2:  strb wzr, [x22, x9]
+    mov  x0, x22                          // nothing in it may fake a line or turn text
+    mov  x1, x20
+    mov  x2, x21
+    bl   _bc_text_clean
+    strb wzr, [x22, x21]
     mov  x0, x19
     bl   _bc_person_clash
     ADRL x2, Lf_bc_said
@@ -812,10 +877,13 @@ _bc_say:
     mov  x2, #BT_MSG_MAX
     bl   _bc_msg_split
     mov  x21, x0
-    mov  x0, #0x02
+    cbnz x21, 21f                         // (never 0: it would never end)
+    mov  x21, #1
+21: mov  x0, #0x02
     mov  x1, x19
     mov  x2, x21
     bl   Lbc_send_own
+    mov  x23, x0                          // links it went to
     mov  x9, #0                           // show it: "you: piece"
 3:  cmp  x9, x21
     b.hs 4f
@@ -830,15 +898,21 @@ _bc_say:
     ADRL x0, _g_bc_line
     mov  x1, #720
     ADRL x2, Lf_bc_you
+    ADRL x10, Lf_bc_unsent                // no link took it: say so, don't pretend
+    cmp  x23, #0
+    csel x2, x10, x2, eq
     bl   _snprintf
     mov  x0, x22
     ADRL x1, _g_bc_line
-    mov  w2, #0
+    cmp  x23, #0
+    cset w2, eq
     bl   _room_line
+    cbz  x23, 22f
     ADRL x8, _g_bc_cnt
     ldr  x9, [x8, #C_SAID]
     add  x9, x9, #1
     str  x9, [x8, #C_SAID]
+22:
     add  x19, x19, x21
     sub  x20, x20, x21
     b    1b
@@ -849,6 +923,28 @@ _bc_say:
 
 // ---------------------------------------------------------------------------
 // our bitchat identity, announces, and the people heard (Milestone 1)
+
+// void Lbc_note(const char *fmt, a, b, c) — a line in Home from bitchat's own callbacks:
+//   straight into the room, never into the reply to a remote command (the wall)
+Lbc_note:
+    ENTER 512
+    str  x1, [sp]
+    str  x2, [sp, #8]
+    str  x3, [sp, #16]
+    mov  x2, x0
+    add  x0, sp, #96
+    mov  x1, #400
+    bl   _snprintf
+    ADRL x8, _g_home_idx
+    ldr  x0, [x8]
+    add  x1, sp, #96
+    mov  w2, #1
+    bl   _room_line
+    LEAVE 512
+Lbc_note0:
+    mov  x1, x0
+    ADRL x0, Ls_bc_pcts
+    b    Lbc_note
 
 // long Lbc_wall_ms(void) -> ms since 1970
 Lbc_wall_ms:
@@ -866,8 +962,25 @@ Lbc_wall_ms:
     add  x0, x0, x1
     LEAVE 16
 
-// void Lbc_keys_load(void) — main thread, switch on: read our keys off the main thread
-//   (macOS may ask first), then Lbc_kc_ready
+// The Keychain, for our bitchat keys: every read, write and delete runs on one serial queue
+// of its own (macOS may ask first, and the app mustn't freeze meanwhile), in the order
+// asked. Each read carries a generation number: an answer to an older one (switched off
+// and on again meanwhile) is ignored, so it can never make us new keys by mistake.
+
+// dispatch_queue_t Lbc_kcq(void) — the queue, made once
+Lbc_kcq:
+    ENTER 0
+    ADRL x8, _g_bc_kcq
+    ldr  x0, [x8]
+    cbnz x0, 1f
+    ADRL x0, Ls_bc_q
+    mov  x1, #0                           // serial
+    bl   _dispatch_queue_create
+    ADRL x8, _g_bc_kcq
+    str  x0, [x8]
+1:  LEAVE 0
+
+// void Lbc_keys_load(void) — main thread, switch on: read our keys, then Lbc_kc_ready
 Lbc_keys_load:
     ENTER 0
     ADRL x8, _g_bc_keys
@@ -875,37 +988,70 @@ Lbc_keys_load:
     cbnz x9, 1f                           // loading, ready, or refused already
     mov  x9, #KS_LOADING
     str  x9, [x8]
-    mov  x0, #0
-    mov  x1, #0
-    bl   _dispatch_get_global_queue
-    mov  x1, #0
+    ADRL x8, _g_bc_kcgen
+    ldr  x19, [x8]
+    add  x19, x19, #1
+    str  x19, [x8]
+    bl   Lbc_kcq
+    mov  x1, x19                          // the generation rides along
     ADRL x2, Lbc_kc_worker
     bl   _dispatch_async_f
 1:  LEAVE 0
 
-// void Lbc_kc_worker(void *unused) — background
+// void Lbc_kc_worker(long gen) — on the Keychain queue
 Lbc_kc_worker:
     ENTER 0
+    mov  x19, x0
     ADRL x0, Ls_bc_kc
     ADRL x1, _g_bc_kcbuf
     mov  x2, #160
-    bl   _kc_get
+    bl   _kc_get                          // x1: what the Keychain said, to this read alone
     ADRL x8, _g_bc_kclen
     str  x0, [x8]
-    ADRL x8, _g_kc_status
-    ldrsw x9, [x8]
     ADRL x8, _g_bc_kcst
-    str  x9, [x8]
+    str  x1, [x8]
     LDGOT x0, __dispatch_main_q
-    mov  x1, #0
+    mov  x1, x19
     ADRL x2, Lbc_kc_ready
     bl   _dispatch_async_f
     LEAVE 0
 
-// void Lbc_kc_ready(void *unused) — main thread: use our keys, or make them if the
-//   Keychain truly has none (never because it said no: that would change who we are)
+// void Lbc_kc_write(void *unused) — on the Keychain queue: save new keys (_g_bc_kcw, hex),
+//   then wipe that copy
+Lbc_kc_write:
+    ENTER 0
+    ADRL x0, Ls_bc_kc
+    ADRL x1, _g_bc_kcw
+    bl   _kc_set
+    ADRL x0, _g_bc_kcw
+    mov  x1, #160
+    bl   _bc_wipe
+    LEAVE 0
+
+// void Lbc_kc_delete(void *unused) — on the Keychain queue: "bitchat forget"
+Lbc_kc_delete:
+    ENTER 0
+    ADRL x0, Ls_bc_kc
+    bl   _kc_del
+    LEAVE 0
+
+// void Lbc_kc_scrub(void *unused) — on the Keychain queue: the read buffer wiped, after
+//   any read still under way
+Lbc_kc_scrub:
+    ENTER 0
+    ADRL x0, _g_bc_kcbuf
+    mov  x1, #160
+    bl   _bc_wipe
+    LEAVE 0
+
+// void Lbc_kc_ready(long gen) — main thread: use our keys, or make them if the Keychain
+//   truly has none (never because it said no: that would change who we are)
 Lbc_kc_ready:
     ENTER 0
+    ADRL x8, _g_bc_kcgen                  // an answer to an older read: not ours to use
+    ldr  x9, [x8]
+    cmp  x0, x9
+    b.ne Lkr_stale
     mov  x0, #SVC_BITCHAT                 // switched off meanwhile: forget what was read
     bl   _svc_on
     cbz  x0, Lkr_off
@@ -922,20 +1068,25 @@ Lbc_kc_ready:
     ADRL x2, _g_bc_sk
     bl   _hex_dec
     cbnz x0, Lkr_derive
-    b    Lkr_new                          // there, but not keys: make new ones
+    b    Lkr_refused                      // there, but not keys: leave it be, say so
 Lkr_none:
     ADRL x8, _g_bc_kcst
     ldr  x9, [x8]
-    cbz  x9, Lkr_new
-    mov  x10, #-25300                     // errSecItemNotFound
+    mov  x10, #-25300                     // errSecItemNotFound: there truly are none
     cmp  x9, x10
     b.eq Lkr_new
+    cbnz x9, Lkr_refused
+    ADRL x8, _g_bc_kclen                  // no error and nothing there: none either
+    ldr  x10, [x8]
+    cbz  x10, Lkr_new
+Lkr_refused:
     ADRL x8, _g_bc_keys
     mov  x10, #KS_REFUSED
     str  x10, [x8]
-    mov  x1, x9
+    ADRL x8, _g_bc_kcst
+    ldr  x1, [x8]
     ADRL x0, Lf_bc_kc_no
-    bl   _home_say
+    bl   Lbc_note
     b    Lkr_done
 Lkr_new:
     mov  x0, #0                           // kSecRandomDefault
@@ -943,15 +1094,16 @@ Lkr_new:
     ADRL x2, _g_bc_sk
     bl   _SecRandomCopyBytes
     cbnz w0, Lkr_fail
-    ADRL x0, _g_bc_sk
+    ADRL x0, _g_bc_sk                     // saved on the Keychain queue, not here
     mov  x1, #64
-    ADRL x2, _g_bc_kcbuf
+    ADRL x2, _g_bc_kcw
     bl   _hex_enc
-    ADRL x0, Ls_bc_kc
-    ADRL x1, _g_bc_kcbuf
-    bl   _kc_set
+    bl   Lbc_kcq
+    mov  x1, #0
+    ADRL x2, Lbc_kc_write
+    bl   _dispatch_async_f
     ADRL x0, Ls_bc_newkeys
-    bl   _home_say0
+    bl   Lbc_note0
 Lkr_derive:
     ADRL x0, _g_bc_xpub
     ADRL x1, _g_bc_sk
@@ -979,26 +1131,30 @@ Lkr_fail:
     mov  x9, #KS_REFUSED
     str  x9, [x8]
     ADRL x0, Ls_bc_norandom
-    bl   _home_say0
+    bl   Lbc_note0
     b    Lkr_done
 Lkr_off:
     bl   Lbc_keys_wipe
+    LEAVE 0
 Lkr_done:
-    ADRL x0, _g_bc_kcbuf
+    ADRL x0, _g_bc_kcbuf                  // ours, and the read is over: wipe it here
     mov  x1, #160
     bl   _bc_wipe
+Lkr_stale:
     LEAVE 0
 
-// void Lbc_keys_wipe(void) — our keys, and everyone we heard, out of memory
+// void Lbc_keys_wipe(void) — our keys, and everyone we heard, out of memory; any read
+//   still under way is ignored when it answers, and its buffer wiped after it
 Lbc_keys_wipe:
     ENTER 0
     ADRL x8, _g_bc_keys
     str  xzr, [x8]
+    ADRL x8, _g_bc_kcgen
+    ldr  x9, [x8]
+    add  x9, x9, #1
+    str  x9, [x8]
     ADRL x0, _g_bc_sk
     mov  x1, #64
-    bl   _bc_wipe
-    ADRL x0, _g_bc_kcbuf
-    mov  x1, #160
     bl   _bc_wipe
     ADRL x0, _g_bc_myid
     mov  x1, #8
@@ -1006,6 +1162,13 @@ Lbc_keys_wipe:
     ADRL x0, _g_bc_peers
     mov  x1, #BT_SIZE
     bl   _bc_wipe
+    ADRL x0, _g_bc_types
+    mov  x1, #2048
+    bl   _bc_wipe
+    bl   Lbc_kcq
+    mov  x1, #0
+    ADRL x2, Lbc_kc_scrub
+    bl   _dispatch_async_f
     LEAVE 0
 
 // long Lbc_send_own(long type, const uint8 *payload, long n) -> links it went to: a packet
@@ -1077,11 +1240,54 @@ Lbc_announce:
     bl   Lbc_send_own
     LEAVE 0
 
-// void _bc_tick(void) — once a second (scanner.s, ios_ui.s): forget people gone quiet,
-//   and announce when it's time
+// void Lbc_sweep(void) — slots back from links that never came up (a phone that left, or
+//   changed its private address, before we connected: CoreBluetooth never gives up on
+//   its own) and from centrals that write but never subscribe. There are only BC_LINKS.
+Lbc_sweep:
+    ENTER 0
+    bl   _fm_now_ms
+    mov  x19, x0
+    mov  x20, #0
+1:  cmp  x20, #BC_LINKS
+    b.hs 9f
+    LINK x21, x20
+    ldr  x22, [x21, #L_KIND]
+    cbz  x22, 5f
+    ldr  x10, [x21, #L_SINCE]
+    sub  x23, x19, x10                    // its age
+    cmp  x22, #K_THEY_PERIPH
+    b.ne 3f
+    ldr  x11, [x21, #L_STATE]             // ours: 15 s to come up
+    cmp  x11, #S_READY
+    b.eq 5f
+    mov  x12, #15000
+    cmp  x23, x12
+    b.lo 5f
+    mov  x0, x20
+    mov  x1, #1
+    bl   _bc_link_free
+    b    5f
+3:  ldr  x11, [x21, #L_SUB]               // theirs: 30 s to subscribe
+    cbnz x11, 5f
+    mov  x12, #30000
+    cmp  x23, x12
+    b.lo 5f
+    mov  x0, x20
+    mov  x1, #0
+    bl   _bc_link_free
+5:  add  x20, x20, #1
+    b    1b
+9:  LEAVE 0
+
+// void _bc_tick(void) — once a second (scanner.s, ios_ui.s): free stuck links, forget
+//   people gone quiet, and announce when it's time
 .globl _bc_tick
 _bc_tick:
     ENTER 0
+    ADRL x8, _g_bc_cm                     // running at all?
+    ldr  x9, [x8]
+    cbz  x9, 9f
+    bl   Lbc_sweep
     ADRL x8, _g_bc_keys
     ldr  x9, [x8]
     cmp  x9, #KS_READY
@@ -1153,10 +1359,12 @@ Lbc_heard:
 // void Lbc_left(void) — a leave was read into _g_bc_dp
 Lbc_left:
     ENTER 0
+    bl   Lbc_wall_ms
+    mov  x1, x0
     ADRL x0, _g_bc_peers
-    ADRL x1, _g_bc_dp
-    ADRL x2, _g_bc_scr
-    mov  x3, #4096
+    ADRL x2, _g_bc_dp
+    ADRL x3, _g_bc_scr
+    mov  x4, #4096
     bl   _bc_peer_leave
     tbnz x0, #63, 1f
     bl   _ui_lists_changed
@@ -1223,10 +1431,10 @@ _bc_person_line:
     mov  x21, x2
     add  x1, sp, #96
     bl   _bc_person_fp
-    ADRL x22, Ls_bc_near
+    ADRL x22, Ls_bc_near                  // BT_HOPS is how many relays: 0 is in range
     ldr  x9, [x19, #BT_HOPS]
-    cmp  x9, #1
-    b.ls 1f
+    cbz  x9, 1f
+    add  x9, x9, #1                       // one relay: two hops away
     str  x9, [sp]
     add  x0, sp, #128
     mov  x1, #32
@@ -1262,7 +1470,7 @@ Lbc_say_person:
     ADRL x0, Lf_bc_new
     add  x1, x19, #BT_NICK
     add  x2, sp, #96
-    bl   _home_say
+    bl   Lbc_note
     LEAVE 128
 
 // long _bc_people_n(void) -> bitchat people to show (0 with the switch off)
@@ -1788,6 +1996,11 @@ _bc_pm_sub:
     mov  x0, x3
     bl   _bc_central_link
     tbnz x0, #63, 1f
+    mov  x19, x0
+    LINK x20, x19                         // a real link: it keeps its slot
+    mov  x9, #1
+    str  x9, [x20, #L_SUB]
+    mov  x0, x19
     bl   _bc_flush
 1:  LEAVE 0
 
@@ -1891,6 +2104,9 @@ _bc_pm_ready:
 .globl _h_bitchat
 _h_bitchat:
     ENTER 0
+    ADRL x8, _g_remote_active             // the wall: what bitchat looks like from here never
+    ldr  x9, [x8]                         //   goes on asmmesh's mesh (it would link this Mac's
+    cbnz x9, Lhb_here                     //   two identities, and carry strangers' names)
     mov  x0, #SVC_BITCHAT
     bl   _svc_gate
     cbz  x0, 1f
@@ -1934,6 +2150,10 @@ _h_bitchat:
     ADRL x0, Ls_wall
     bl   _home_say0
 1:  LEAVE 0
+Lhb_here:
+    ADRL x0, Ls_bc_local
+    bl   _home_say0
+    LEAVE 0
 
 // void Lbc_say_me(void) — who this Mac is on bitchat, and who it has heard
 Lbc_say_me:
@@ -1970,6 +2190,12 @@ Lbc_say_me:
     ldr  x3, [x8, #C_RELAYED]
     ADRL x0, Lf_bc_chat_n
     bl   _home_say
+    ADRL x8, _g_bc_cnt
+    ldr  x1, [x8, #C_LIMITED]
+    cbz  x1, 2f
+    ADRL x0, Lf_bc_limited
+    bl   _home_say
+2:
     LEAVE 32
 1:  ADRL x0, Ls_bc_nokeys
     ADRL x10, Ls_bc_loading
@@ -2003,6 +2229,9 @@ _h_bitchat_quiet:
 .globl _h_bitchat_people
 _h_bitchat_people:
     ENTER 144                             // [96] a line
+    ADRL x8, _g_remote_active             // (not over the mesh: see _h_bitchat)
+    ldr  x9, [x8]
+    cbnz x9, 4f
     mov  x0, #SVC_BITCHAT
     bl   _svc_gate
     cbz  x0, 3f
@@ -2030,6 +2259,9 @@ _h_bitchat_people:
 2:  ADRL x0, Ls_bc_nobody
     bl   _home_say0
 3:  LEAVE 144
+4:  ADRL x0, Ls_bc_local
+    bl   _home_say0
+    LEAVE 144
 
 // "bitchat forget" — delete our bitchat keys and everyone heard (this Mac only). With
 //   the switch on, new keys are made: to bitchat phones this Mac is then someone new.
@@ -2043,8 +2275,10 @@ _h_bitchat_forget:
     mov  x1, #0
     mov  x2, #0
     bl   Lbc_send_own
-    ADRL x0, Ls_bc_kc
-    bl   _kc_del
+    bl   Lbc_kcq                          // deleted on the Keychain queue, before any new read
+    mov  x1, #0
+    ADRL x2, Lbc_kc_delete
+    bl   _dispatch_async_f
     bl   Lbc_keys_wipe
     ADRL x0, _g_bc_cnt
     mov  x1, #C_SIZE
@@ -2227,9 +2461,15 @@ Lf_links:     .asciz "\302\267 bitchat: %ld linked (%ld this Mac found, %ld foun
 Lf_heard:     .asciz "\302\267 heard %ld packets: %ld hellos, %ld public messages"
 Lf_heard2:    .asciz "\302\267 %ld private (sealed), %ld fragments, %ld put back together"
 Ls_bc_kc:     .asciz "asmmesh.bitchat"
+Ls_bc_room:   .asciz "bitchat"
+Ls_bc_noroom: .asciz "\302\267 bitchat: no space for the bitchat room (every room slot is taken). Leave a room and switch bitchat off and on."
+Ls_bc_q:      .asciz "asmmesh.bitchat.keychain"
+Ls_bc_pcts:   .asciz "%s"
+Ls_bc_local:  .asciz "\302\267 what bitchat sees is only shown on this Mac, never over the mesh"
 Lf_bc_said:   .asciz "%s: %s"
 Lf_bc_said_clash: .asciz "\342\232\240\357\270\217 %s (bitchat, not the asmmesh one): %s"
 Lf_bc_you:    .asciz "you: %s"
+Lf_bc_unsent: .asciz "not sent (no bitchat link could take it): %s"
 Ls_bc_say_off: .asciz "bitchat is off: switch it on in Settings (or type \342\200\234enable bitchat\342\200\235 in Home). Not sent."
 Ls_bc_say_nokeys: .asciz "This Mac has no bitchat keys yet (type \342\200\234bitchat\342\200\235 in Home to see why). Not sent."
 Ls_bc_say_nolink: .asciz "No bitchat phones are linked right now. Not sent."
@@ -2241,6 +2481,7 @@ Lf_bc_kc_no:  .asciz "\302\267 bitchat: the Keychain didn't hand over this Mac's
 Ls_bc_nokeys: .asciz "\302\267 this Mac isn't announcing itself on bitchat (no keys)"
 Ls_bc_loading: .asciz "\302\267 this Mac's bitchat keys are being read"
 Lf_bc_me:     .asciz "\302\267 this Mac on bitchat: \342\200\234%s\342\200\235 \302\267 %s \302\267 %ld announces sent"
+Lf_bc_limited: .asciz "\302\267 %ld packets left unchecked: more than 30 a second came in"
 Lf_bc_chat_n: .asciz "\302\267 bitchat room: %ld messages shown, %ld sent; %ld packets passed on for other bitchat users"
 Lf_bc_people_n: .asciz "\302\267 bitchat people: %ld around (%ld announces taken, %ld refused); say \342\200\234bitchat people\342\200\235"
 Ls_bc_people_hdr: .asciz "\302\267 bitchat people (walled off: a name and a fingerprint, nothing more):"

@@ -125,6 +125,72 @@ _bc_utf8_cut:
 2:  mov  x0, x2
     ret
 
+// void _bc_text_clean(uint8 *dst, const uint8 *src, long n) — a bitchat name or message as
+//   it may be shown: control characters (C0, DEL, U+0085), line and paragraph separators
+//   (U+2028/9) and direction marks, overrides and isolates (U+200E/F, U+202A-E, U+2066-9)
+//   become spaces, byte for byte, so nobody can start a fake line or turn text around.
+//   dst may be src (leaf)
+.globl _bc_text_clean
+_bc_text_clean:
+    mov  x9, #0
+    mov  w15, #' '
+1:  cmp  x9, x2
+    b.hs 9f
+    ldrb w10, [x1, x9]
+    cmp  w10, #0x20
+    b.lo 7f
+    cmp  w10, #0x7f
+    b.eq 7f
+    cmp  w10, #0xc2
+    b.eq 3f
+    cmp  w10, #0xe2
+    b.eq 4f
+2:  strb w10, [x0, x9]                    // as it is
+    add  x9, x9, #1
+    b    1b
+3:  add  x11, x9, #1                      // U+0085
+    cmp  x11, x2
+    b.hs 2b
+    ldrb w12, [x1, x11]
+    cmp  w12, #0x85
+    b.ne 2b
+    strb w15, [x0, x9]
+    strb w15, [x0, x11]
+    add  x9, x9, #2
+    b    1b
+4:  add  x11, x9, #2                      // E2 80 xx / E2 81 xx
+    cmp  x11, x2
+    b.hs 2b
+    ldrb w13, [x1, x11]                   //   the third byte
+    sub  x11, x11, #1
+    ldrb w12, [x1, x11]                   //   the second
+    cmp  w12, #0x80
+    b.ne 5f
+    cmp  w13, #0x8e                       //   U+200E, U+200F
+    b.eq 6f
+    cmp  w13, #0x8f
+    b.eq 6f
+    sub  w14, w13, #0xa8                  //   U+2028 to U+202E
+    cmp  w14, #6
+    b.ls 6f
+    b    2b
+5:  cmp  w12, #0x81
+    b.ne 2b
+    sub  w14, w13, #0xa6                  //   U+2066 to U+2069
+    cmp  w14, #3
+    b.hi 2b
+6:  strb w15, [x0, x9]
+    add  x9, x9, #1
+    strb w15, [x0, x9]
+    add  x9, x9, #1
+    strb w15, [x0, x9]
+    add  x9, x9, #1
+    b    1b
+7:  strb w15, [x0, x9]
+    add  x9, x9, #1
+    b    1b
+9:  ret
+
 // void Lpcopy(dst, src, n) — bytes, forwards (leaf: x9, x10)
 Lpcopy:
     mov  x9, #0
@@ -255,8 +321,10 @@ Lfind:
 // long _bc_peer_heard(tab, long now_ms, const uint8 own_id[8], const uint8 *dp, uint8 *scratch,
 //   long cap) -> the person's slot, with x1 = 1 if they're new; or why not: -1 not an
 //   announce we can read, -2 its sender isn't its key's id, -3 it's ours, -4 older than 15
-//   minutes, -5 not signed by the key it announces, -6 another signing key than before.
-//   A new person takes a free slot, or the one heard from longest ago.
+//   minutes, -5 not signed by the key it announces, -6 another signing key than before,
+//   -9 the table is full of people heard in the last 30 s. A new person takes a free
+//   slot, or the one heard from longest ago if that's over 30 s: a flood of made-up
+//   people can't push out the real ones around.
 .globl _bc_peer_heard
 _bc_peer_heard:
     ENTER 96                              // [96] announce (AN_SIZE) [128] SHA-256 [160] scratch
@@ -331,8 +399,13 @@ _bc_peer_heard:
     mov  x23, x9
 32: add  x9, x9, #1
     b    3b
+4:  sub  x12, x20, x11                    // no free slot: the oldest must be quiet 30 s
+    mov  x13, #(BT_FRESH & 0xffff)
+    cmp  x12, x13
+    b.lt Lph_full
+    b    41f
 31: mov  x23, x9
-4:  add  x0, x19, x23, lsl #BT_SHIFT
+41: add  x0, x19, x23, lsl #BT_SHIFT
     mov  x1, #(1 << BT_SHIFT)
     bl   Lpzero
     add  x9, x19, x23, lsl #BT_SHIFT
@@ -340,6 +413,8 @@ _bc_peer_heard:
     str  x20, [x9, #BT_FIRST]
 5:  add  x22, x19, x23, lsl #BT_SHIFT     // x22: the slot from here on
     str  x20, [x22, #BT_HEARD]
+    ldr  x9, [x21, #DP_TS]                // a leave must be later than this
+    str  x9, [x22, #BT_TS]
     ldr  x9, [x21, #DP_TTL]
     mov  x10, #7
     cmp  x9, x10
@@ -363,6 +438,10 @@ _bc_peer_heard:
     add  x0, x22, #BT_NICK
     ldr  x1, [sp, #96 + AN_NICK]
     bl   Lpcopy
+    ldr  x2, [x22, #BT_NLEN]              // nothing in a name may fake a line or turn text
+    add  x0, x22, #BT_NICK
+    mov  x1, x0
+    bl   _bc_text_clean
     ldr  x9, [x22, #BT_NLEN]
     add  x10, x22, #BT_NICK
     strb wzr, [x10, x9]
@@ -386,19 +465,24 @@ Lph_badsig:
     b    Lph_out
 Lph_pinned:
     mov  x0, #-6
+    b    Lph_out
+Lph_full:
+    mov  x0, #-9
 Lph_out:
     mov  x1, #0
     LEAVE 96
 
-// long _bc_peer_leave(tab, const uint8 *dp, uint8 *scratch, long cap) -> the slot of the
-//   person who left, or -1: not a leave, nobody we know, or not signed with their key
+// long _bc_peer_leave(tab, long now_ms, const uint8 *dp, uint8 *scratch, long cap) -> the
+//   slot of the person who left, or -1: not a leave, nobody we know, over 15 minutes old,
+//   older than their last announce (a recording played back), or not signed with their key
 .globl _bc_peer_leave
 _bc_peer_leave:
     ENTER 0
     mov  x19, x0
-    mov  x20, x1
-    mov  x21, x2
-    mov  x22, x3
+    mov  x24, x1
+    mov  x20, x2
+    mov  x21, x3
+    mov  x22, x4
     ldr  x9, [x20, #DP_TYPE]
     cmp  x9, #0x03
     b.ne 9f
@@ -408,6 +492,18 @@ _bc_peer_leave:
     bl   Lfind
     tbnz x0, #63, 9f
     mov  x23, x0
+    ldr  x10, [x20, #DP_TS]
+    mov  x9, #(BT_STALE & 0xffff)         // fresh
+    movk x9, #(BT_STALE >> 16), lsl #16
+    cmp  x24, x9
+    b.lo 1f
+    sub  x9, x24, x9
+    cmp  x10, x9
+    b.lo 9f
+1:  add  x9, x19, x23, lsl #BT_SHIFT      // and later than their last announce
+    ldr  x9, [x9, #BT_TS]
+    cmp  x10, x9
+    b.lo 9f
     mov  x0, x20
     add  x1, x19, x23, lsl #BT_SHIFT
     add  x1, x1, #BT_EDPUB
@@ -487,12 +583,14 @@ _bc_peer_nth:
 4:  mov  x0, x10
     ret
 
-// void Lpzero(p, n) (leaf)
+// void Lpzero(p, n), Lpfill(p, n, byte) (leaf)
 Lpzero:
+    mov  w2, #0
+Lpfill:
     mov  x9, #0
 1:  cmp  x9, x1
     b.hs 2f
-    strb wzr, [x0, x9]
+    strb w2, [x0, x9]
     add  x9, x9, #1
     b    1b
 2:  ret
@@ -578,12 +676,13 @@ Lmr_stranger:
 //   as much as fits without cutting a character
 .globl _bc_msg_split
 _bc_msg_split:
-    ENTER 0
+    ENTER 16                              // [96] max
     mov  x19, x0
+    str  x2, [sp, #96]
     cmp  x1, x2
     b.hi 1f
     mov  x0, x1
-    LEAVE 0
+    LEAVE 16
 1:  bl   _bc_utf8_cut
     mov  x20, x0
     sub  x9, x20, #1
@@ -594,15 +693,24 @@ _bc_msg_split:
     b.eq 4f
     sub  x9, x9, #1
     b    2b
-3:  mov  x0, x20
-    LEAVE 0
+3:  mov  x0, x20                          // no space: as much as fits (never 0, or a
+    cbnz x0, 5f                           //   caller would never finish: then the bytes
+    ldr  x2, [sp, #96]                    //   as they come, not valid UTF-8 anyway)
+    mov  x0, x2
+5:  LEAVE 16
 4:  mov  x0, x9
-    LEAVE 0
+    LEAVE 16
 
 // long _bc_relay_ok(uint8 *rl, long now_ms) -> 1 if another packet may be relayed for
 //   bitchat this second (BT_RELAY_PS at most), else 0 (leaf)
 .globl _bc_relay_ok
 _bc_relay_ok:
+    mov  x2, #BT_RELAY_PS
+
+// long _bc_rate_ok(uint8 *rl, long now_ms, long max) -> 1 if there's room for one more
+//   this second (max at most), else 0 (leaf)
+.globl _bc_rate_ok
+_bc_rate_ok:
     mov  x9, #1000
     udiv x9, x1, x9
     ldr  x10, [x0, #RL_SEC]
@@ -611,7 +719,7 @@ _bc_relay_ok:
     str  x9, [x0, #RL_SEC]
     str  xzr, [x0, #RL_N]
 1:  ldr  x10, [x0, #RL_N]
-    cmp  x10, #BT_RELAY_PS
+    cmp  x10, x2
     b.hs 2f
     add  x10, x10, #1
     str  x10, [x0, #RL_N]
@@ -621,7 +729,7 @@ _bc_relay_ok:
     ret
 
 // ---------------------------------------------------------------------------
-// self-tests 165-175, called from test.s
+// self-tests 165-176, called from test.s
 
 .macro PP_AND
     cset x9, eq
@@ -839,10 +947,12 @@ _bc_peer_selftest:
 
     // 170. a leave signed by someone else changes nothing; theirs takes them off
     READ Lp_leave_forged, PLF_N
+    AT   1000
+    mov  x1, x0
     mov  x0, x21
-    mov  x1, x22
-    mov  x2, x23
-    mov  x3, #4096
+    mov  x2, x22
+    mov  x3, x23
+    mov  x4, #4096
     bl   _bc_peer_leave
     cmn  x0, #1
     cset x20, eq
@@ -850,11 +960,23 @@ _bc_peer_selftest:
     bl   _bc_peer_count
     cmp  x0, #1
     PP_AND
-    READ Lp_leave, PLV_N
+    READ Lp_leave, PLV_N                  // played back over 15 minutes later: no
+    AT   900010
+    mov  x1, x0
     mov  x0, x21
-    mov  x1, x22
-    mov  x2, x23
-    mov  x3, #4096
+    mov  x2, x22
+    mov  x3, x23
+    mov  x4, #4096
+    bl   _bc_peer_leave
+    cmn  x0, #1
+    PP_AND
+    READ Lp_leave, PLV_N
+    AT   1000
+    mov  x1, x0
+    mov  x0, x21
+    mov  x2, x22
+    mov  x3, x23
+    mov  x4, #4096
     bl   _bc_peer_leave
     cmp  x0, #0
     PP_AND
@@ -880,21 +1002,21 @@ _bc_peer_selftest:
     bl   _bc_peer_expire
     cmp  x0, #1
     PP_AND
-    mov  x25, #0                          // 32 others, heard at TS + 100 + slot, but slot 5 earliest
+    mov  x25, #0                          // 32 others: heard 10 s ago, but slot 5 40 s ago
 2:  add  x9, x21, x25, lsl #BT_SHIFT
     add  x10, x25, #100
     str  x10, [x9, #BT_ID]
-    AT   100
+    AT   30000
     add  x0, x0, x25
     cmp  x25, #5
     b.ne 3f
-    AT   50
+    AT   100
 3:  add  x9, x21, x25, lsl #BT_SHIFT
     str  x0, [x9, #BT_HEARD]
     add  x25, x25, #1
     cmp  x25, #BT_N
     b.lo 2b
-    HEARD 1000, Lq_zero
+    HEARD 40000, Lq_zero                  // Anna takes slot 5
     cmp  x0, #5
     PP_AND
     cmp  x1, #1
@@ -902,6 +1024,14 @@ _bc_peer_selftest:
     mov  x0, x21
     bl   _bc_peer_count
     cmp  x0, #BT_N
+    PP_AND
+    AT   39000                            // everyone heard lately: no room for her
+    add  x9, x21, #(5 << BT_SHIFT)
+    mov  x10, #999
+    str  x10, [x9, #BT_ID]
+    str  x0, [x9, #BT_HEARD]
+    HEARD 40000, Lq_zero
+    cmn  x0, #9
     PP_AND
     PP_REPORT Ln_pp171
 
@@ -1010,6 +1140,16 @@ _bc_peer_selftest:
     bl   _bc_msg_split
     cmp  x0, #94
     PP_AND
+    mov  x0, x23                          // 100 stray continuation bytes: never 0
+    mov  x1, #100
+    mov  w2, #0x80
+    bl   Lpfill
+    mov  x0, x23
+    mov  x1, #100
+    mov  x2, #BT_MSG_MAX
+    bl   _bc_msg_split
+    cmp  x0, #BT_MSG_MAX
+    PP_AND
     PP_REPORT Ln_pp174
 
     // 175. relaying for bitchat: 20 a second at most
@@ -1037,6 +1177,27 @@ _bc_peer_selftest:
     cmp  x0, #1
     PP_AND
     PP_REPORT Ln_pp175
+
+    // 176. names and messages can't fake a line or turn text around
+    mov  x20, #1
+    ADRL x25, Lq_clean                    // each: length, the bytes, then what they become
+7:  ldrb w26, [x25]
+    cbz  w26, 8f
+    mov  x0, x23
+    add  x1, x25, #1
+    mov  x2, x26
+    bl   _bc_text_clean
+    mov  x0, x23
+    add  x1, x25, #1
+    add  x1, x1, x26
+    mov  x2, x26
+    bl   _bc_memeq
+    cmp  x0, #1
+    PP_AND
+    add  x25, x25, x26, lsl #1
+    add  x25, x25, #1
+    b    7b
+8:  PP_REPORT Ln_pp176
 
     ldp  x25, x26, [sp, #96]
     mov  x0, x19
@@ -1080,6 +1241,18 @@ Lq_bad:
     .fill 32, 1, 0x21
     .byte 0
 
+// cleaning: length, the bytes, then what they become
+Lq_clean:
+    .byte 5, 'a', 0x0a, 'b', 0x7f, 'c',          'a', ' ', 'b', ' ', 'c'
+    .byte 4, 'x', 0xc2, 0x85, 'y',               'x', ' ', ' ', 'y'
+    .byte 5, 0xe2, 0x80, 0xa8, 'h', 'i',         ' ', ' ', ' ', 'h', 'i'
+    .byte 6, 0xe2, 0x80, 0xae, 0xe2, 0x81, 0xa9, ' ', ' ', ' ', ' ', ' ', ' '
+    .byte 3, 0xe2, 0x80, 0x8f,                   ' ', ' ', ' '
+    .byte 6, 0xe2, 0x98, 0x95, 0xc2, 0xa9, 'z',  0xe2, 0x98, 0x95, 0xc2, 0xa9, 'z'
+    .byte 2, 0xe2, 0x80,                         0xe2, 0x80
+    .byte 3, 0xe2, 0x80, 0xa7,                   0xe2, 0x80, 0xa7
+    .byte 0
+
 // UTF-8 cases: length, 1 if well-formed, bytes
 Lq_utf8:
     .byte 3, 1, 'a', 'b', 'c'
@@ -1103,12 +1276,13 @@ Ln_pp166:   .asciz "166 bitchat people: announces read as bitchat reads them; br
 Ln_pp167:   .asciz "167 bitchat people: an announce from bitchat is taken: name, keys, hops"
 Ln_pp168:   .asciz "168 bitchat people: wrong id, our own, stale, unsigned, forged are refused"
 Ln_pp169:   .asciz "169 bitchat people: a known person's signing key can't be swapped"
-Ln_pp170:   .asciz "170 bitchat people: only a leave signed with their key takes them off"
-Ln_pp171:   .asciz "171 bitchat people: forgotten after a minute; a full table gives up the oldest"
+Ln_pp170:   .asciz "170 bitchat people: only a fresh leave signed with their key takes them off"
+Ln_pp171:   .asciz "171 bitchat people: forgotten after a minute; a full table gives up only the long quiet"
 Ln_pp172:   .asciz "172 bitchat people: UTF-8 checked, and cut between characters"
 Ln_pp173:   .asciz "173 bitchat chat: messages shown only from known, signing, recent people"
 Ln_pp174:   .asciz "174 bitchat chat: what we type goes in pieces that fit, cut at a space"
 Ln_pp175:   .asciz "175 bitchat chat: relaying for bitchat is capped at 20 a second"
+Ln_pp176:   .asciz "176 bitchat chat: control, line-break and direction characters become spaces"
 Lq_hello:   .ascii "hello"
 Lq_long:    .ascii "Hello from the asmmesh room on a Mac mini in the kitchen, passing a message over to bitchat phones nearby today"
 Lq_long_end:
