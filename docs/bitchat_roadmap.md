@@ -102,7 +102,7 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 - `tools/qemu/run.sh` runs them on Linux. `tools/qemu/run.sh diff 300` checks every function against Python's `cryptography` with random inputs and edge cases (Poly1305's reduction limits, X25519 inputs at or above p, low-order points).
 - Keychain storage for the two bitchat keys moved to Milestone 1, where the keys are first needed and the off switch has to keep them unloaded.
 
-**Phase 2 — Bluetooth link** (`src/bc_link.s`, `src/bc_ble.s`) — **written; to be tried on a Mac**
+**Phase 2 — Bluetooth link** (`src/bc_link.s`, `src/bc_ble.s`) — **works on a Mac (tried Oct 30, 2026)**
 - The **bitchat** switch is service 24, off by default. It's a new card in Settings (the Mac window is now five columns by five rows, which is full). "enable all" leaves it off, and it can't be switched from the mesh.
 - bitchat gets its own CBCentralManager, CBPeripheralManager and delegate class, so its callbacks never pass through asmmesh's controller. Each of its three entry points for outside bytes runs under the guard.
 - Central: scans for bitchat's service only, connects (up to 8 links), subscribes to notifications, and writes without response when the radio has room.
@@ -119,6 +119,12 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 4. Another Mac running asmmesh still links as before (`ble.s` is unchanged).
 5. "bitchat advertise on": the phone links to this Mac too ("found this Mac"), and step 4 still works. If asmmesh's own linking breaks, turn it off and note it here.
 6. "disable bitchat": links drop, and "bitchat" says it's off.
+
+*Results of the first Mac test (Oct 30, 2026, the App Store bitchat on an iPhone):*
+- Steps 1–3 passed. With bitchat open on the iPhone, "bitchat" showed 1 linked (this Mac found it), and 11 packets heard: 6 hellos, 5 "other", none refused.
+- Step 5 passed. After "bitchat advertise on", "found this Mac" went to 1, and asmmesh's own links stayed up while both services were advertised.
+- Still to do: step 6 (switching off); the bitchat build on iPhone (installed, not tried yet).
+- The 5 "other" packets are types the link layer doesn't name yet. Find out which in Phase 3 (likely sync requests `0x21` or a newer type).
 
 **Phase 3 — packet codec** (`src/bc_packet.s`)
 - Encode and decode v1 and v2 headers, flags, zlib, padding, and signatures.
