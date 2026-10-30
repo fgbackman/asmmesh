@@ -145,12 +145,13 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 
 *Results on the Mac (Oct 30, 2026):* self-tests 127–164 pass (so libz unpacks bitchat's compression), every packet from the iPhone's bitchat was read with **0 refused**, and the 5 "other" packets from Phase 2 are **sync requests (`0x21`)**: bitchat asking its neighbours what they have, which never travels further than one link. Answering them is optional (Milestone 2).
 
-**Milestone 1 — "I can see bitchat people"** (`src/bc_peer.s`, `src/bc_ble.s`) — **written and tested under qemu (Oct 30); to be tried on a Mac and iPhone**
+**Milestone 1 — "I can see bitchat people"** (`src/bc_peer.s`, `src/bc_ble.s`) — **works on a Mac (Oct 30): each sees the other; iPhone build not tried yet**
 - **Keys:** an X25519 (Noise) key and an Ed25519 signing key, 64 random bytes from `SecRandomCopyBytes`, in one Keychain item of their own (`asmmesh.bitchat`), never derived from or linked to the asmmesh identity. Read off the main thread when the switch goes on, wiped from memory when it goes off. New ones are made only when the Keychain says there are none; if it refuses, this Mac stays quiet on bitchat and says why. Our peer id is the first 8 bytes of SHA-256 of the X25519 key, as bitchat's.
 - **Announcing:** our asmmesh name (cut to 26 bytes) and both keys, signed, as bitchat's `AnnouncementPacket`. Sent a tick after a link comes up, then every 15–19 s while there's a link (bitchat's sparse-mesh pace), without padding so the packet (at most 182 bytes) fits one write. No neighbour list or capabilities (both optional). A signed leave goes out when the switch goes off (best effort: the links drop right after).
 - **Reading announces** (bitchat's preflight and trust rules): the sender id must come from the announced Noise key, not ours, under 15 minutes old, and signed by the announced signing key. That signing key is then pinned: another key for the same id is refused. A leave counts only when signed with the pinned key. People are forgotten a minute after their last announce (bitchat keeps verified peers 60 s); the table holds 32.
 - **Showing them:** People (Mac and iPhone) lists bitchat people after asmmesh's, in orange, with their name, a **bitchat** label and their fingerprint (the peer id, the start of bitchat's own fingerprint), and nearby or how many hops. Nothing to click: they can't be invited, found or sent commands. If a bitchat name matches an asmmesh person's, the line starts with a warning that it's not the same person. "bitchat" also says who this Mac is on bitchat and how many announces were taken and refused; "bitchat people" lists everyone; "bitchat forget" deletes the keys and the people (this Mac only; with the switch on, new keys follow).
 - Not done: the Mesh Scanner doesn't show bitchat devices (People does instead).
+- For testing: "bitchat announce off" makes this Mac listen without announcing; "bitchat announce on" undoes it.
 - Self-tests 165–172 (`_bc_peer_selftest`); `tools/qemu/run.sh diff` cross-checks announces, UTF-8 and the people table (coming, refused, leaving, forgotten) against `bcwire.py`.
 
 *Checklist for the Mac and iPhone:*
@@ -161,6 +162,13 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 5. Close bitchat on the phone: within about a minute it leaves People here.
 6. "disable bitchat": the phone's bitchat drops this Mac; People here has no bitchat people.
 7. On an iPhone with the bitchat build of asmmesh: the People tab shows an "On bitchat" section.
+
+*Results on the Mac (Oct 30, 2026, the App Store bitchat on an iPhone):*
+- **Both directions work.** The Mac took the phone's announces (7 taken, 0 refused) and listed it, and **bitchat on the phone lists the Mac ("CC")**, so bitchat accepts our signed announce: Phase 3's signing is right.
+- The phone then sent 2 sealed packets, most likely starting a Noise session with the Mac (it only does that with verified peers). Answering them is Milestone 3.
+- The sync requests (`0x21`) keep coming (8 in a minute); answering them is optional (Milestone 2).
+- What went wrong first: two copies of asmmesh were running at once, and the phone stopped sending to the Mac until its Bluetooth was switched off and on (Settings › Bluetooth). With one copy and a fresh phone link everything worked, announcing on or off. If a phone goes quiet again on a link that stays up, note what came before it here.
+- Still to try: steps 5–7 (the phone leaving, switching off, the iPhone build).
 
 **Milestone 2 — public chat both ways**
 - New **bitchat** room. Incoming `0x02` messages appear there with the sender's nickname. Messages typed there go out signed.
