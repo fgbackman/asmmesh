@@ -79,7 +79,8 @@ Lfl_bad:
 //   for more, -1 if the write was dropped (too big, or not a bitchat packet).
 //   A piece at offset 0 starts a new write. A later piece with nothing waiting (the rest
 //   of a write whose packet is already complete, or one whose start was lost or dropped)
-//   is ignored: the old bytes must never be read as a packet again.
+//   is ignored: the old bytes must never be read as a packet again. A later piece must
+//   start where the last one ended; one that leaves a gap drops the write.
 .globl _bc_inbox_put
 _bc_inbox_put:
     ENTER 0
@@ -96,6 +97,8 @@ _bc_inbox_put:
     cbz  x1, 4f                           // a later piece with nothing waiting: ignored
     ldr  x10, [x19, #IB_LEN]
     cbz  x10, Lib_wait
+    cmp  x1, x10                          // and it must follow on, with no gap: bytes left
+    b.ne Lib_drop                         //   from an earlier write never join a packet
 4:  add  x10, x19, #IB_DATA
     add  x10, x10, x1
     mov  x11, #0
@@ -131,12 +134,17 @@ Lib_drop:
     LEAVE 0
 
 // long _bc_frag_put(fa, long now_ms, const uint8 *sender[8], const uint8 *payload,
-//   long n, uint8 *out[FA_BYTES]) -> the original packet's length when this fragment
-//   completes it (its bytes are in out), 0 while waiting (or a repeat), -1 refused
+//   long n, uint8 *out[FA_BYTES], long link) -> the original packet's length when this
+//   fragment completes it (its bytes are in out), 0 while waiting (or a repeat), -1 refused.
+//   A set belongs to the link its first piece came on: pieces from other links don't join
+//   it, and one link has at most FA_PER_LINK sets (a new one evicts its own oldest), so a
+//   stranger's link can't push out or poison other phones' sets.
 .globl _bc_frag_put
 _bc_frag_put:
-    ENTER 64                              // [96] id [104] index [112] total [120] type [128] chunk length [144] x25
-    str  x25, [sp, #144]
+    ENTER 64                              // [96] id [104] index [112] total [120] type [128] chunk length
+    str  x25, [sp, #144]                  //   [136] link + 1 [144] x25
+    add  x6, x6, #1
+    str  x6, [sp, #136]
     mov  x19, x0
     mov  x20, x1
     ldr  x21, [x2]                        // sender (8 bytes, compared as one word)
@@ -179,12 +187,14 @@ _bc_frag_put:
 2:  add  x9, x9, #1
     cmp  x9, #FA_N
     b.lo 1b
-    // this sender's set with this id?
+    // this sender's set with this id, on this link?
     ldr  x15, [sp, #96]
+    ldr  x17, [sp, #136]
     mov  x9, #0
 3:  madd x25, x9, x13, x19
     ldr  x11, [x25, #FS_USED]
-    cbz  x11, 4f
+    cmp  x11, x17
+    b.ne 4f
     ldr  x11, [x25, #FS_SENDER]
     cmp  x11, x21
     b.ne 4f
@@ -194,7 +204,27 @@ _bc_frag_put:
 4:  add  x9, x9, #1
     cmp  x9, #FA_N
     b.lo 3b
-    // a new set: a free slot, or the oldest one
+    // a new set: if this link has FA_PER_LINK already, its own oldest; else a free slot,
+    // or the oldest of all
+    mov  x9, #0
+    mov  x12, #0                          // this link's sets
+    mov  x25, #0
+    mov  x16, #-1                         // its oldest start
+50: madd x10, x9, x13, x19
+    ldr  x11, [x10, #FS_USED]
+    cmp  x11, x17
+    b.ne 51f
+    add  x12, x12, #1
+    ldr  x11, [x10, #FS_START]
+    cmp  x11, x16
+    b.hs 51f
+    mov  x16, x11
+    mov  x25, x10
+51: add  x9, x9, #1
+    cmp  x9, #FA_N
+    b.lo 50b
+    cmp  x12, #FA_PER_LINK
+    b.hs 8f
     mov  x9, #0
     mov  x25, #0
     mov  x16, #-1                         // oldest start seen
@@ -212,7 +242,7 @@ _bc_frag_put:
 7:  add  x9, x9, #1
     cmp  x9, #FA_N
     b.lo 5b
-8:  mov  x9, #1
+8:  ldr  x9, [sp, #136]
     str  x9, [x25, #FS_USED]
     str  x21, [x25, #FS_SENDER]
     str  x15, [x25, #FS_ID]
@@ -473,21 +503,22 @@ Lfy_no:
 .endm
 
 // x0 = _bc_frag_put(fa, now, Lv_fsender, payload, n, out)
-.macro FRAG now, pl, n
+.macro FRAG now, pl, n, link=0
     mov  x0, x22
     mov  x1, #\now
     ADRL x2, Lv_fsender
     \pl
     mov  x4, #\n
     mov  x5, x23
+    mov  x6, #\link
     bl   _bc_frag_put
 .endm
 
 // long _bc_link_selftest(void) -> number of failures
 .globl _bc_link_selftest
 _bc_link_selftest:
-    ENTER 16                              // [96] x25
-    str  x25, [sp, #96]
+    ENTER 16                              // [96] x25 [104] x26
+    stp  x25, x26, [sp, #96]
     mov  x19, #0
     mov  x0, #1                           // inbox, fragment table, output, queue
     mov  x1, #IB_SIZE
@@ -780,7 +811,55 @@ _bc_link_selftest:
     bl   _bc_inbox_put
     cmp  x0, #0
     BL_AND
+    mov  x0, x21                          // a piece that leaves a gap drops the write
+    mov  x1, #0
+    ADRL x2, Lv_p1
+    mov  x3, #100
+    bl   _bc_inbox_put
+    cmp  x0, #0
+    BL_AND
+    mov  x0, x21
+    mov  x1, #120
+    ADRL x2, Lv_p1
+    add  x2, x2, #120
+    mov  x3, #34
+    bl   _bc_inbox_put
+    cmn  x0, #1
+    BL_AND
     BL_REPORT Ln_bl177
+    // 178. one link can't push out another's fragment sets, or slip pieces into them
+    mov  x0, x22
+    mov  x1, #(FA_SIZE & 0xffff)
+    movk x1, #(FA_SIZE >> 16), lsl #16
+    bl   _bc_wipe
+    FRAG 5000, "ADRL x3, Lv_f0", 133, 2   // link 2 starts the real set
+    cmp  x0, #0
+    cset x20, eq
+    add  x25, x23, #FA_BYTES              // link 1: three sets of its own (copies, new ids)
+    mov  x26, #1
+9:  mov  x0, x25
+    ADRL x1, Lv_f0
+    mov  x2, #133
+    bl   _memcpy
+    strb w26, [x25]                       //   (the id's first byte)
+    mov  w9, #0x5a
+    strb w9, [x25, #1]
+    FRAG 5001, "mov x3, x25", 133, 1
+    cmp  x0, #0
+    BL_AND
+    add  x26, x26, #1
+    cmp  x26, #4
+    b.ls 9b
+    FRAG 5002, "ADRL x3, Lv_f1", 133, 1   // link 1 with the real set's next piece: not joined
+    cmp  x0, #0
+    BL_AND
+    FRAG 5003, "ADRL x3, Lv_f2", 62, 2    // link 2: the rest, and the real packet comes out
+    cmp  x0, #0
+    BL_AND
+    FRAG 5004, "ADRL x3, Lv_f1", 133, 2
+    cmp  x0, #289
+    BL_AND
+    BL_REPORT Ln_bl178
     mov  x0, x21
     bl   _free
     mov  x0, x22
@@ -790,7 +869,7 @@ _bc_link_selftest:
     mov  x0, x24
     bl   _free
     mov  x0, x19
-    ldr  x25, [sp, #96]
+    ldp  x25, x26, [sp, #96]
     LEAVE 16
 
 .section __TEXT,__const
@@ -803,7 +882,8 @@ Ln_bl150:   .asciz "150 bitchat link: impossible fragments are refused"
 Ln_bl151:   .asciz "151 bitchat link: a fragment set left for 30 s is forgotten"
 Ln_bl152:   .asciz "152 bitchat link: fragments are made the way bitchat makes them"
 Ln_bl153:   .asciz "153 bitchat link: the send queue keeps 8, oldest first"
-Ln_bl177:   .asciz "177 bitchat link: the rest of a write after its packet is ignored"
+Ln_bl177:   .asciz "177 bitchat link: the rest of a write after its packet is ignored; gaps drop it"
+Ln_bl178:   .asciz "178 bitchat link: fragment sets stay with their link, at most 2 each"
 Ln_bl154:   .asciz "154 bitchat link: a fragment's payload is found; a compressed one waits"
 // a v1 packet with recipient and signature (154 bytes)
 Lv_p1:

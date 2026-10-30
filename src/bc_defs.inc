@@ -19,6 +19,7 @@
 
 // fragment reassembly: FA_N slots
 .set FA_N,          8
+.set FA_PER_LINK,   2           // sets one link may have going at once (it evicts its own)
 .set FA_FRAGS,      64          // most fragments in one set
 .set FA_BYTES,      8192        // most bytes in one set (text; files are out of scope)
 .set FA_TIMEOUT,    30000       // ms
@@ -104,3 +105,24 @@
 .set RL_SEC,        0           // the relay limit: which second, and how many in it
 .set RL_N,          8
 .set RL_SIZE,       16
+
+// hardening (second review)
+.set BT_MTS,        160         // the time on their newest message shown (bc_peer.s)
+.set BT_FUTURE,     300000      // announces and messages from over 5 minutes ahead: refused
+.set BT_REPLAY,     300000      // a message 5 minutes behind their newest shown: a replay
+
+// pins: every bitchat signing key we've taken, kept for good (in the Keychain), so nobody
+// can take over someone's fingerprint while they're away, and old announces and leaves
+// can't be played back
+.set PN_N,          128
+.set PN_ID,         0
+.set PN_FLOOR,      8           // the time on their latest announce or leave taken
+.set PN_HEARD,      16          // when we last took one (our clock); 0: free
+.set PN_ED,         24          // the signing key
+.set PN_ESIZE,      56
+.set PN_DIRTY,      0           // header: 1 when it needs saving
+.set PN_RATE,       8           //   new pins this minute (RL_*)
+.set PN_HDR,        32
+.set PN_SIZE,       (PN_HDR + PN_N * PN_ESIZE)
+.set PN_NEW,        6           // new people a minute, at most
+.set PN_PERIOD,     60000

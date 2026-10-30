@@ -51,6 +51,7 @@ _g_id_check:    .quad 1                // tests switch off "id = hash of key" fo
 _g_rx_replay:   .quad 0                // 1 while a pending packet is being re-read
 .globl _g_time_override
 _g_time_override: .quad 0              // tests: sign as if at this time
+_g_id_kcst:     .quad 0                // what the Keychain said when the identity was read
 .globl _g_my_pub
 .zerofill __DATA,__bss,_g_my_pub,72,4
 .zerofill __DATA,__bss,_g_keys,6144,4
@@ -360,6 +361,8 @@ _id_kc_read:
     ADRL x1, _g_kcblob
     mov  x2, #2400
     bl   _kc_get
+    ADRL x8, _g_id_kcst               // what the Keychain said to this read: _g_kc_status
+    str  x1, [x8]                     //   is shared by every reader on every thread
     LEAVE 0
 
 // void _id_ready(void) — main thread, after _id_kc_read: adopt or create our key,
@@ -371,8 +374,8 @@ _id_ready:
     ADRL x19, _g_kcblob
     ldrb w9, [x19]
     cbnz w9, Lir_have
-    ADRL x8, _g_kc_status             // nothing came back: only make a new identity if the
-    ldrsw x9, [x8]                     //   Keychain truly has none — never because it said no
+    ADRL x8, _g_id_kcst               // nothing came back: only make a new identity if the
+    ldr  x9, [x8]                      //   Keychain truly has none — never because it said no
     mov  w10, #-25300                 //   (that would replace your identity for good)
     cmp  w9, w10
     b.eq Lir_new

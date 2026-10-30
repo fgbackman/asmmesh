@@ -150,6 +150,8 @@ Lsimple:
     .quad Lw_bc_forget,      0, _h_bitchat_forget, 0
     .quad Lw_bc_ann_on,      0, _h_bitchat_quiet, 0
     .quad Lw_bc_ann_off,     0, _h_bitchat_quiet, 1
+    .quad Lw_bc_name,        0, _h_bitchat_name, 0
+    .quad Lw_bc_name,        1, _h_bitchat_name, 0
     .quad Lw_settings,       2, _h_services, 0
     .quad Lw_service_list,   2, _h_services, 0
     .quad Lw_enable,         1, _h_svc_switch, 1
@@ -2830,6 +2832,7 @@ Lw_bc_people:    .asciz "bitchat people"
 Lw_bc_forget:    .asciz "bitchat forget"
 Lw_bc_ann_on:    .asciz "bitchat announce on"
 Lw_bc_ann_off:   .asciz "bitchat announce off"
+Lw_bc_name:      .asciz "bitchat name"
 Lw_settings:     .asciz "settings"
 Lw_service_list: .asciz "list services"
 Lw_enable:       .asciz "enable"

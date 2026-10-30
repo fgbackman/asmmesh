@@ -145,3 +145,11 @@ Numbers now taken:
   every thread shares. Self-tests 176 (bc_peer.s) and 177 (bc_link.s).
 - bc_peer.s: `_bc_msg_read`, `_bc_msg_split`, `_bc_relay_ok`; self-tests 173-175.
 - bc_ble.s: duplicate filter, messages into the room, relaying between bitchat links.
+
+## bitchat security hardening (Oct 31, branch claude/bitchat-roadmap)
+- Self-tests 176-183 (bc_peer.s, bc_link.s). bc_peer.s: pins (PN_*), _bc_name_same/_bc_name_skel,
+  _bc_ed_small, _bc_rate_ok(rl, now, max, period). _bc_peer_heard takes pins in x6,
+  _bc_peer_leave in x5; _bc_seen takes a "remember" flag in x3; _bc_frag_put takes the link in x6.
+- New Keychain item "asmmesh.bitchat.pins"; defaults key "bitchatName"; Home word "bitchat name".
+- ident.s: _id_ready reads _g_id_kcst (its own read's status), not the shared _g_kc_status.
+- mesh.s: `_room_drop(idx)` removes a room without saving; `_room_remove` = drop + save.

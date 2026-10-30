@@ -189,16 +189,53 @@ def ed_ok(pub, sig, msg):
     from cryptography.hazmat.primitives.asymmetric import ed25519
     try: ed25519.Ed25519PublicKey.from_public_bytes(pub).verify(sig, msg); return True
     except Exception: return False
+FUTURE_MS, PIN_N, PIN_NEW, PIN_PERIOD = 300000, 128, 6, 60000
+SMALL_ORDER = [bytes.fromhex(h) for h in (
+    '0000000000000000000000000000000000000000000000000000000000000000',
+    '0100000000000000000000000000000000000000000000000000000000000000',
+    '26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05',
+    'c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a',
+    'ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f',
+    'edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f',
+    'eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f')]
+def ed_small(pub):
+    # an Ed25519 key of small order (or its non-canonical twin): anyone could sign as it
+    k = pub[:31] + bytes([pub[31] & 0x7f])
+    return any(k == x for x in SMALL_ORDER)
+class Rate:
+    def __init__(self, mx, period): self.mx, self.period, self.sec, self.n = mx, period, -1, 0
+    def ok(self, now):
+        s = now // self.period
+        if s != self.sec: self.sec, self.n = s, 0
+        if self.n >= self.mx: return 0
+        self.n += 1; return 1
+class Pins:
+    # every signing key seen, for good (kept in the Keychain): id -> floor (the time on the
+    # latest announce or leave taken), heard (our clock), signing key; the least lately heard
+    # goes when it's full; at most 6 new ones a minute
+    def __init__(self): self.t = [None] * PIN_N; self.rate = Rate(PIN_NEW, PIN_PERIOD)
+    def find(self, i):
+        for p in self.t:
+            if p and p['id'] == i: return p
+        return None
+    def note(self, i, e, ts, now):
+        p = self.find(i)
+        if p is None:
+            free = [j for j, q in enumerate(self.t) if q is None]
+            j = free[0] if free else min(range(PIN_N), key=lambda j: (self.t[j]['heard'], j))
+            p = self.t[j] = dict(id=i, floor=0, e=e)
+        p['floor'] = max(p['floor'], ts); p['heard'] = now
 class Peers:
     def __init__(self): self.t = [None] * PEERS        # dict(id, heard, first, hops, x, e, nick)
     def find(self, i):
         for k, p in enumerate(self.t):
             if p and p['id'] == i: return k
         return -1
-    def heard(self, now, own, d):
+    def heard(self, now, own, d, pins=None):
         # -> (slot, new) or (code, 0): -1 not an announce, -2 id not from its key, -3 us,
-        #    -4 stale, -5 signature, -6 a different signing key than before, -9 table full
-        #    of people heard in the last 30 s
+        #    -4 stale, from the future, or not later than one taken before, -5 signature or
+        #    a weak key, -6 a different signing key than before, -9 table full of people
+        #    heard in the last 30 s, -10 too many new people this minute
         if d['type'] != 1: return (-1, 0)
         a = ann_read(d['payload'])
         if a is None: return (-1, 0)
@@ -206,20 +243,28 @@ class Peers:
         if peer_id(x) != d['sender']: return (-2, 0)
         if d['sender'] == own: return (-3, 0)
         if now >= STALE_MS and d['ts'] < now - STALE_MS: return (-4, 0)
+        if d['ts'] > now + FUTURE_MS: return (-4, 0)
+        if ed_small(e): return (-5, 0)
         k = self.find(d['sender'])
         if k >= 0 and self.t[k]['e'] != e: return (-6, 0)
+        pin = pins.find(d['sender']) if pins else None
+        if pin and pin['e'] != e: return (-6, 0)
+        if pin and d['ts'] <= pin['floor']: return (-4, 0)
+        if k >= 0 and d['ts'] < self.t[k]['ts']: return (-4, 0)
         if d['sig'] is None or not ed_ok(e, d['sig'], signing_bytes(d)): return (-5, 0)
+        if pins and pin is None and not pins.rate.ok(now): return (-10, 0)
         new = 0
         if k < 0:
             new = 1
             free = [j for j, p in enumerate(self.t) if p is None]
             k = free[0] if free else min(range(PEERS), key=lambda j: (self.t[j]['heard'], j))
             if not free and now - self.t[k]['heard'] < FRESH_MS: return (-9, 0)
-            self.t[k] = dict(id=d['sender'], first=now)
+            self.t[k] = dict(id=d['sender'], first=now, mts=0)
         p = self.t[k]
         p.update(ts=d['ts'], heard=now, hops=7 - min(d['ttl'], 7), x=x, e=e, nick=text_clean(nick[:utf8_cut(nick, NICK_MAX)]))
+        if pins: pins.note(d['sender'], e, d['ts'], now)
         return (k, new)
-    def leave(self, now, d):
+    def leave(self, now, d, pins=None):
         # only a fresh leave, later than their last announce, signed with their key
         if d['type'] != 3: return -1
         k = self.find(d['sender'])
@@ -227,6 +272,7 @@ class Peers:
         if now >= STALE_MS and d['ts'] < now - STALE_MS: return -1
         if d['ts'] < self.t[k]['ts']: return -1
         if d['sig'] is None or not ed_ok(self.t[k]['e'], d['sig'], signing_bytes(d)): return -1
+        if pins: pins.note(d['sender'], self.t[k]['e'], d['ts'], now)
         self.t[k] = None
         return k
     def expire(self, now):
@@ -251,7 +297,7 @@ def announce_packet(xseed, edseed, nick, ts, ttl=7, sender=None, sign_with=None,
     return p
 
 # ---- Milestone 2: public messages (BLEPublicMessageHandler, BLEPublicMessagePolicy)
-MSG_STALE_MS, MSG_MAX, RELAY_PER_S = 6 * 3600 * 1000, 96, 20
+MSG_STALE_MS, MSG_MAX, RELAY_PER_S, MSG_REPLAY_MS = 6 * 3600 * 1000, 96, 20, 300000
 def msg_read(T, now, own, d):
     # -> the sender's slot, or -1 not a public message, -3 ours, -4 older than 6 hours,
     #    -5 not signed by them, -7 not UTF-8 / too long, -8 nobody we know
@@ -260,10 +306,13 @@ def msg_read(T, now, own, d):
     if r is not None and r != b'\xff' * 8: return -1
     if d['sender'] == own: return -3
     if now >= MSG_STALE_MS and d['ts'] < now - MSG_STALE_MS: return -4
+    if d['ts'] > now + FUTURE_MS: return -4
     if len(d['payload']) > 65535 or not utf8_ok(d['payload']): return -7
     k = T.find(d['sender'])
     if k < 0: return -8
+    if d['ts'] + MSG_REPLAY_MS < T.t[k]['mts']: return -4      # well behind their newest: a replay
     if d['sig'] is None or not ed_ok(T.t[k]['e'], d['sig'], signing_bytes(d)): return -5
+    T.t[k]['mts'] = max(T.t[k]['mts'], d['ts'])
     return k
 def msg_split(b, mx=MSG_MAX):
     # how much of b goes in the first message: all of it if it fits, else up to the last
@@ -272,26 +321,68 @@ def msg_split(b, mx=MSG_MAX):
     m = utf8_cut(b, mx)
     s = b.rfind(b' ', 0, m)
     return s if s > 0 else (m if m > 0 else mx)
-class RelayLimit:
-    def __init__(self): self.sec, self.n = -1, 0
-    def ok(self, now):
-        s = now // 1000
-        if s != self.sec: self.sec, self.n = s, 0
-        if self.n >= RELAY_PER_S: return 0
-        self.n += 1; return 1
+class RelayLimit(object):
+    def __init__(self): self.r = Rate(RELAY_PER_S, 1000)
+    def ok(self, now): return self.r.ok(now)
 
 # ---- hardening: what a bitchat name or message may not do on our screen
 def text_clean(b):
-    # control characters (C0, DEL, U+0085), line and paragraph separators (U+2028/9), and
-    # direction marks, overrides and isolates (U+200E/F, U+202A-E, U+2066-9) become spaces,
-    # byte for byte, so the length stays the same
+    # control characters (C0, DEL, C1 including U+0085), line and paragraph separators,
+    # direction marks, embeddings, overrides and isolates, and invisible format characters
+    # (U+00AD, U+061C, U+180E, U+200B-F, U+2028-E, U+2060-4, U+2066-F, U+FEFF, U+FFF9-B)
+    # become spaces, byte for byte, so the length stays the same
     out, i = bytearray(b), 0
     while i < len(b):
         c = b[i]
         if c < 0x20 or c == 0x7f: out[i] = 0x20; i += 1; continue
-        if c == 0xc2 and i + 1 < len(b) and b[i + 1] == 0x85: out[i:i + 2] = b'  '; i += 2; continue
-        if c == 0xe2 and i + 2 < len(b) and ((b[i + 1] == 0x80 and (0xa8 <= b[i + 2] <= 0xae or b[i + 2] in (0x8e, 0x8f)))
-                                             or (b[i + 1] == 0x81 and 0xa6 <= b[i + 2] <= 0xa9)):
+        if i + 1 < len(b) and ((c == 0xc2 and (0x80 <= b[i + 1] <= 0x9f or b[i + 1] == 0xad))
+                               or (c == 0xd8 and b[i + 1] == 0x9c)):
+            out[i:i + 2] = b'  '; i += 2; continue
+        if i + 2 < len(b) and _blank3(b[i], b[i + 1], b[i + 2]):
             out[i:i + 3] = b'   '; i += 3; continue
         i += 1
     return bytes(out)
+BLANK3 = [(0xe2, 0x80, 0x8b, 0x8f), (0xe2, 0x80, 0xa8, 0xae), (0xe2, 0x81, 0xa0, 0xa4),
+          (0xe2, 0x81, 0xa6, 0xaf), (0xef, 0xbb, 0xbf, 0xbf), (0xe1, 0xa0, 0x8e, 0x8e), (0xef, 0xbf, 0xb9, 0xbb)]
+def _blank3(a, b, c):
+    return any(a == x and b == y and lo <= c <= hi for x, y, lo, hi in BLANK3)
+# look-alikes: two-byte letters that pass for Latin ones, and fullwidth Latin
+HOMO2 = {
+    (0xd0, 0xb0): 'a', (0xd0, 0xb2): 'b', (0xd0, 0xb5): 'e', (0xd0, 0xba): 'k', (0xd0, 0xbc): 'm',
+    (0xd0, 0xbd): 'h', (0xd0, 0xbe): 'o', (0xd1, 0x80): 'p', (0xd1, 0x81): 'c', (0xd1, 0x82): 't',
+    (0xd1, 0x83): 'y', (0xd1, 0x85): 'x', (0xd1, 0x96): 'i', (0xd1, 0x98): 'j', (0xd1, 0x95): 's',
+    (0xd0, 0x90): 'a', (0xd0, 0x92): 'b', (0xd0, 0x95): 'e', (0xd0, 0x9a): 'k', (0xd0, 0x9c): 'm',
+    (0xd0, 0x9d): 'h', (0xd0, 0x9e): 'o', (0xd0, 0xa0): 'p', (0xd0, 0xa1): 'c', (0xd0, 0xa2): 't',
+    (0xd0, 0xa3): 'y', (0xd0, 0xa5): 'x', (0xd0, 0x86): 'i', (0xd0, 0x88): 'j', (0xd0, 0x85): 's',
+    (0xce, 0x91): 'a', (0xce, 0x92): 'b', (0xce, 0x95): 'e', (0xce, 0x96): 'z', (0xce, 0x97): 'h',
+    (0xce, 0x99): 'i', (0xce, 0x9a): 'k', (0xce, 0x9c): 'm', (0xce, 0x9d): 'n', (0xce, 0x9f): 'o',
+    (0xce, 0xa1): 'p', (0xce, 0xa4): 't', (0xce, 0xa5): 'y', (0xce, 0xa7): 'x', (0xce, 0xbf): 'o',
+    (0xce, 0xbd): 'v', (0xcf, 0x81): 'p', (0xce, 0xb1): 'a', (0xce, 0xb9): 'i', (0xce, 0xba): 'k',
+    (0xcf, 0x85): 'u'}
+def name_skel(b):
+    # what a name looks like: invisible and blank characters gone, look-alikes as the Latin
+    # letter, case folded, and 0 as o, 1 l | ! as i
+    out, i = bytearray(), 0
+    while i < len(b):
+        c = b[i]
+        if c <= 0x20 or c == 0x7f: i += 1; continue
+        if c < 0x80:
+            ch = chr(c).lower()
+            ch = {'0': 'o', '1': 'i', 'l': 'i', '|': 'i', '!': 'i'}.get(ch, ch)
+            out += ch.encode(); i += 1; continue
+        if i + 1 < len(b):
+            if (c == 0xc2 and (0x80 <= b[i + 1] <= 0x9f or b[i + 1] in (0xa0, 0xad))) or (c == 0xd8 and b[i + 1] == 0x9c) \
+               or (c == 0xcd and b[i + 1] == 0x8f):
+                i += 2; continue
+            m = HOMO2.get((c, b[i + 1]))
+            if m:
+                m = {'l': 'i'}.get(m, m); out += m.encode(); i += 2; continue
+        if i + 2 < len(b):
+            if _blank3(c, b[i + 1], b[i + 2]): i += 3; continue
+            if c == 0xef and b[i + 1] == 0xbc and 0xa1 <= b[i + 2] <= 0xba:      # A-Z fullwidth
+                out += chr(b[i + 2] - 0xa1 + 0x61).encode(); i += 3; continue
+            if c == 0xef and b[i + 1] == 0xbd and 0x81 <= b[i + 2] <= 0x9a:      # a-z fullwidth
+                out += chr(b[i + 2] - 0x81 + 0x61).replace('l', 'i').encode(); i += 3; continue
+        out.append(c); i += 1
+    return bytes(out)
+def names_same(a, b): return name_skel(a) == name_skel(b)

@@ -29,7 +29,7 @@ extern long bc_selftest(void) F(bc_selftest) __attribute__((weak));
 extern long bc_link_selftest(void) F(bc_link_selftest) __attribute__((weak));
 extern long bc_frame_len(const void *, long) F(bc_frame_len);
 extern long bc_inbox_put(void *, long, const void *, long) F(bc_inbox_put);
-extern long bc_frag_put(void *, long, const void *, const void *, long, void *) F(bc_frag_put);
+extern long bc_frag_put(void *, long, const void *, const void *, long, void *, long) F(bc_frag_put);
 extern long bc_packet_selftest(void) F(bc_packet_selftest) __attribute__((weak));
 extern long bc_peer_selftest(void) F(bc_peer_selftest) __attribute__((weak));
 extern long bc_decode(const void *, long, void *, void *, long) F(bc_decode);
@@ -37,11 +37,13 @@ extern long bc_sign_data(const void *, void *, long) F(bc_sign_data);
 extern long bc_verify(const void *, const void *, void *, long) F(bc_verify);
 extern long bc_would_compress(const void *, long) F(bc_would_compress);
 extern long bc_build(const void *, const void *, void *, long) F(bc_build);
-extern long bc_seen(void *, long, const void *) F(bc_seen);
+extern long bc_seen(void *, long, const void *, long) F(bc_seen);
 extern long bc_utf8_ok(const void *, long) F(bc_utf8_ok);
 extern long bc_ann_make(const void *, long, const void *, const void *, void *) F(bc_ann_make);
 extern long bc_ann_read(const void *, long, void *) F(bc_ann_read);
-extern long bc_peer_leave(void *, long, const void *, void *, long) F(bc_peer_leave);
+extern long bc_peer_leave(void *, long, const void *, void *, long, void *) F(bc_peer_leave);
+extern long bc_name_skel(void *, const void *, long) F(bc_name_skel);
+extern long bc_ed_small(const void *) F(bc_ed_small);
 extern long bc_peer_expire(void *, long) F(bc_peer_expire);
 extern long bc_msg_read(void *, long, const void *, const void *, void *, long) F(bc_msg_read);
 extern long bc_msg_split(const void *, long, long) F(bc_msg_split);
@@ -49,11 +51,11 @@ extern long bc_relay_ok(void *, long) F(bc_relay_ok);
 extern void bc_text_clean(void *, const void *, long) F(bc_text_clean);
 
 // _bc_peer_heard answers in x0 and x1
-static void bc_heard2(void *tab, long now, const void *own, const void *dp, void *scr, long cap, long r[2]) {
+static void bc_heard2(void *tab, long now, const void *own, const void *dp, void *scr, long cap, void *pins, long r[2]) {
     register long x0 __asm__("x0") = (long)tab, x1 __asm__("x1") = now, x2 __asm__("x2") = (long)own,
-        x3 __asm__("x3") = (long)dp, x4 __asm__("x4") = (long)scr, x5 __asm__("x5") = cap;
-    __asm__ volatile("bl _bc_peer_heard" : "+r"(x0), "+r"(x1), "+r"(x2), "+r"(x3), "+r"(x4), "+r"(x5) :
-                     : "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17",
+        x3 __asm__("x3") = (long)dp, x4 __asm__("x4") = (long)scr, x5 __asm__("x5") = cap, x6 __asm__("x6") = (long)pins;
+    __asm__ volatile("bl _bc_peer_heard" : "+r"(x0), "+r"(x1), "+r"(x2), "+r"(x3), "+r"(x4), "+r"(x5), "+r"(x6) :
+                     : "x7", "x8", "x9", "x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17",
                        "x18", "x30", "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v16", "v17", "v18",
                        "v19", "v20", "v21", "v22", "v23", "v24", "v25", "v26", "v27", "v28", "v29", "v30",
                        "v31", "cc", "memory");
@@ -111,7 +113,7 @@ int main(int argc, char **argv) {
     }
     static char line[300000];
     unsigned char ctx[208];
-    static unsigned char ib[528], fa[8 * 8520], fout[16384], pay[8192], dd[8 + 1000 * 32], bt[32 * 256];
+    static unsigned char ib[528], fa[8 * 8520], fout[16384], pay[8192], dd[8 + 1000 * 32], bt[32 * 256], pn[32 + 128 * 56];
     Dp dp;
     while (fgets(line, sizeof line, stdin)) {
         char *cmd = strtok(line, " \n");
@@ -169,7 +171,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(cmd, "frag")) {
             // frag <now as 4 bytes> <sender 8> <payload>
             long now = (long)A[0][0] << 24 | A[0][1] << 16 | A[0][2] << 8 | A[0][3];
-            long r = bc_frag_put(fa, now, A[1], A[2], N[2], fout);
+            long r = bc_frag_put(fa, now, A[1], A[2], N[2], fout, N[3] ? A[3][0] : 0);
             printf("%ld", r);
             if (r > 0) { printf(" "); hex(fout, r); }
         }
@@ -218,7 +220,7 @@ int main(int argc, char **argv) {
             // seen <now as 4 bytes> <frame>
             long now = (long)A[0][0] << 24 | A[0][1] << 16 | A[0][2] << 8 | A[0][3];
             if (bc_decode(A[1], N[1], &dp, pay, sizeof pay)) printf("-1");
-            else printf("%ld", bc_seen(dd, now, &dp));
+            else printf("%ld", bc_seen(dd, now, &dp, 1));
         }
         else if (!strcmp(cmd, "utf8")) printf("%ld", bc_utf8_ok(A[0], N[0]));
         else if (!strcmp(cmd, "annmake")) {
@@ -231,12 +233,14 @@ int main(int argc, char **argv) {
             if (bc_ann_read(A[0], N[0], an)) printf("-1");
             else { hex(an[0], (long)an[1]); printf(" "); hex(an[2], 32); printf(" "); hex(an[3], 32); }
         }
-        else if (!strcmp(cmd, "peerreset")) { memset(bt, 0, sizeof bt); printf("ok"); }
+        else if (!strcmp(cmd, "peerreset")) { memset(bt, 0, sizeof bt); memset(pn, 0, sizeof pn); printf("ok"); }
+        else if (!strcmp(cmd, "skel")) { long r = bc_name_skel(out, A[0], N[0]); hex(out, r); }
+        else if (!strcmp(cmd, "small")) printf("%ld", bc_ed_small(A[0]));
         else if (!strcmp(cmd, "heard")) {
             // heard <now as 8 bytes> <our id> <frame>: slot and new, or the reason; then that slot
             long r[2];
             if (bc_decode(A[2], N[2], &dp, pay, sizeof pay)) { printf("bad"); goto done; }
-            bc_heard2(bt, be(A[0], 8), A[1], &dp, out, 4096, r);
+            bc_heard2(bt, be(A[0], 8), A[1], &dp, out, 4096, pn, r);
             printf("%ld %ld", r[0], r[1]);
             if (r[0] >= 0) {
                 unsigned char *e = bt + r[0] * 256;
@@ -249,7 +253,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(cmd, "leave")) {
             // leave <now as 8 bytes> <frame>
             if (bc_decode(A[1], N[1], &dp, pay, sizeof pay)) printf("bad");
-            else printf("%ld", bc_peer_leave(bt, be(A[0], 8), &dp, out, 4096));
+            else printf("%ld", bc_peer_leave(bt, be(A[0], 8), &dp, out, 4096, pn));
         }
         else if (!strcmp(cmd, "msgread")) {
             // msgread <now as 8 bytes> <our id> <frame>

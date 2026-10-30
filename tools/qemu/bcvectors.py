@@ -1,5 +1,6 @@
 # bcvectors.py — prints, as assembly, the test packets of bc_packet.s's self-tests (155-164);
-# with `peer` those of bc_peer.s (165-172), with `msg` its public-message ones (173-175).
+# with `peer` those of bc_peer.s (165-172), with `msg` its public-message ones (173-175),
+# with `pin` its pin and replay ones (181-183).
 # Run it again, and paste over the vectors in the .s file, if bcwire.py changes.
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -131,5 +132,49 @@ def msg_vectors():
     print('.set MOK_N, %d\n.set MFG_N, %d\n.set MST_N, %d\n.set MU8_N, %d\n.set MTO_N, %d\n.set MBC_N, %d\n.set MTX_N, %d'
           % (len(m_ok), len(m_forged), len(m_stale), len(m_utf8), len(m_to), len(m_bcast), len(text)))
 
+# ---- bc_peer.s pins and replays (self-tests 181-183): `bcvectors.py pin`
+def pin_vectors():
+    X1, E1, E2 = bytes([7] * 32), bytes([8] * 32), bytes([9] * 32)
+    nick = 'Anna'.encode()
+    ann1 = w.announce_packet(X1, E1, nick, TS)
+    ann2 = w.announce_packet(X1, E1, nick, TS + 10000)
+    other = w.announce_packet(X1, E2, nick, TS + 20000)
+    from cryptography.hazmat.primitives.asymmetric import x25519
+    pid = w.peer_id(x25519.X25519PrivateKey.from_private_bytes(X1).public_key().public_bytes(
+        serialization.Encoding.Raw, serialization.PublicFormat.Raw))
+    leave = w.build(1, 3, 7, TS + 15000, pid, None, b'', E1)
+    T, P = w.Peers(), w.Pins()
+    assert T.heard(TS + 1000, bytes(8), w.decode(ann1), P) == (0, 1)
+    assert T.expire(TS + 61000) == 1
+    assert T.heard(TS + 21000, bytes(8), w.decode(other), P)[0] == -6
+    assert T.heard(TS + 21000, bytes(8), w.decode(ann1), P)[0] == -4
+    assert T.heard(TS + 21000, bytes(8), w.decode(ann2), P) == (0, 1)
+    assert T.leave(TS + 21000, w.decode(leave), P) == 0
+    assert T.heard(TS + 21000, bytes(8), w.decode(ann2), P)[0] == -4
+    # 182: messages
+    now = TS + 31000
+    m1 = w.build(1, 2, 7, TS + 30000, pid, None, b'hi', E1)
+    mold = w.build(1, 2, 7, TS + 30000 - w.MSG_REPLAY_MS - 1, pid, None, b'old', E1)
+    mfut = w.build(1, 2, 7, now + w.FUTURE_MS + 1, pid, None, b'later', E1)
+    T2 = w.Peers(); T2.heard(now, bytes(8), w.decode(ann2))
+    assert w.msg_read(T2, now, bytes(8), w.decode(m1)) == 0
+    assert w.msg_read(T2, now, bytes(8), w.decode(mold)) == -4
+    assert w.msg_read(T2, now, bytes(8), w.decode(mfut)) == -4
+    # 183: seven new people in one minute
+    crowd = [w.announce_packet(bytes([0x30 + k] * 32), bytes([0x40 + k] * 32), b'p%d' % k, TS) for k in range(7)]
+    T3, P3 = w.Peers(), w.Pins()
+    got = [T3.heard(TS + 1000, bytes(8), w.decode(c), P3)[0] for c in crowd]
+    assert got[:6] == [0, 1, 2, 3, 4, 5] and got[6] == -10, got
+    assert T3.heard(TS + 61000, bytes(8), w.decode(crowd[6]), P3)[0] == 6
+    for name, pkt, note in (('Lr_ann1', ann1, '181: Anna, signing key E1'), ('Lr_ann2', ann2, '181: Anna again, 10 s later'),
+                            ('Lr_other', other, '181: Anna\'s Noise key with another signing key'),
+                            ('Lr_leave', leave, '181: Anna leaving, 15 s in'), ('Lr_m1', m1, '182: Anna says hi'),
+                            ('Lr_mold', mold, '182: a message 5 minutes behind'), ('Lr_mfut', mfut, '182: one from the future')):
+        out(name, pkt, note)
+    for k, c in enumerate(crowd): out('Lr_crowd%d' % k, c, '183: someone new (%d)' % k)
+    print('.set RA_N, %d\n.set RM_N, %d\n.set RMO_N, %d\n.set RMF_N, %d\n.set RL_LV_N, %d\n.set RC_N, %d'
+          % (len(ann1), len(m1), len(mold), len(mfut), len(leave), len(crowd[0])))
+    assert all(len(x) == len(ann1) for x in (ann2, other) + tuple(crowd))
+
 if __name__ == '__main__':
-    {'peer': peer_vectors, 'msg': msg_vectors}.get(sys.argv[1] if sys.argv[1:] else '', packet_vectors)()
+    {'peer': peer_vectors, 'msg': msg_vectors, 'pin': pin_vectors}.get(sys.argv[1] if sys.argv[1:] else '', packet_vectors)()

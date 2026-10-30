@@ -40,46 +40,13 @@
 
 // long _bc_decode(const uint8 *p, long n, uint8 *dp, uint8 *buf, long cap) -> 0, or -1 refused.
 //   Fills dp (DP_*). A compressed payload is unpacked into buf (at most cap bytes); any
-//   other payload is left where it is in p. Like bitchat: the frame as it is first, then
-//   without its padding; bytes after the packet are ignored.
+//   other payload is left where it is in p. Bytes after the packet (padding) are ignored.
+//   bitchat tries again without the padding when this fails, but every check here only
+//   needs bytes to be there, so a frame refused with its padding is refused without it too
+//   (tools/qemu/bcwire.py keeps bitchat's retry, and run.sh diff shows they agree).
 .globl _bc_decode
 _bc_decode:
-    ENTER 0
-    mov  x19, x0
-    mov  x20, x1
-    mov  x21, x2
-    mov  x22, x3
-    mov  x23, x4
-    bl   Ldec_core
-    cbz  x0, Ldc_ok
-    cbz  x20, Ldc_bad                     // padding: n bytes of value n at the end
-    sub  x9, x20, #1
-    ldrb w10, [x19, x9]
-    cbz  w10, Ldc_bad
-    cmp  x10, x20
-    b.hi Ldc_bad
-    sub  x24, x20, x10
-    mov  x9, x24
-1:  cmp  x9, x20
-    b.hs 2f
-    ldrb w11, [x19, x9]
-    cmp  w11, w10
-    b.ne Ldc_bad
-    add  x9, x9, #1
-    b    1b
-2:  mov  x0, x19
-    mov  x1, x24
-    mov  x2, x21
-    mov  x3, x22
-    mov  x4, x23
-    bl   Ldec_core
-    LEAVE 0
-Ldc_ok:
-    mov  x0, #0
-    LEAVE 0
-Ldc_bad:
-    mov  x0, #-1
-    LEAVE 0
+    b    Ldec_core
 
 // long Ldec_core(p, n, dp, buf, cap) -> 0 or -1: BinaryProtocol.decodeCore
 Ldec_core:
@@ -581,15 +548,18 @@ _bc_build:
 3:  mov  x0, #-1
     LEAVE 64
 
-// long _bc_seen(uint8 *dd, long now_ms, const uint8 *dp) -> 1 if this packet came by in the
-//   last 5 minutes, else 0 (and it's remembered). bitchat's id: sender, time, type and the
-//   first 4 bytes of SHA-256 of the payload. Fragments aren't meant to go through this.
+// long _bc_seen(uint8 *dd, long now_ms, const uint8 *dp, long remember) -> 1 if this packet
+//   came by in the last 5 minutes, else 0 (and, with remember, it's remembered). bitchat's
+//   id: sender, time, type and the first 4 bytes of SHA-256 of the payload. Fragments
+//   aren't meant to go through this. A packet whose signature must be checked is looked up
+//   first and remembered only once it's taken, so a forged copy can't block the real one.
 .globl _bc_seen
 _bc_seen:
-    ENTER 32                              // [96] SHA-256
+    ENTER 48                              // [96] SHA-256 [128] remember
     mov  x19, x0
     mov  x20, x1
     mov  x21, x2
+    str  x3, [sp, #128]
     ldr  x0, [x21, #DP_PAY]
     ldr  x1, [x21, #DP_PLEN]
     add  x2, sp, #96
@@ -621,7 +591,9 @@ _bc_seen:
 2:  add  x10, x10, #32
     add  x11, x11, #1
     b    1b
-3:  ldr  x9, [x19, #DD_POS]               // new: into the next slot, the oldest
+3:  ldr  x9, [sp, #128]                   // new: remembered, into the next slot (the oldest)
+    cbz  x9, 5f
+    ldr  x9, [x19, #DD_POS]
     add  x10, x19, #DD_ENT
     add  x10, x10, x9, lsl #5
     stp  x22, x23, [x10]
@@ -631,10 +603,10 @@ _bc_seen:
     cmp  x9, #DD_N
     csel x9, xzr, x9, hs
     str  x9, [x19, #DD_POS]
-    mov  x0, #0
-    LEAVE 32
+5:  mov  x0, #0
+    LEAVE 48
 4:  mov  x0, #1
-    LEAVE 32
+    LEAVE 48
 
 // long _bc_relay(const uint8 *dp, long sent_by_us, long to_us, long links) -> the TTL to
 //   pass it on with (0: don't), and in x1, x2 the delay to wait first, in ms (a random
@@ -1098,12 +1070,14 @@ _bc_packet_selftest:
     mov  x0, x24
     mov  x1, #1000
     mov  x2, x21
+    mov  x3, #1
     bl   _bc_seen
     cmp  x0, #0
     cset x20, eq
     mov  x0, x24
     mov  x1, #2000
     mov  x2, x21
+    mov  x3, #1
     bl   _bc_seen
     cmp  x0, #1
     BP_AND
@@ -1112,6 +1086,7 @@ _bc_packet_selftest:
     mov  x0, x24
     mov  x1, #3000
     mov  x2, x21
+    mov  x3, #1
     bl   _bc_seen
     cmp  x0, #0
     BP_AND
@@ -1120,6 +1095,7 @@ _bc_packet_selftest:
     mov  x1, #(301000 & 0xffff)
     movk x1, #(301000 >> 16), lsl #16
     mov  x2, x21
+    mov  x3, #1
     bl   _bc_seen
     cmp  x0, #0
     BP_AND
@@ -1138,6 +1114,7 @@ _bc_packet_selftest:
     mov  x0, x24
     mov  x1, #5000
     mov  x2, x21
+    mov  x3, #1
     bl   _bc_seen
     add  x25, x25, #1
     cbz  x0, 6b
@@ -1146,6 +1123,7 @@ _bc_packet_selftest:
     mov  x0, x24
     mov  x1, #5000
     mov  x2, x21
+    mov  x3, #1
     bl   _bc_seen
     cmp  x0, #0
     BP_AND
@@ -1154,6 +1132,7 @@ _bc_packet_selftest:
     mov  x0, x24
     mov  x1, #5000
     mov  x2, x21
+    mov  x3, #1
     bl   _bc_seen
     cmp  x0, #1
     BP_AND

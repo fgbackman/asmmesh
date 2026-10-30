@@ -1838,9 +1838,20 @@ Lra_full:
     mov  x0, #-1
     LEAVE 0
 
-// void _room_remove(long idx) — forget a room (never Main)
+// void _room_remove(long idx) — forget a room (never Main), and save the room list and keys
 .globl _room_remove
 _room_remove:
+    ENTER 0
+    bl   _room_drop
+    cbz  x0, 1f
+    bl   _rooms_save
+    bl   _keys_save
+1:  LEAVE 0
+
+// long _room_drop(long idx) -> 1 if it was there: forget a room (never Main) without saving
+//   anything (_room_remove saves; a local room like bitchat's has nothing to save)
+.globl _room_drop
+_room_drop:
     ENTER 0
     mov  x19, x0
     cbz  x19, Lrm_done
@@ -1870,9 +1881,10 @@ Lrm_move:
     add  x0, x8, x20, lsl #ROOM_SHIFT
     mov  x1, #64
     bl   _bzero
-    bl   _rooms_save
-    bl   _keys_save
+    mov  x0, #1
+    LEAVE 0
 Lrm_done:
+    mov  x0, #0
     LEAVE 0
 
 // void _rooms_init(void) — Main, plus the rooms remembered from last time

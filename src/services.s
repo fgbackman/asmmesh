@@ -625,8 +625,9 @@ Lhw_all:
 Lhw_all_loop:
     cmp  x21, #NSVC
     b.hs Lhw_done
-    cmp  x21, #SVC_BITCHAT
-    b.eq 1f
+    cmp  x21, #SVC_BITCHAT            // "enable all" leaves bitchat off; "disable all"
+    ccmp x19, #0, #4, eq              //   switches it off too: off means off
+    b.ne 1f
     mov  x0, x21
     mov  x1, x19
     bl   _svc_set
