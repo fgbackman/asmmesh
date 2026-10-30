@@ -125,9 +125,9 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 - Step 5 passed. After "bitchat advertise on", "found this Mac" went to 1, and asmmesh's own links stayed up while both services were advertised.
 - Step 6 passed: "disable bitchat" drops the links and "bitchat" says it's off.
 - Still to do: the bitchat build on iPhone (installed, not tried yet).
-- The 5 "other" packets are types the link layer doesn't name yet. Find out which in Phase 3 (likely sync requests `0x21` or a newer type).
+- The 5 "other" packets turned out to be sync requests (`0x21`), found in Phase 3.
 
-**Phase 3 — packet codec** (`src/bc_packet.s`, `src/bc_zlib.s`) — **written and tested under qemu (Oct 30); to be tried on a Mac**
+**Phase 3 — packet codec** (`src/bc_packet.s`, `src/bc_zlib.s`) — **done: tested under qemu and on a Mac (Oct 30)**
 - Ported from bitchat `04995f6` (still its latest commit on Oct 30): `BinaryProtocol.decode`, `toBinaryDataForSigning`, `PacketPayloadLimits`, `CompressionUtil.shouldCompress`, `MessagePadding`, `RelayController` and the receive pipeline's message id.
 - `_bc_decode`: v1 and v2 headers, recipient, source route, signature, padding (tried as it is, then unpadded, as bitchat does), and bitchat's payload cap per type. Compressed payloads are raw DEFLATE (Apple's `COMPRESSION_ZLIB`), unpacked by libz (`bc_zlib.s`) into the caller's buffer, never past the declared size and with bitchat's 1032:1 ratio limit. The stream must end properly; that's stricter than Apple's decoder, but real senders' streams always do.
 - `_bc_sign_data` / `_bc_verify`: what a signature covers is the packet re-encoded with TTL 0, no signature, no RSR flag, an empty route left out, and padded. It's rebuilt from the wire bytes, so compressed packets check out too. Relays lowering the TTL or setting RSR don't break it.
@@ -142,6 +142,8 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 1. `make selftest`: 127–164 all PASS (157 is the one that uses libz).
 2. With bitchat open on a phone: "bitchat" shows packets heard and **0 refused**, and an "other kinds" line if any arrive. Note which kinds here.
 3. Send a public message from the phone: "public messages" goes up.
+
+*Results on the Mac (Oct 30, 2026):* self-tests 127–164 pass (so libz unpacks bitchat's compression), every packet from the iPhone's bitchat was read with **0 refused**, and the 5 "other" packets from Phase 2 are **sync requests (`0x21`)**: bitchat asking its neighbours what they have, which never travels further than one link. Answering them is optional (Milestone 2).
 
 **Milestone 1 — "I can see bitchat people"**
 - Make the bitchat Curve25519 and Ed25519 keys (random, from `SecRandomCopyBytes`) and keep them in their own Keychain items, following `ident.s` (only make new ones on "not found"). Load them only while the bitchat switch is on.
