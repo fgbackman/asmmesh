@@ -243,3 +243,33 @@ def announce_packet(xseed, edseed, nick, ts, ttl=7, sender=None, sign_with=None,
     if sign_with is False: return encode(version=version, type=1, ttl=ttl, ts=ts, sender=snd, payload=pay)
     p = build(version, 1, ttl, ts, snd, None, pay, sign_with or edseed)
     return p
+
+# ---- Milestone 2: public messages (BLEPublicMessageHandler, BLEPublicMessagePolicy)
+MSG_STALE_MS, MSG_MAX, RELAY_PER_S = 6 * 3600 * 1000, 96, 20
+def msg_read(T, now, own, d):
+    # -> the sender's slot, or -1 not a public message, -3 ours, -4 older than 6 hours,
+    #    -5 not signed by them, -7 not UTF-8 / too long, -8 nobody we know
+    if d['type'] != 2: return -1
+    r = d['rcpt']
+    if r is not None and r != b'\xff' * 8: return -1
+    if d['sender'] == own: return -3
+    if now >= MSG_STALE_MS and d['ts'] < now - MSG_STALE_MS: return -4
+    if len(d['payload']) > 65535 or not utf8_ok(d['payload']): return -7
+    k = T.find(d['sender'])
+    if k < 0: return -8
+    if d['sig'] is None or not ed_ok(T.t[k]['e'], d['sig'], signing_bytes(d)): return -5
+    return k
+def msg_split(b, mx=MSG_MAX):
+    # how much of b goes in the first message: all of it if it fits, else up to the last
+    # space within mx bytes, else as much as fits between characters
+    if len(b) <= mx: return len(b)
+    m = utf8_cut(b, mx)
+    s = b.rfind(b' ', 0, m)
+    return s if s > 0 else m
+class RelayLimit:
+    def __init__(self): self.sec, self.n = -1, 0
+    def ok(self, now):
+        s = now // 1000
+        if s != self.sec: self.sec, self.n = s, 0
+        if self.n >= RELAY_PER_S: return 0
+        self.n += 1; return 1

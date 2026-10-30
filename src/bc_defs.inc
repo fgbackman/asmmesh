@@ -93,3 +93,11 @@
 .set BT_NICK_SEND,  26          // our name in announces: the signed packet stays within 182
                                 // bytes (one write on most phone links), and under 100 bytes
                                 // of payload, which bitchat never compresses
+
+// public messages (bc_peer.s, Milestone 2)
+.set BT_MSG_MAX,    96          // bytes per message we send: one write, never compressed
+.set BT_MSG_STALE,  21600000    // older than 6 hours: not shown (as bitchat)
+.set BT_RELAY_PS,   20          // packets relayed for bitchat per second, at most
+.set RL_SEC,        0           // the relay limit: which second, and how many in it
+.set RL_N,          8
+.set RL_SIZE,       16

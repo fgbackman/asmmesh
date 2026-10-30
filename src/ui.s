@@ -233,6 +233,9 @@ Lsr_labels:
     ADRL x8, Ls_hdr_news
     cmp  x9, #NEWS_ID
     csel x2, x8, x2, eq
+    ADRL x8, Ls_hdr_bitchat
+    cmp  x9, #BITCHAT_ID
+    csel x2, x8, x2, eq
     bl   _snprintf
     add  x0, sp, #96
     bl   _nsstr
@@ -253,6 +256,9 @@ Lsr_labels:
     csel x2, x8, x2, eq
     ADRL x8, Ls_ph_news
     cmp  x9, #NEWS_ID
+    csel x2, x8, x2, eq
+    ADRL x8, Ls_ph_bitchat
+    cmp  x9, #BITCHAT_ID
     csel x2, x8, x2, eq
     bl   _snprintf
     add  x0, sp, #96
@@ -1585,6 +1591,8 @@ Ls_ph_home:           .asciz "Say or type a command, e.g. kitchen lights off%.0s
 Ls_hdr_web:           .asciz "# %s \342\200\224 web pages fetched by a Mac with internet"
 Ls_hdr_news:          .asciz "# %s \342\200\224 headlines from Macs with internet"
 Ls_ph_web:            .asciz "A web address or search words; a number follows a link%.0s"
+Ls_hdr_bitchat:       .asciz "# %s \342\200\224 public chat with bitchat phones nearby (walled off: just chat)"
+Ls_ph_bitchat:        .asciz "Message bitchat phones nearby%.0s"
 Ls_ph_news:           .asciz "Headlines arrive here; type refresh or feed <address>%.0s"
 Ls_ph_fmt:            .asciz "Message #%s"
 Ls_status_fmt:        .asciz "%ld linked nearby  \302\267  %ld on the mesh  \302\267  %ld relayed"

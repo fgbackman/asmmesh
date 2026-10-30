@@ -11,7 +11,7 @@ struct Line: Identifiable {
 }
 
 enum RoomKind {
-    case main, home, web, news, privateRoom
+    case main, home, web, news, bitchat, privateRoom
 
     var symbol: String {
         switch self {
@@ -19,6 +19,7 @@ enum RoomKind {
         case .home: return "house.fill"
         case .web: return "safari.fill"
         case .news: return "newspaper.fill"
+        case .bitchat: return "antenna.radiowaves.left.and.right"
         case .privateRoom: return "lock.fill"
         }
     }
@@ -28,6 +29,7 @@ enum RoomKind {
         case .home: return Theme.orange
         case .web: return Theme.grey
         case .news: return Theme.yellow
+        case .bitchat: return Theme.orange
         case .privateRoom: return Theme.purple
         }
     }
@@ -37,6 +39,7 @@ enum RoomKind {
         case .home: return "Lights, locks and scenes"
         case .web: return "Pages through a Mac with internet"
         case .news: return "Headlines from Macs with internet"
+        case .bitchat: return "Public chat with bitchat phones"
         case .privateRoom: return "Invite-only"
         }
     }
@@ -55,6 +58,7 @@ struct Room: Identifiable, Equatable {
         case 1: return .home
         case 2: return .web
         case 3: return .news
+        case 4: return .bitchat
         default: return .privateRoom
         }
     }

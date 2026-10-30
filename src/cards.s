@@ -53,6 +53,7 @@ Lk_main:     .quad Ls_y_globe, 0x0A84FF, Ls_k_main
 Lk_home:     .quad Ls_y_house, 0xFF9E0A, Ls_k_home
 Lk_web:      .quad Ls_y_safari, 0x99999E, Ls_k_web
 Lk_news:     .quad Ls_y_news, 0xFFD60A, Ls_k_news
+Lk_bitchat:  .quad Ls_y_bitchat, 0xFF9500, Ls_k_bitchat
 Lk_private:  .quad Ls_y_lock, 0xBF59F2, Ls_k_private
 
 Lcd_methods:
@@ -212,6 +213,9 @@ Lcv_room:
     csel x22, x8, x22, eq
     ADRL x8, Lk_news
     cmp  x9, #NEWS_ID
+    csel x22, x8, x22, eq
+    ADRL x8, Lk_bitchat
+    cmp  x9, #BITCHAT_ID
     csel x22, x8, x22, eq
     ADRL x8, Lk_main
     cmp  x20, #0
@@ -744,5 +748,6 @@ Ls_y_bitchat:        .asciz "antenna.radiowaves.left.and.right"
 Ls_k_main:           .asciz "Everyone on the mesh"
 Ls_k_home:           .asciz "Lights, locks and scenes"
 Ls_k_web:            .asciz "Pages through a Mac with internet"
+Ls_k_bitchat:        .asciz "Public chat with bitchat phones"
 Ls_k_news:           .asciz "Headlines from Macs with internet"
 Ls_k_private:        .asciz "Invite-only"

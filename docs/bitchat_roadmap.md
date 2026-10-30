@@ -170,11 +170,22 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 - What went wrong first: two copies of asmmesh were running at once, and the phone stopped sending to the Mac until its Bluetooth was switched off and on (Settings › Bluetooth). With one copy and a fresh phone link everything worked, announcing on or off. If a phone goes quiet again on a link that stays up, note what came before it here.
 - Still to try: steps 5–7 (the phone leaving, switching off, the iPhone build).
 
-**Milestone 2 — public chat both ways**
-- New **bitchat** room. Incoming `0x02` messages appear there with the sender's nickname. Messages typed there go out signed.
-- Keep it separate from Main and behind the wall: the bitchat room is display-only, and nothing in it is ever treated as a command.
-- Relay bitchat packets for other bitchat users like any bitchat node does.
-- Optional: answer sync requests (`0x21`, GCS filters) so late arrivals get recent history.
+**Milestone 2 — public chat both ways** (`src/bc_peer.s`, `src/bc_ble.s`, the bitchat room) — **written and tested under qemu (Oct 30); to be tried on a Mac**
+- **The bitchat room** (local room id 4, after Home, Web and News; `LOCAL_ROOMS` is now 5, so there's room for 11 private rooms instead of 12). Mac and iPhone, orange, "Public chat with bitchat phones".
+- **Messages in:** a public message (`0x02`: plain UTF-8, signed) shows as "Anna: text" only if it's from someone whose announce we took, signed with their pinned key, under 6 hours old, and real UTF-8; the rest is dropped (bitchat's rules, `BLEPublicMessageHandler`). At most 600 bytes are shown, control characters as spaces. If the name matches an asmmesh person's, the line starts with a warning. It's only shown: nothing in it is ever run as a command.
+- **Messages out:** what you type in the bitchat room goes to bitchat as signed public messages, never as a command (it doesn't pass through the Home or chat-command paths). Long text goes in pieces of at most 96 bytes, cut at a space: each fits one write and stays under the 100 bytes bitchat would compress (a compressed payload couldn't carry our signature). With bitchat off, no keys yet or no phone linked, the room says so and nothing is sent.
+- **Duplicates:** every packet but fragments goes through bitchat's duplicate filter (sender, time, type, payload digest; 1000, 5 minutes) before it's acted on or passed on.
+- **Relaying for other bitchat users:** with two or more bitchat links, packets are passed on as bitchat's `RelayController` says (TTL rules by type and number of links), never back over the link they came in on, at most 20 a second, only to bitchat links. Not relayed: fragments (bitchat doesn't de-duplicate them, so they're left to the phones) and anything bigger than one write. Relaying goes out at once, without bitchat's random delay.
+- Not done: answering sync requests (`0x21`) with recent history.
+- Self-tests 173–175; `tools/qemu/run.sh diff` cross-checks message reading, splitting and the relay limit.
+
+*Checklist for the Mac:*
+1. `make selftest`: 127–175 all PASS.
+2. With bitchat on and the phone linked: Rooms has a **bitchat** room (orange).
+3. Send a public message from bitchat on the phone: it shows in the bitchat room as "<phone's name>: text".
+4. Type in the bitchat room on the Mac: the phone's bitchat public chat shows it from "CC". Try a long message (over 96 bytes): it arrives in pieces.
+5. Type "kitchen lights off" in the bitchat room: it goes to bitchat as text, and nothing happens to any light. A phone sending the same changes nothing either.
+6. "bitchat" in Home: the "bitchat room" line counts messages shown and sent.
 
 **Milestone 3 — private chat** (`src/bc_noise.s`)
 - Noise XX handshake over `0x10`, sessions keyed by peer ID, rekeying, and replay protection.

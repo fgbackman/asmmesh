@@ -304,6 +304,34 @@ for i in range(n * 4):
     else:
         cases.append(('expire ' + now.to_bytes(8, 'big').hex(), str(T.expire(now)), 'bitchat people'))
 
+# ---- Milestone 2: public messages, splitting, the relay limit
+for i in range(n * 2):
+    now += rnd.choice([10, 1000, 60000])
+    xs, es, nick = rnd.choice(ids)
+    from cryptography.hazmat.primitives.asymmetric import x25519
+    pid = bcwire.peer_id(raw(x25519.X25519PrivateKey.from_private_bytes(xs).public_key()))
+    if rnd.random() < .3:                                         # make sure some are known
+        p = bcwire.announce_packet(xs, es, nick, now, ttl=7)
+        k, new = T.heard(now, own, bcwire.decode(p))
+        exp = '%d %d' % (k, new) + ((' ' + T.dump(k)) if k >= 0 else '')
+        cases.append(('heard %s %s %s' % (now.to_bytes(8, 'big').hex(), own.hex(), h(p)), exp, 'bitchat people'))
+    text = rutf8(rnd.randrange(80)) if rnd.random() < .85 else rb(rnd.randrange(6))
+    ts = now - rnd.choice([0, 0, 500, 21599000, 21601000])
+    rc = rnd.choice([None, None, None, b'\xff' * 8, rb(8)])
+    snd = pid if rnd.random() < .9 else (own if rnd.random() < .5 else rb(8))
+    key = es if rnd.random() < .85 else rb(32)
+    p = bcwire.build(rnd.choice([1, 1, 2]), rnd.choice([2, 2, 2, 1]), rnd.randrange(8), ts, snd, rc, text, key)
+    if p is None: continue
+    cases.append(('msgread %s %s %s' % (now.to_bytes(8, 'big').hex(), own.hex(), h(p)),
+                  str(bcwire.msg_read(T, now, own, bcwire.decode(p))), 'public message read'))
+    b = rutf8(rnd.randrange(150)).replace(b' ', b' ' if rnd.random() < .7 else b'_')
+    mx = rnd.choice([96, 96, 20, 7])
+    cases.append(('split %s %02x' % (h(b), mx), str(bcwire.msg_split(b, mx)), 'message split'))
+R = bcwire.RelayLimit(); t = 1_760_000_000_000
+for i in range(n * 3):
+    t += rnd.choice([0, 0, 10, 300, 1000])
+    cases.append(('relayok ' + t.to_bytes(8, 'big').hex(), str(R.ok(t)), 'relay limit'))
+
 inp = '\n'.join(c[0] for c in cases) + '\n'
 res = subprocess.run(['qemu-aarch64', harness], input=inp, capture_output=True, text=True).stdout.split('\n')
 fails = {}

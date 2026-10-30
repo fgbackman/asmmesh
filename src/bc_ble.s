@@ -72,7 +72,10 @@
 .set C_ANN_OK,      80          // announces taken
 .set C_ANN_BAD,     88          // announces refused (not counting our own coming back)
 .set C_SENT,        96          // announces and leaves we sent
-.set C_SIZE,        104
+.set C_RELAYED,     104         // packets passed on for other bitchat users
+.set C_SHOWN,       112         // public messages shown in the bitchat room
+.set C_SAID,        120         // public messages we sent
+.set C_SIZE,        128
 
 // our bitchat keys (_g_bc_keys)
 .set KS_NONE,       0
@@ -114,6 +117,10 @@ _g_bc_quiet:    .quad 0         // 1: "bitchat announce off", for testing (liste
 .zerofill __DATA,__bss,_g_bc_mydp,DP_SIZE,4               // a packet of ours
 .zerofill __DATA,__bss,_g_bc_pl,128,4                     // its payload
 .zerofill __DATA,__bss,_g_bc_out,512,4                    // and its bytes
+.zerofill __DATA,__bss,_g_bc_dd,DD_SIZE,4                 // the duplicate filter (bc_packet.s)
+.zerofill __DATA,__bss,_g_bc_rl,RL_SIZE,4                 // the relay limit (bc_peer.s)
+.zerofill __DATA,__bss,_g_bc_fwd,512,4                    // a packet being passed on
+.zerofill __DATA,__bss,_g_bc_line,720,4                   // a line for the bitchat room
 
 .section __DATA,__const
 .p2align 3
@@ -514,6 +521,7 @@ _bc_frame_in:
     str  x9, [x23, #C_BYTES]
     mov  x0, x20                          // read it (bc_packet.s): a broken one goes no further
     mov  x1, x21
+    mov  x2, x19
     bl   Lbc_read
     tbnz x0, #63, Lfi_refused
     ldrb w10, [x20, #1]                   // type
@@ -564,6 +572,7 @@ _bc_frame_in:
     add  x9, x9, #1
     str  x9, [x23, #C_JOINED]
     ADRL x0, _g_bc_joined                 // what it was: read that too
+    mov  x2, x19
     bl   Lbc_read
     b    Lfi_done
 Lfi_refused:
@@ -573,30 +582,270 @@ Lfi_refused:
 Lfi_done:
     LEAVE 0
 
-// long Lbc_read(const uint8 *p, long n) -> 0, counted by type in _g_bc_types, or -1 if
-//   bc_packet.s refuses it. Nothing else is done with it yet (Milestone 1).
+// long Lbc_read(const uint8 *p, long n, long link) -> 0, or -1 if bc_packet.s refuses it.
+//   Counted by type; then, unless it's a fragment (put back together by the caller) or a
+//   duplicate: announces and leaves keep the list of people, public messages go to the
+//   bitchat room, and it's passed on for other bitchat users when bitchat's rules say so.
 Lbc_read:
     ENTER 0
+    mov  x19, x0
+    mov  x20, x1
+    mov  x21, x2
     ADRL x2, _g_bc_dp
     ADRL x3, _g_bc_pay
     mov  x4, #8192
     bl   _bc_decode
-    tbnz x0, #63, 1f
+    tbnz x0, #63, 9f
     ADRL x8, _g_bc_dp
-    ldr  x9, [x8, #DP_TYPE]
+    ldr  x22, [x8, #DP_TYPE]
     ADRL x8, _g_bc_types
-    ldr  x10, [x8, x9, lsl #3]
+    ldr  x10, [x8, x22, lsl #3]
     add  x10, x10, #1
-    str  x10, [x8, x9, lsl #3]
-    cmp  x9, #0x01
+    str  x10, [x8, x22, lsl #3]
+    cmp  x22, #0x20                       // fragments: never relayed, put back together
+    b.eq 8f
+    ADRL x8, _g_bc_keys                   // without our id we can't tell our own apart
+    ldr  x9, [x8]
+    cmp  x9, #KS_READY
+    b.ne 8f
+    bl   Lbc_wall_ms
+    mov  x1, x0
+    ADRL x0, _g_bc_dd
+    ADRL x2, _g_bc_dp
+    bl   _bc_seen
+    cbnz x0, 8f                           // heard it already, by another way
+    cmp  x22, #0x01
     b.ne 2f
     bl   Lbc_heard
-    b    3f
-2:  cmp  x9, #0x03
+    b    4f
+2:  cmp  x22, #0x03
     b.ne 3f
     bl   Lbc_left
-3:  mov  x0, #0
-1:  LEAVE 0
+    b    4f
+3:  cmp  x22, #0x02
+    b.ne 4f
+    bl   Lbc_message
+4:  mov  x0, x19
+    mov  x1, x20
+    mov  x2, x21
+    bl   Lbc_forward
+8:  mov  x0, #0
+9:  LEAVE 0
+
+// void Lbc_forward(const uint8 *p, long n, long link) — pass the packet just read (in
+//   _g_bc_dp) on to our other links, as a bitchat phone would: bitchat's TTL rule
+//   (bc_packet.s _bc_relay), never back where it came from, 20 a second at most. The TTL
+//   isn't signed, so lowering it keeps the signature good. Only to bitchat links: nothing
+//   from bitchat ever goes on asmmesh's mesh.
+Lbc_forward:
+    ENTER 0
+    mov  x19, x0
+    mov  x20, x1
+    mov  x21, x2
+    ADRL x22, _g_bc_dp
+    ADRL x8, _g_bc_myid
+    ldr  x10, [x8]
+    ldr  x9, [x22, #DP_SENDER]
+    ldr  x9, [x9]
+    cmp  x9, x10
+    cset x23, eq                          // sent by us
+    mov  x24, #0                          // to us
+    ldr  x9, [x22, #DP_RCPT]
+    cbz  x9, 1f
+    ldr  x9, [x9]
+    cmp  x9, x10
+    cset x24, eq
+1:  mov  x0, #0
+    bl   _bc_link_count
+    mov  x3, x0
+    cmp  x3, #2                           // only one link: nowhere else to pass it
+    b.lo 9f
+    mov  x0, x22
+    mov  x1, x23
+    mov  x2, x24
+    bl   _bc_relay
+    cbz  x0, 9f
+    mov  x23, x0                          // the TTL to pass it on with
+    bl   Lbc_wall_ms
+    mov  x1, x0
+    ADRL x0, _g_bc_rl
+    bl   _bc_relay_ok
+    cbz  x0, 9f
+    mov  x0, x19                          // without its padding, at most one write
+    mov  x1, x20
+    bl   _bc_frame_len
+    cmp  x0, #0
+    b.le 9f
+    cmp  x0, #BC_WRITE_MAX
+    b.hi 9f
+    mov  x20, x0
+    mov  x9, #0
+2:  cmp  x9, x20
+    b.hs 3f
+    ldrb w10, [x19, x9]
+    ADRL x11, _g_bc_fwd
+    strb w10, [x11, x9]
+    add  x9, x9, #1
+    b    2b
+3:  ADRL x11, _g_bc_fwd
+    strb w23, [x11, #2]
+    mov  x22, #0                          // every link but the one it came in on
+    mov  x24, #0
+4:  cmp  x22, #BC_LINKS
+    b.hs 6f
+    cmp  x22, x21
+    b.eq 5f
+    mov  x0, x22
+    ADRL x1, _g_bc_fwd
+    mov  x2, x20
+    bl   _bc_send
+    cmp  x0, #1
+    cinc x24, x24, eq
+5:  add  x22, x22, #1
+    b    4b
+6:  cbz  x24, 9f
+    ADRL x8, _g_bc_cnt
+    ldr  x9, [x8, #C_RELAYED]
+    add  x9, x9, #1
+    str  x9, [x8, #C_RELAYED]
+9:  LEAVE 0
+
+// void Lbc_message(void) — a public message was read into _g_bc_dp: into the bitchat room,
+//   as "Anna: text", if it's from someone whose announce we took and signed by them.
+//   Only shown: never read as a command, whatever it says.
+Lbc_message:
+    ENTER 800                             // [96] the text [720] room
+    bl   Lbc_wall_ms
+    mov  x1, x0
+    ADRL x0, _g_bc_peers
+    ADRL x2, _g_bc_myid
+    ADRL x3, _g_bc_dp
+    ADRL x4, _g_bc_scr
+    mov  x5, #4096
+    bl   _bc_msg_read
+    tbnz x0, #63, 9f
+    ADRL x8, _g_bc_peers
+    add  x19, x8, x0, lsl #BT_SHIFT       // x19: who said it
+    mov  x0, #BITCHAT_ID
+    bl   _room_find
+    tbnz x0, #63, 9f
+    str  x0, [sp, #720]
+    ADRL x8, _g_bc_dp                     // the text: at most 600 bytes, between characters,
+    ldr  x20, [x8, #DP_PAY]               //   control characters as spaces
+    ldr  x1, [x8, #DP_PLEN]
+    mov  x0, x20
+    mov  x2, #600
+    bl   _bc_utf8_cut
+    mov  x21, x0
+    add  x22, sp, #96
+    mov  x9, #0
+1:  cmp  x9, x21
+    b.hs 2f
+    ldrb w10, [x20, x9]
+    cmp  w10, #0x20
+    mov  w11, #0x20
+    csel w10, w11, w10, lo
+    cmp  w10, #0x7f
+    csel w10, w11, w10, eq
+    strb w10, [x22, x9]
+    add  x9, x9, #1
+    b    1b
+2:  strb wzr, [x22, x9]
+    mov  x0, x19
+    bl   _bc_person_clash
+    ADRL x2, Lf_bc_said
+    ADRL x10, Lf_bc_said_clash
+    cmp  x0, #0
+    csel x2, x10, x2, ne
+    add  x9, x19, #BT_NICK
+    str  x9, [sp]
+    str  x22, [sp, #8]
+    ADRL x0, _g_bc_line
+    mov  x1, #720
+    bl   _snprintf
+    ldr  x0, [sp, #720]
+    ADRL x1, _g_bc_line
+    mov  w2, #0
+    bl   _room_line
+    ADRL x8, _g_bc_cnt
+    ldr  x9, [x8, #C_SHOWN]
+    add  x9, x9, #1
+    str  x9, [x8, #C_SHOWN]
+9:  LEAVE 800
+
+// void _bc_say(const char *text) — typed into the bitchat room (mesh.s): a public message
+//   to bitchat, in pieces of BT_MSG_MAX bytes (cut at spaces), each signed. Only chat:
+//   whatever it says, nothing here runs it as a command.
+.globl _bc_say
+_bc_say:
+    ENTER 144                             // [96] one piece, for showing it
+    mov  x19, x0
+    mov  x0, #BITCHAT_ID
+    bl   _room_find
+    mov  x22, x0                          // x22: the bitchat room
+    tbnz x22, #63, 9f
+    mov  x0, #SVC_BITCHAT
+    bl   _svc_on
+    ADRL x1, Ls_bc_say_off
+    cbz  x0, 8f
+    ADRL x8, _g_bc_keys
+    ldr  x9, [x8]
+    cmp  x9, #KS_READY
+    ADRL x1, Ls_bc_say_nokeys
+    b.ne 8f
+    mov  x0, #0
+    bl   _bc_link_count
+    ADRL x1, Ls_bc_say_nolink
+    cbz  x0, 8f
+    mov  x0, x19
+    bl   _strlen
+    mov  x20, x0                          // x20: bytes left
+1:  cbz  x20, 9f
+    ldrb w9, [x19]                        // no piece starts with a space
+    cmp  w9, #' '
+    b.ne 2f
+    add  x19, x19, #1
+    sub  x20, x20, #1
+    b    1b
+2:  mov  x0, x19
+    mov  x1, x20
+    mov  x2, #BT_MSG_MAX
+    bl   _bc_msg_split
+    mov  x21, x0
+    mov  x0, #0x02
+    mov  x1, x19
+    mov  x2, x21
+    bl   Lbc_send_own
+    mov  x9, #0                           // show it: "you: piece"
+3:  cmp  x9, x21
+    b.hs 4f
+    ldrb w10, [x19, x9]
+    add  x11, sp, #96
+    strb w10, [x11, x9]
+    add  x9, x9, #1
+    b    3b
+4:  add  x11, sp, #96
+    strb wzr, [x11, x9]
+    str  x11, [sp]
+    ADRL x0, _g_bc_line
+    mov  x1, #720
+    ADRL x2, Lf_bc_you
+    bl   _snprintf
+    mov  x0, x22
+    ADRL x1, _g_bc_line
+    mov  w2, #0
+    bl   _room_line
+    ADRL x8, _g_bc_cnt
+    ldr  x9, [x8, #C_SAID]
+    add  x9, x9, #1
+    str  x9, [x8, #C_SAID]
+    add  x19, x19, x21
+    sub  x20, x20, x21
+    b    1b
+8:  mov  x0, x22
+    mov  w2, #1
+    bl   _room_line
+9:  LEAVE 144
 
 // ---------------------------------------------------------------------------
 // our bitchat identity, announces, and the people heard (Milestone 1)
@@ -1715,6 +1964,12 @@ Lbc_say_me:
     ldr  x3, [x8, #C_ANN_BAD]
     ADRL x0, Lf_bc_people_n
     bl   _home_say
+    ADRL x8, _g_bc_cnt
+    ldr  x1, [x8, #C_SHOWN]
+    ldr  x2, [x8, #C_SAID]
+    ldr  x3, [x8, #C_RELAYED]
+    ADRL x0, Lf_bc_chat_n
+    bl   _home_say
     LEAVE 32
 1:  ADRL x0, Ls_bc_nokeys
     ADRL x10, Ls_bc_loading
@@ -1972,6 +2227,12 @@ Lf_links:     .asciz "\302\267 bitchat: %ld linked (%ld this Mac found, %ld foun
 Lf_heard:     .asciz "\302\267 heard %ld packets: %ld hellos, %ld public messages"
 Lf_heard2:    .asciz "\302\267 %ld private (sealed), %ld fragments, %ld put back together"
 Ls_bc_kc:     .asciz "asmmesh.bitchat"
+Lf_bc_said:   .asciz "%s: %s"
+Lf_bc_said_clash: .asciz "\342\232\240\357\270\217 %s (bitchat, not the asmmesh one): %s"
+Lf_bc_you:    .asciz "you: %s"
+Ls_bc_say_off: .asciz "bitchat is off: switch it on in Settings (or type \342\200\234enable bitchat\342\200\235 in Home). Not sent."
+Ls_bc_say_nokeys: .asciz "This Mac has no bitchat keys yet (type \342\200\234bitchat\342\200\235 in Home to see why). Not sent."
+Ls_bc_say_nolink: .asciz "No bitchat phones are linked right now. Not sent."
 Ls_bc_ann_on: .asciz "\302\267 bitchat: this Mac announces itself again"
 Ls_bc_ann_off: .asciz "\302\267 bitchat: this Mac only listens for now, without announcing itself (\342\200\234bitchat announce on\342\200\235 to undo)"
 Ls_bc_newkeys: .asciz "\302\267 bitchat: this Mac has its own bitchat keys now, kept apart from its asmmesh identity"
@@ -1980,6 +2241,7 @@ Lf_bc_kc_no:  .asciz "\302\267 bitchat: the Keychain didn't hand over this Mac's
 Ls_bc_nokeys: .asciz "\302\267 this Mac isn't announcing itself on bitchat (no keys)"
 Ls_bc_loading: .asciz "\302\267 this Mac's bitchat keys are being read"
 Lf_bc_me:     .asciz "\302\267 this Mac on bitchat: \342\200\234%s\342\200\235 \302\267 %s \302\267 %ld announces sent"
+Lf_bc_chat_n: .asciz "\302\267 bitchat room: %ld messages shown, %ld sent; %ld packets passed on for other bitchat users"
 Lf_bc_people_n: .asciz "\302\267 bitchat people: %ld around (%ld announces taken, %ld refused); say \342\200\234bitchat people\342\200\235"
 Ls_bc_people_hdr: .asciz "\302\267 bitchat people (walled off: a name and a fingerprint, nothing more):"
 Lf_bc_person: .asciz "\302\267 %s \342\200\224 %s"

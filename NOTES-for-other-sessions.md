@@ -136,3 +136,9 @@ Numbers now taken:
 - People: rows past _g_node_count are bitchat people (`_people_rows` in ui.s, `Lcv_bitchat` in
   cards.s; iPhone: `am_bc_*` and Mesh.bitchatPeople). Code that takes a People row as an index
   into _g_nodes must check it against _g_node_count first (Invite already does).
+
+## bitchat Milestone 2 (Oct 30, branch claude/bitchat-roadmap): public chat
+- Room id 4 is the local bitchat room (BITCHAT_ID); LOCAL_ROOMS is 5 (ids 1-4 local). New
+  private rooms start at index 5. mesh.s routes text typed there to `_bc_say` (bc_ble.s) only.
+- bc_peer.s: `_bc_msg_read`, `_bc_msg_split`, `_bc_relay_ok`; self-tests 173-175.
+- bc_ble.s: duplicate filter, messages into the room, relaying between bitchat links.

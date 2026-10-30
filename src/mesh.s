@@ -544,6 +544,8 @@ _mesh_send_text:
     b.eq Lst_web
     cmp  x9, #NEWS_ID
     b.eq Lst_news
+    cmp  x9, #BITCHAT_ID
+    b.eq Lst_bitchat
     cmp  x9, #HOME_ID
     b.ne Lst_mesh
     mov  x0, x20                      // Home: a device command, stays on this Mac
@@ -557,6 +559,10 @@ Lst_web:
 Lst_news:
     mov  x0, x20
     bl   _news_command
+    LEAVE 0
+Lst_bitchat:
+    mov  x0, x20                      // bitchat: chat text only, never a command
+    bl   _bc_say
     LEAVE 0
 Lst_mesh:
     mov  x0, x20                      // a device command typed here? run it in Home
@@ -1190,7 +1196,7 @@ Lrx_msg_text:
     bl   _sanitize
     ldr  x0, [x19, #12]
     sub  x9, x0, #1                   // nobody else's words land in a local room
-    cmp  x9, #(LOCAL_ROOMS - 2)       //   (Home, Web, News)
+    cmp  x9, #(LOCAL_ROOMS - 2)       //   (Home, Web, News, bitchat)
     b.ls Lrx_relay
     bl   _room_find
     tbnz x0, #63, Lrx_relay           // not a room we are in: just pass it on
@@ -1891,6 +1897,10 @@ _rooms_init:
     ADRL x1, Ls_newsroom
     mov  x2, #0
     bl   _room_add
+    mov  x0, #BITCHAT_ID              // local: bitchat's public chat, walled off (bc_ble.s)
+    ADRL x1, Ls_bitchatroom
+    mov  x2, #0
+    bl   _room_add
     ADRL x8, _g_no_persist
     ldr  x8, [x8]
     cbnz x8, Lri_done
@@ -2054,6 +2064,7 @@ Ls_main:              .asciz "Main"
 Ls_home:              .asciz "Home"
 Ls_webroom:           .asciz "Web"
 Ls_newsroom:          .asciz "News"
+Ls_bitchatroom:       .asciz "bitchat"
 Ls_key_node:          .asciz "nodeId"
 Ls_key_nick:          .asciz "nick"
 Ls_key_rooms:         .asciz "rooms"

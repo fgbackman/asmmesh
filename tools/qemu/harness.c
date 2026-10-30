@@ -43,6 +43,9 @@ extern long bc_ann_make(const void *, long, const void *, const void *, void *) 
 extern long bc_ann_read(const void *, long, void *) F(bc_ann_read);
 extern long bc_peer_leave(void *, const void *, void *, long) F(bc_peer_leave);
 extern long bc_peer_expire(void *, long) F(bc_peer_expire);
+extern long bc_msg_read(void *, long, const void *, const void *, void *, long) F(bc_msg_read);
+extern long bc_msg_split(const void *, long, long) F(bc_msg_split);
+extern long bc_relay_ok(void *, long) F(bc_relay_ok);
 
 // _bc_peer_heard answers in x0 and x1
 static void bc_heard2(void *tab, long now, const void *own, const void *dp, void *scr, long cap, long r[2]) {
@@ -245,6 +248,13 @@ int main(int argc, char **argv) {
             if (bc_decode(A[0], N[0], &dp, pay, sizeof pay)) printf("bad");
             else printf("%ld", bc_peer_leave(bt, &dp, out, 4096));
         }
+        else if (!strcmp(cmd, "msgread")) {
+            // msgread <now as 8 bytes> <our id> <frame>
+            if (bc_decode(A[2], N[2], &dp, pay, sizeof pay)) printf("bad");
+            else printf("%ld", bc_msg_read(bt, be(A[0], 8), A[1], &dp, out, 4096));
+        }
+        else if (!strcmp(cmd, "split")) printf("%ld", bc_msg_split(A[0], N[0], A[1][0]));
+        else if (!strcmp(cmd, "relayok")) { static unsigned char rl[16]; printf("%ld", bc_relay_ok(rl, be(A[0], 8))); }
         else if (!strcmp(cmd, "expire")) printf("%ld", bc_peer_expire(bt, be(A[0], 8)));
         else printf("?");
         done:

@@ -176,4 +176,4 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
             the page's piece count u16 and a bitmap of the pieces still missing (type 8)
     WEBPART +12 asker id  +20 gateway id  +28 0  +29 request id u32  +33 piece u16  +35 pieces u16
             +37 flags (1 sealed)  +38 up to 120 bytes of the zlib-packed page (type 9)
-    at most 240 bytes; Main is room id 0; Web (2) and News (3), like Home (1), are local rooms
+    at most 240 bytes; Main is room id 0; Web (2), News (3) and bitchat (4), like Home (1), are local rooms

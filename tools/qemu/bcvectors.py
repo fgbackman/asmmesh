@@ -1,6 +1,6 @@
-# bcvectors.py — prints the test packets that bc_packet.s's self-tests (155-164) carry, or with
-# `peer` those of bc_peer.s (165-172), as assembly. Run it again, and paste over the vectors in
-# the .s file, if bcwire.py changes.
+# bcvectors.py — prints, as assembly, the test packets of bc_packet.s's self-tests (155-164);
+# with `peer` those of bc_peer.s (165-172), with `msg` its public-message ones (173-175).
+# Run it again, and paste over the vectors in the .s file, if bcwire.py changes.
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bcwire as w
@@ -100,5 +100,36 @@ def peer_vectors():
     print('.set PA1_N, %d\n.set PBS_N, %d\n.set PUN_N, %d\n.set POS_N, %d\n.set PPN_N, %d\n.set PLV_N, %d\n.set PLF_N, %d\n.set POURS_N, %d\n.set PNICK_N, %d'
           % (len(a1), len(bad_sender), len(unsigned), len(other_sig), len(pinned), len(leave), len(leave_forged), len(ours), len(nick)))
 SEED_X_PUB = bytes(range(0x40, 0x60))
+
+# ---- bc_peer.s public messages (self-tests 173-175): `bcvectors.py msg`
+def msg_vectors():
+    X1, E1, E2 = bytes([7] * 32), bytes([8] * 32), bytes([9] * 32)
+    from cryptography.hazmat.primitives.asymmetric import x25519
+    xpub = x25519.X25519PrivateKey.from_private_bytes(X1).public_key().public_bytes(
+        serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    pid = w.peer_id(xpub)
+    text = 'hi from bitchat \u2615'.encode('utf-8')
+    now = TS + 3000
+    m_ok = w.build(1, 2, 7, TS + 2000, pid, None, text, E1)
+    m_forged = w.build(1, 2, 7, TS + 2000, pid, None, text, E2)
+    m_stale = w.build(1, 2, 7, now - w.MSG_STALE_MS - 1, pid, None, text, E1)
+    m_utf8 = w.build(1, 2, 7, TS + 2000, pid, None, b'\xc0\xaf', E1)
+    m_to = w.build(1, 2, 7, TS + 2000, pid, bytes(range(8)), text, E1)
+    m_bcast = w.build(1, 2, 7, TS + 2000, pid, b'\xff' * 8, text, E1)
+    T = w.Peers(); T.heard(TS + 1000, bytes(8), w.decode(w.announce_packet(X1, E1,         "Anna's phone \u2615".encode('utf-8'), TS, ttl=6)))
+    for pkt, want in ((m_ok, 0), (m_forged, -5), (m_stale, -4), (m_utf8, -7), (m_to, -1), (m_bcast, 0)):
+        assert w.msg_read(T, now, bytes(8), w.decode(pkt)) == want, want
+    assert w.msg_read(T, now, pid, w.decode(m_ok)) == -3
+    assert w.msg_read(w.Peers(), now, bytes(8), w.decode(m_ok)) == -8
+    out('Lm_ok', m_ok, '173: Anna says "hi from bitchat \u2615", signed')
+    out('Lm_forged', m_forged, '173: the same, signed with another key')
+    out('Lm_stale', m_stale, '173: the same, over 6 hours old')
+    out('Lm_utf8', m_utf8, '173: not UTF-8')
+    out('Lm_to', m_to, '173: addressed to someone')
+    out('Lm_bcast', m_bcast, '173: addressed to everyone (ff x 8)')
+    out('Lm_text', text, 'what Anna said')
+    print('.set MOK_N, %d\n.set MFG_N, %d\n.set MST_N, %d\n.set MU8_N, %d\n.set MTO_N, %d\n.set MBC_N, %d\n.set MTX_N, %d'
+          % (len(m_ok), len(m_forged), len(m_stale), len(m_utf8), len(m_to), len(m_bcast), len(text)))
+
 if __name__ == '__main__':
-    peer_vectors() if sys.argv[1:] == ['peer'] else packet_vectors()
+    {'peer': peer_vectors, 'msg': msg_vectors}.get(sys.argv[1] if sys.argv[1:] else '', packet_vectors)()

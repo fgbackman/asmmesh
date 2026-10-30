@@ -144,7 +144,8 @@
 .set HOME_ID,       1        // the local-only Home room; never sent on the mesh
 .set WEB_ID,        2        // the local Web room: pages fetched by a gateway Mac
 .set NEWS_ID,       3        // the local News room: headlines from gateway Macs
-.set LOCAL_ROOMS,   4        // ids 1..3 are local rooms, never sent on the mesh
+.set BITCHAT_ID,    4        // the local bitchat room: public chat with bitchat phones (bc_ble.s)
+.set LOCAL_ROOMS,   5        // ids 1..4 are local rooms, never sent on the mesh
 .set T_NEWS,        7        // +12 zero[8] +20 sender[8] +28 nlen +29 nick, mode, headline
 .set T_WEBREQ,      8        // +12 gateway[8] (0 any) +20 sender[8] +28 nlen +29 nick, then web.s body
 .set T_WEBPART,     9        // +12 requester[8] +20 gateway[8] +28 nlen (0), then web.s body
