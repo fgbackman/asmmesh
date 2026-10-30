@@ -17,8 +17,8 @@
 .set ST_CLOUD,  41                    //   (above every service's own bit)
 
 // window geometry
-.set SW_W,      964
-.set SW_H,      794                   // three columns, nine rows of cards
+.set SW_W,      1440
+.set SW_H,      498                   // five columns, five rows of cards
 .set SW_TOP,    (SW_H - 118 - 64)     // y of the first row of cards
 
 .data
@@ -68,9 +68,9 @@ Lsvc:
 Lc0:        .double 0.0
 Lc1:        .double 1.0
 Lc255:      .double 255.0
-Lc_W:       .double 964.0
-Lc_H:       .double 794.0
-Lc_cw:      .double 300.0
+Lc_W:       .double 1440.0
+Lc_H:       .double 498.0
+Lc_cw:      .double 272.0
 Lc_ch:      .double 64.0
 Lc_r16:     .double 16.0
 Lc_r18:     .double 18.0
@@ -79,13 +79,13 @@ Lc_s14:     .double 14.0
 Lc_s13:     .double 13.0
 Lc_s11:     .double 11.0
 // frames inside the window / a card: x, y, w, h
-Lf_title:   .double 24.0, 720.0, 420.0, 34.0
-Lf_sub:     .double 24.0, 696.0, 900.0, 18.0
+Lf_title:   .double 24.0, 424.0, 420.0, 34.0
+Lf_sub:     .double 24.0, 400.0, 900.0, 18.0
 Lf_icon:    .double 14.0, 14.0, 36.0, 36.0
 Lf_glyph:   .double 8.0, 8.0, 20.0, 20.0
-Lf_name:    .double 62.0, 33.0, 170.0, 18.0
-Lf_what:    .double 62.0, 14.0, 172.0, 16.0
-Lf_switch:  .double 240.0, 20.0, 44.0, 24.0
+Lf_name:    .double 62.0, 33.0, 142.0, 18.0
+Lf_what:    .double 62.0, 14.0, 144.0, 16.0
+Lf_switch:  .double 212.0, 20.0, 44.0, 24.0
 
 .text
 .p2align 2
@@ -815,11 +815,11 @@ _svc_card:
     ADRL x8, Lsvc
     mov  x9, #SV_SIZE
     madd x21, x19, x9, x8
-    // three columns; row r = i / 3 from the top
-    mov  x11, #3
+    // five columns; row r = i / 5 from the top
+    mov  x11, #5
     udiv x10, x19, x11
     msub x9, x10, x11, x19
-    mov  x11, #316
+    mov  x11, #284
     mul  x9, x9, x11
     add  x9, x9, #16
     ucvtf d0, x9

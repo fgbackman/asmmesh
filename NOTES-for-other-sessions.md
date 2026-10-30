@@ -109,7 +109,7 @@ Numbers now taken:
 - New files: `src/bc_link.s` (pure: frame length, long writes, fragment reassembly, send queue),
   `src/bc_ble.s` (CoreBluetooth), `src/bc_defs.inc`. In the Makefile (and its include list) and
   ios/make_project.py.
-- Numbers taken: SVC_BITCHAT 24, NSVC 25. The Mac Settings window is now nine rows (SW_H 794).
+- Numbers taken: SVC_BITCHAT 24, NSVC 25. The Mac Settings window is now five columns by five rows (1440 x 498), full at 25.
   "enable all" skips bitchat; it can't be switched from the mesh (_g_remote_active).
 - Home words: "bitchat", "bitchat status", "bitchat advertise on/off" (rules.s table).
 - bitchat has its own CBCentralManager, CBPeripheralManager and delegate class (AMeshBitchat):

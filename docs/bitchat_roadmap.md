@@ -92,7 +92,7 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 ### Phases
 
 **Phase 0 — groundwork**
-- Pick the new service number and file names, and add them to `NOTES-for-other-sessions.md` so parallel sessions don't collide. *(Done: service 24, `src/bc_*.s`, a ninth Settings row.)*
+- Pick the new service number and file names, and add them to `NOTES-for-other-sessions.md` so parallel sessions don't collide. *(Done: service 24, `src/bc_*.s`, a Settings card; the Mac window is now 5 x 5.)*
 - Pin one bitchat release to test against, and install it on a spare iPhone or Mac.
 
 **Phase 1 — crypto in assembly** (`src/bc_crypto.s`) — **done**
@@ -103,7 +103,7 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 - Keychain storage for the two bitchat keys moved to Milestone 1, where the keys are first needed and the off switch has to keep them unloaded.
 
 **Phase 2 — Bluetooth link** (`src/bc_link.s`, `src/bc_ble.s`) — **written; to be tried on a Mac**
-- The **bitchat** switch is service 24, off by default. It's a new row in Settings (the Mac window grew to nine rows). "enable all" leaves it off, and it can't be switched from the mesh.
+- The **bitchat** switch is service 24, off by default. It's a new card in Settings (the Mac window is now five columns by five rows, which is full). "enable all" leaves it off, and it can't be switched from the mesh.
 - bitchat gets its own CBCentralManager, CBPeripheralManager and delegate class, so its callbacks never pass through asmmesh's controller. Each of its three entry points for outside bytes runs under the guard.
 - Central: scans for bitchat's service only, connects (up to 8 links), subscribes to notifications, and writes without response when the radio has room.
 - Peripheral: publishes the same service and characteristic, takes writes (long writes in pieces too), and notifies subscribers.
