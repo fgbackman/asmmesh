@@ -247,7 +247,8 @@ _selftest:
     ADRL x8, _g_rooms
     add  x8, x8, x20, lsl #ROOM_SHIFT
     ldr  x9, [x8, #R_UNREAD]
-    cmp  x20, #4                          // after Main, Home, Web and News
+    cmp  x20, #LOCAL_ROOMS                // after Main and the local rooms (Home, Web,
+                                          //   News, bitchat)
     ccmp x9, #1, #0, eq
     EXPECT_TRUE Ln_unread
 
