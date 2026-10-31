@@ -153,3 +153,6 @@ Numbers now taken:
 - New Keychain item "asmmesh.bitchat.pins"; defaults key "bitchatName"; Home word "bitchat name".
 - ident.s: _id_ready reads _g_id_kcst (its own read's status), not the shared _g_kc_status.
 - mesh.s: `_room_drop(idx)` removes a room without saving; `_room_remove` = drop + save.
+
+## Handoff
+For where the bitchat work stands and what comes next, start with `docs/bitchat_handoff.md`.
