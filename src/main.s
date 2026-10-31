@@ -173,6 +173,8 @@ Lmethods:
     .quad Ls_m_netDone,     _net_done,          Ls_ty_v3
     .quad Ls_m_bonjourFound, _lan_found,        Ls_ty_found
     .quad Ls_m_resolved,    _lan_resolved,      Ls_ty_v1
+    .quad Ls_m_fieldCmd,    _term_cmd,          Ls_ty_fieldCmd
+    .quad Ls_m_fieldChange, _term_changed,      Ls_ty_v1
     .quad Ls_m_speechHyp,   _voice_hyp,         Ls_ty_v2
     .quad Ls_m_speechFinal, _voice_final,       Ls_ty_v2
     .quad Ls_m_speechDone,  _voice_done,        Ls_ty_vB
@@ -552,6 +554,10 @@ _build_ui:
     mov  x0, x24
     mov  x2, x23
     MSG1 Ls_addSubview
+    mov  x0, x23                      // a terminal's line: history, suggestions (term.s)
+    mov  x1, x24
+    mov  x2, x21
+    bl   _term_setup
 
     ADRL x0, Ls_y_send
     ADRL x1, Ls_m_send
@@ -1728,6 +1734,9 @@ Ls_ty_reopen:          .asciz "B@:@B"
 Ls_ty_rows:            .asciz "q@:@"
 Ls_ty_value:           .asciz "@@:@@q"
 Ls_ty_v1:              .asciz "v@:@"
+Ls_ty_fieldCmd:        .asciz "B@:@@:"
+Ls_m_fieldCmd:         .asciz "control:textView:doCommandBySelector:"
+Ls_m_fieldChange:      .asciz "controlTextDidChange:"
 Ls_ty_v2:              .asciz "v@:@@"
 Ls_ty_v3:              .asciz "v@:@@@"
 Ls_ty_v4:              .asciz "v@:@@@@"

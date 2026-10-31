@@ -32,6 +32,7 @@ extern long bc_inbox_put(void *, long, const void *, long) F(bc_inbox_put);
 extern long bc_frag_put(void *, long, const void *, const void *, long, void *, long) F(bc_frag_put);
 extern long bc_packet_selftest(void) F(bc_packet_selftest) __attribute__((weak));
 extern long bc_peer_selftest(void) F(bc_peer_selftest) __attribute__((weak));
+extern long term_selftest(void) F(term_selftest) __attribute__((weak));
 extern long bc_decode(const void *, long, void *, void *, long) F(bc_decode);
 extern long bc_sign_data(const void *, void *, long) F(bc_sign_data);
 extern long bc_verify(const void *, const void *, void *, long) F(bc_verify);
@@ -107,7 +108,7 @@ static long unhex(const char *s, unsigned char *p) {
 
 int main(int argc, char **argv) {
     if (argc > 1 && !strcmp(argv[1], "selftest")) {
-        long f = bc_selftest() + bc_link_selftest() + bc_packet_selftest() + bc_peer_selftest();
+        long f = bc_selftest() + bc_link_selftest() + bc_packet_selftest() + bc_peer_selftest() + term_selftest();
         printf("%ld failed\n", f);
         return f != 0;
     }

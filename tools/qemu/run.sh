@@ -12,13 +12,15 @@ out="${TMPDIR:-/tmp}/asmmesh-qemu"
 mkdir -p "$out"
 python3 "$here/lint.py" >/dev/null || { python3 "$here/lint.py"; exit 1; }   # ENTER/LEAVE, LINK
 # Mach-O -> ELF: the macros file, section names and libc's leading underscore
-for f in bc_crypto bc_link bc_packet bc_peer; do
+for f in bc_crypto bc_link bc_packet bc_peer term_core; do
     sed -e 's/^\.include "macros\.inc"/.include "elf.inc"/' \
         -e 's/^\.section __TEXT,__const/.section .rodata/' \
+        -e 's/^\.section __TEXT,__cstring,cstring_literals/.section .rodata/' \
+        -e 's/^\.section __DATA,__const/.section .data.rel.ro/' \
         -e 's/bl   _\(memcpy\|calloc\|free\)$/bl   \1/' \
         "$src/$f.s" > "$out/$f.s"
 done
-aarch64-linux-gnu-gcc -O1 -static -I "$here" -I "$src" -o "$out/harness" "$here/harness.c" "$here/inflate.c" "$out/bc_crypto.s" "$out/bc_link.s" "$out/bc_packet.s" "$out/bc_peer.s"
+aarch64-linux-gnu-gcc -O1 -static -I "$here" -I "$src" -o "$out/harness" "$here/harness.c" "$here/inflate.c" "$out/bc_crypto.s" "$out/bc_link.s" "$out/bc_packet.s" "$out/bc_peer.s" "$out/term_core.s"
 case "$1" in
     diff) python3 "$here/diff.py" "$out/harness" "${2:-200}" ;;
     *)    qemu-aarch64 "$out/harness" selftest ;;

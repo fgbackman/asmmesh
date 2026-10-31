@@ -151,6 +151,10 @@ Lsimple:
     .quad Lw_bc_ann_on,      0, _h_bitchat_quiet, 0
     .quad Lw_bc_ann_off,     0, _h_bitchat_quiet, 1
     .quad Lw_bc_name,        0, _h_bitchat_name, 0
+    .quad Lw_hist,           0, _h_term_history, 3
+    .quad Lw_hist_on,        0, _h_term_history, 1
+    .quad Lw_hist_off,       0, _h_term_history, 0
+    .quad Lw_hist_clear,     0, _h_term_history, 2
     .quad Lw_bc_name,        1, _h_bitchat_name, 0
     .quad Lw_settings,       2, _h_services, 0
     .quad Lw_service_list,   2, _h_services, 0
@@ -609,6 +613,23 @@ Lsa_done:
 // ---------------------------------------------------------------------------
 // The Home room's other words
 // ---------------------------------------------------------------------------
+
+// long _rules_words(pair *out, long max) -> how many: Home's command words and their kinds
+//   (16 bytes each: text, kind), for the input field's suggestions (term.s) (leaf)
+.globl _rules_words
+_rules_words:
+    ADRL x9, Lsimple
+    mov  x10, #0
+1:  cmp  x10, x1
+    b.hs 2f
+    ldp  x11, x12, [x9], #32
+    cbz  x11, 2f
+    add  x13, x0, x10, lsl #4
+    stp  x11, x12, [x13]
+    add  x10, x10, #1
+    b    1b
+2:  mov  x0, x10
+    ret
 
 // long _simple_cmd(const char *lc, const char *orig, long prefix_pass, long dry) -> 1 if it is one
 _simple_cmd:
@@ -2833,6 +2854,10 @@ Lw_bc_forget:    .asciz "bitchat forget"
 Lw_bc_ann_on:    .asciz "bitchat announce on"
 Lw_bc_ann_off:   .asciz "bitchat announce off"
 Lw_bc_name:      .asciz "bitchat name"
+Lw_hist:         .asciz "history"
+Lw_hist_on:      .asciz "history on"
+Lw_hist_off:     .asciz "history off"
+Lw_hist_clear:   .asciz "history clear"
 Lw_settings:     .asciz "settings"
 Lw_service_list: .asciz "list services"
 Lw_enable:       .asciz "enable"

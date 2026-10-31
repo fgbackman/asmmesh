@@ -196,6 +196,7 @@ _chat_line:
 _ui_select_room:
     ENTER 256
     mov  x19, x0
+    bl   _term_hide                   // suggestions are Home's
     ADRL x8, _g_cur_room
     str  x19, [x8]
     ADRL x8, _g_rooms
@@ -644,6 +645,9 @@ _ui_send:
     cbz  x0, Lsend_done
     ldrb w8, [x0]
     cbz  w8, Lsend_done
+    mov  x20, x0
+    bl   _term_sent                   // remembered for up and down (term.s)
+    mov  x0, x20
     bl   _mesh_send_text
     ADRL x0, Ls_empty
     bl   _nsstr

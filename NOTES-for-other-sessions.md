@@ -156,3 +156,14 @@ Numbers now taken:
 
 ## Handoff
 For where the bitchat work stands and what comes next, start with `docs/bitchat_handoff.md`.
+
+## The input field as a terminal (Oct 31, branch claude/bitchat-roadmap)
+- New files: `src/term_core.s` (pure: history ring, saving, suggestion matching; runs under qemu)
+  and `src/term.s` (Mac: monospaced field with a prompt, up/down history, suggestions in Home).
+  In the Makefile; not on iPhone.
+- Self-tests 184-187. Defaults keys "termHistory" ("0" = don't keep) and "termHistoryLines".
+  Home words "history", "history on", "history off", "history clear".
+- The controller is the field's delegate: `control:textView:doCommandBySelector:` (_term_cmd)
+  and `controlTextDidChange:` (_term_changed) are in main.s's method table.
+- rules.s `_rules_words` hands the Lsimple words to the suggestions: a word added there is
+  suggested automatically.
