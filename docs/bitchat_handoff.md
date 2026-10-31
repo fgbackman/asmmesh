@@ -18,6 +18,7 @@ for whoever picks the work up next.
 | Hardening 1 and 2 | Two deep reviews' fixes | Written, self-tests pass; **not yet tried on a Mac** |
 | Guard-fault fix | `LINK` macro clobbered its own register | Fixed (`4154d9e`); **waiting for the Mac to confirm** |
 | Milestone 3 | Private chat (Noise) | Not started |
+| (not bitchat) | Input line like a terminal: history, suggestions (`term_core.s`, `term.s`) | Written (`e3a229d`), self-tests 184–187 pass; **not yet seen on screen** |
 
 The last thing seen on the Mac (build of `29f15b4`): the guard caught a steady stream of faults
 at `bc_frame_in + 792`, address `0x2618`. That was the `LINK` macro bug (section 9), fixed in
@@ -25,13 +26,15 @@ at `bc_frame_in + 792`, address `0x2618`. That was the `LINK` macro bug (section
 
 ## 2. Where the code is
 
-- **Branch:** `claude/bitchat-roadmap` on `github.com/fgbackman/asmmesh`, 17 commits on top of
-  `61cd2ee` ("Find someone on the mesh…").
+- **Branch:** `claude/bitchat-roadmap` on `github.com/fgbackman/asmmesh`, on top of `61cd2ee`
+  ("Find someone on the mesh…"). It also carries one change that isn't bitchat: the terminal-style
+  input line (section 4).
 - **`main`** has moved on by two commits since then (`be7464f` added `ROADMAP.md`, `94a6653`
   fixed docs). Nothing on the branch is merged yet.
 - **Merging into main:** a test merge conflicts only in `README.md`, the last line of the packet
   format section: keep main's v3 table and the branch's "Web (2), News (3) and bitchat (4), like
-  Home (1), are local rooms". After merging, `ROADMAP.md` on main still says "nothing in the code
+  Home (1), are local rooms". (The branch's README has its own bitchat, typing and files-list
+  updates; they sit in sections main didn't change.) After merging, `ROADMAP.md` on main still says "nothing in the code
   mentions bitchat"; that section needs rewriting, pointing at `docs/bitchat_roadmap.md`.
 - **Don't merge before** Milestone 2 and the hardening have been tried on the Mac
   (section 6): `main` is what's installed on the Mac mini.
@@ -90,13 +93,17 @@ How the wall is kept, concretely:
 | `tools/qemu/diff.py` | random and corrupted cases through the assembly vs `bcwire.py` | — |
 | `tools/qemu/bcvectors.py` | makes the self-tests' packets (`… peer`, `… msg`, `… pin` for the other files) | — |
 | `tools/qemu/lint.py` | ENTER/LEAVE sizes and `LINK` registers (run.sh runs it first) | — |
+| `src/term_core.s` | not bitchat: the input line's history ring, saving it, matching Home's commands | yes |
+| `src/term.s` | not bitchat: the Mac's input line as a terminal (prompt, ↑↓ history, suggestions in Home) | no |
 
 Touched outside `bc_*`: `mesh.s` (bitchat room typing → `_bc_say`, `_room_drop`), `ui.s`
 (People rows, room header), `cards.s` (bitchat people and room cards), `rules.s` (Home words),
 `services.s` (switch 24, Settings 5×5, disable all), `net.s` (`_kc_del`, `_kc_get` returns its
 status in x1), `ident.s` (`_id_ready` uses its own read's status), `listed.s`/`mesh.s`/`ident.s`
 (room arrays sized from `ROOM_MAX`), `scanner.s`/`ios_ui.s` (`_bc_tick` once a second),
-`test.s`, the iPhone's `Mesh.swift`, `PeopleView.swift` and bridging header.
+`test.s`, the iPhone's `Mesh.swift`, `PeopleView.swift` and bridging header. For the input line:
+`main.s` (the controller is the field's delegate; `_term_setup`), `ui.s` (`_term_sent` on send,
+`_term_hide` on a change of room), `rules.s` (`_rules_words`, `history …` words).
 
 ### A packet's way in (bc_ble.s)
 
@@ -120,9 +127,11 @@ status in x1), `ident.s` (`_id_ready` uses its own read's status), `listed.s`/`m
   as an index into `_g_nodes` must check it against `_g_node_count` first.
 - **Keychain:** `asmmesh.bitchat` (our two keys, hex), `asmmesh.bitchat.pins` (signing keys
   seen). All Keychain work for them runs on one serial queue, off the main thread.
-- **Defaults:** `bitchatName`.
+- **Defaults:** `bitchatName`; for the input line `termHistory` ("0": don't keep) and
+  `termHistoryLines`.
 - **Self-tests:** 127–144 crypto, 145–154 and 177–178 link, 155–164 packets, 165–176 and
-  179–183 people, chat and hardening. 57 in all; `make selftest` runs them with the rest.
+  179–183 people, chat and hardening, 184–187 the input line. 61 in all, every one runs under
+  qemu too; `make selftest` runs them with the rest.
 - **asmmesh packet types:** none added; bitchat packets never touch asmmesh's mesh.
 
 ## 6. How to test
@@ -160,6 +169,8 @@ Then, with bitchat open on the iPhone (screen on, in front):
 6. `disable bitchat`: the room goes, the phone drops the Mac.
 7. iPhone build (`ios/Install on iPhone.command` from the bitchat worktree): People has an
    "On bitchat" section. The Swift has never been compiled.
+8. The input line: monospaced with ❯; in Home, typing `bat` lists `batteries`… above it (Tab
+   fills one in); ↑ walks back through what was sent, also after quitting and reopening.
 
 If the phone goes quiet on a link that stays up: check for a second asmmesh copy, then switch
 the phone's Bluetooth off and on in Settings › Bluetooth.
@@ -198,11 +209,10 @@ Left on purpose, or not fixable without more protocol:
 3. Remove `~/Developer/asmmesh-p3`.
 
 **Before merging into main**
-4. Bring `README.md` up to date: the files list still calls `bc_crypto.s` "not used yet" and lacks
-   `bc_packet.s`, `bc_peer.s`, `bc_zlib.s` and `tools/qemu`'s new files; add a short bitchat section
-   (switch, room, Home words, the wall).
+4. Check the input line on screen (step 8): positions and sizes were set without seeing them.
 5. Merge `main` into the branch (one README conflict), rewrite main's `ROADMAP.md` bitchat
-   section, run `make selftest` and the checklist again, then merge.
+   section, run `make selftest` and the checklist again, then merge. (README is up to date on
+   the branch: bitchat, typing, files.)
 
 **Milestone 3: private chat** (`src/bc_noise.s`, new)
 - `Noise_XX_25519_ChaChaPoly_SHA256` handshake over `0x10`, sessions per peer, rekeying, replay
@@ -225,6 +235,8 @@ Left on purpose, or not fixable without more protocol:
 - Mesh Scanner rows for bitchat devices.
 - Cleanups: one shared byte-copy helper (there are four), drop dead link-layer code, a faster
   variable-time Ed25519 verify, a per-row-kind accessor for People.
+- The input line on iPhone (its field is SwiftUI: history and suggestions would be Swift, with
+  `term_core.s` underneath).
 
 ## 9. Gotchas learned the hard way
 

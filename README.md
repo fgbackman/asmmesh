@@ -81,6 +81,26 @@ Switch on **Bluetooth Sensors** in Settings, then:
 
 Sensor readings can be faked by anyone with a radio nearby, so unlocking and opening a garage still ask on screen however they were triggered.
 
+## bitchat (Settings › bitchat, off by default)
+
+asmmesh can also talk to phones running [bitchat](https://github.com/permissionlesstech/bitchat), Jack Dorsey's Bluetooth mesh chat, walled off from asmmesh's own mesh: bitchat people and their chat show up here, but nothing from bitchat reaches your rooms, devices, rules or keys, and nothing of asmmesh goes to bitchat.
+
+- **Switch it on** in Settings, or `enable bitchat` in Home. This Mac gets bitchat keys of its own (Keychain item `asmmesh.bitchat`), never linked to its asmmesh identity, and a separate name: "anon" and four digits until you set one with `bitchat name …`.
+- **People** lists bitchat people in orange after asmmesh's, with a fingerprint, and "nearby" when a phone is linked straight to this Mac. They can't be invited, found or sent commands. A name that looks like an asmmesh person's gets a warning.
+- **The bitchat room** (there while bitchat is on) shows bitchat's public chat as "Name (1a2b): text", the start of each sender's fingerprint after the name. What you type there goes to bitchat as signed public messages, in pieces of up to 96 bytes; it's only ever chat, never a command.
+- **In Home:** `bitchat` (status), `bitchat people`, `bitchat name …`, `bitchat forget` (deletes this Mac's bitchat keys and everything heard), `bitchat advertise on/off` (let phones find this Mac too). None of these work from the mesh.
+- With two or more phones linked, this Mac passes bitchat packets on for them, as a bitchat phone would.
+
+Private bitchat chat (Noise) isn't done yet. How it works, how it was tested and what's next: `docs/bitchat_roadmap.md` and `docs/bitchat_handoff.md`.
+
+## Typing: history and suggestions (Mac)
+
+The input line works like a terminal's: monospaced, with a ❯ prompt.
+
+- **↑ and ↓** bring back what you typed, up to the last 100 lines; past the newest, ↓ gives back what you were in the middle of typing.
+- **In Home**, commands that match what you're typing appear above the line, those that start with it first. **Tab** fills in the chosen one, ↑ ↓ choose, **Esc** hides them; Enter sends what's typed.
+- **Remembered between launches** with `history on` (the default); `history off` keeps it only until asmmesh quits and deletes what was saved; `history clear` forgets everything; `history` says which. Lines typed in private rooms or the bitchat room, and anything with a token, key, topic or password in it, are never saved.
+
 ## asmmesh for iPhone (ios/)
 
 The same assembly core (`src/*.s`) runs on iPhone. `ios/asm/ios_ui.s` takes the place of main.s, ui.s and scanner.s, and a thin SwiftUI front end (`ios/asmmesh/*.swift`) draws four tabs: **Rooms** (mesh chat, Home with the Talk mic), **People**, **Nearby** (radar, Bluetooth sensors, batteries, headphones) and **Settings** (Hue, SmartThings, Home Assistant, LIFX, Govee, the mesh passphrase and the service switches).
@@ -150,14 +170,21 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
     src/listed.s   listed rooms: ROOMAD and JOINREQ, asking to join, letting people in
     src/scan_core.s the scanner's list, details and Connect & Pair / Set Up (Mac window and iPhone)
     src/files_mac.s Files on Wi-Fi's Mac side: folder chooser, AirDrop, the QR window
-    src/bc_crypto.s bitchat's cryptography (not used yet): SHA-256/512, HMAC, HKDF, ChaCha20-Poly1305, X25519, Ed25519
+    src/bc_crypto.s bitchat's cryptography: SHA-256/512, HMAC, HKDF, ChaCha20-Poly1305, X25519, Ed25519
     src/bc_link.s  bitchat's link layer, bytes only: packet lengths, long writes, fragments, send queues
-    src/bc_ble.s   the Bluetooth link to bitchat phones (switch "bitchat", off by default), walled off; "bitchat" in Home
+    src/bc_packet.s bitchat packets: reading, what a signature covers, signing ours, duplicates, relaying
+    src/bc_zlib.s  bitchat's compressed payloads, through libz
+    src/bc_peer.s  bitchat people and chat: announces, leaves, messages, pinned keys, cleaning names and text
+    src/bc_ble.s   the Bluetooth link to bitchat phones (switch "bitchat", off by default), walled off; keys,
+                   announcing, the bitchat room, "bitchat …" in Home
     src/bc_defs.inc sizes and layouts shared by the bitchat files
+    src/term_core.s the input line's history and command matching (bytes only)
+    src/term.s     the input line as a terminal: prompt, up/down history, suggestions in Home (Mac)
     src/test.s     `asmmesh --selftest`
     src/util.s     objc_msgSend shortcuts, NSString helpers, chat formatting
     src/macros.inc frame and messaging macros
-    tools/qemu/    runs bc_crypto.s's self-tests under qemu on Linux, and checks it against Python's cryptography
+    tools/qemu/    runs the bitchat and typing self-tests under qemu on Linux (run.sh), checks them against
+                   Python's cryptography and a Python copy of bitchat's rules (run.sh diff), and lints (lint.py)
 
 ## Packet format (v2)
 
