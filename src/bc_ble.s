@@ -198,10 +198,11 @@ Lbc_kind_tab:
     BC_GUARDED _bc_g_writes, _bc_pm_writes
 
 // x0 = &link[i]
+// reg = the link idx (reg and idx may be any registers but x17, its scratch)
 .macro LINK reg, idx
     ADRL \reg, _g_bc_links
-    mov  x9, #L_SIZE
-    madd \reg, \idx, x9, \reg
+    mov  x17, #L_SIZE
+    madd \reg, \idx, x17, \reg
 .endm
 
 // ---------------------------------------------------------------------------

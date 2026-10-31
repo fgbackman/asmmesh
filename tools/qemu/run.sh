@@ -10,6 +10,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 src="$here/../../src"
 out="${TMPDIR:-/tmp}/asmmesh-qemu"
 mkdir -p "$out"
+python3 "$here/lint.py" >/dev/null || { python3 "$here/lint.py"; exit 1; }   # ENTER/LEAVE, LINK
 # Mach-O -> ELF: the macros file, section names and libc's leading underscore
 for f in bc_crypto bc_link bc_packet bc_peer; do
     sed -e 's/^\.include "macros\.inc"/.include "elf.inc"/' \
