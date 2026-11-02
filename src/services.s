@@ -15,6 +15,7 @@
 .set SV_SIZE,   48                    // key, title, subtitle, SF Symbol, colour, kinds
 .set ST_LAN,    40                    // "started" bits shared by several switches
 .set ST_CLOUD,  41                    //   (above every service's own bit)
+.set ST_CLOUD_READY, 42               // the clouds' tokens are read
 
 // window geometry
 .set SW_W,      1440
@@ -363,7 +364,9 @@ Lss_cloud:
     bl   _dispatch_async_f
     b    Lss_done
 Lss_cloud_more:                       // another cloud switched on later: its token is
-    bl   _cloud_load                  //   already read, so just ask it now
+    ldr  x9, [x20]                    //   already read, so just ask it now (still being
+    tbz  x9, #ST_CLOUD_READY, Lss_done  // read: _svc_cloud_ready loads every one on)
+    bl   _cloud_load
     bl   _ui_lists_changed
 Lss_done:
     LEAVE 0
@@ -409,6 +412,10 @@ _svc_cloud_worker:
 
 _svc_cloud_ready:
     ENTER 0
+    ADRL x8, _g_svc_started
+    ldr  x9, [x8]
+    orr  x9, x9, #(1 << ST_CLOUD_READY)
+    str  x9, [x8]
     bl   _cloud_init
     bl   _ui_lists_changed
     LEAVE 0

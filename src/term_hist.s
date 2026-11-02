@@ -4,7 +4,8 @@
 //
 // What's typed is remembered while asmmesh runs. Across launches only if "history on" (the
 // default), and never lines typed in private rooms or the bitchat room, nor ones that look
-// like they carry a secret (a token, key, topic, password or passphrase). "history off"
+// like they carry a secret (a token, key, topic, password or passphrase, a Pushover
+// setting, a web address). "history off"
 // forgets what was saved, "history clear" everything.
 
 .include "macros.inc"
@@ -37,7 +38,7 @@ Lterm_extra:
     .quad Lw_hist_clear, 0
     .quad 0, 0
 Lterm_secrets:
-    .quad Ls_s_token, Ls_s_key, Ls_s_topic, Ls_s_pass, 0
+    .quad Ls_s_token, Ls_s_key, Ls_s_topic, Ls_s_pass, Ls_s_po, Ls_s_url, 0
 
 .text
 .p2align 2
@@ -250,6 +251,8 @@ Ls_s_token:     .asciz "token"
 Ls_s_key:       .asciz "key"
 Ls_s_topic:     .asciz "topic"
 Ls_s_pass:      .asciz "pass"
+Ls_s_po:        .asciz "pushover"          // its user key, typed after \342\200\234pushover user\342\200\235
+Ls_s_url:       .asciz "://"               // an address may carry a key or a login
 Lw_help:        .asciz "help"
 Lw_devices:     .asciz "devices"
 Lw_pairhue:     .asciz "pair hue"
@@ -258,7 +261,7 @@ Lw_hist:        .asciz "history"
 Lw_hist_on:     .asciz "history on"
 Lw_hist_off:    .asciz "history off"
 Lw_hist_clear:  .asciz "history clear"
-Ls_hist_on:     .asciz "\302\267 History is on: what you type is remembered between launches (not private or bitchat rooms, nor anything with a token, key, topic or password). Up and down bring it back."
+Ls_hist_on:     .asciz "\302\267 History is on: what you type is remembered between launches (not private or bitchat rooms, nor anything with a token, key, topic, password, Pushover setting or web address). Up and down bring it back."
 Ls_hist_off:    .asciz "\302\267 History is off: what you type is only remembered until asmmesh quits, and what was saved is gone."
 Ls_hist_cleared: .asciz "\302\267 History cleared."
 Ls_hist_is_on:  .asciz "\302\267 History is on (\342\200\234history off\342\200\235 to stop, \342\200\234history clear\342\200\235 to forget). Up and down bring back what you typed."
