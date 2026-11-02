@@ -112,6 +112,7 @@ _am_start:
     ADRL x1, _g_nick
     bl   _chat_fmt
     bl   _ble_start
+    bl   _term_init                   // what was typed before, and Home's words
     LDGOT x0, __dispatch_main_q       // Home starts after the first screen is up
     mov  x1, #0
     ADRL x2, _home_init
@@ -696,10 +697,85 @@ _am_send:
     cbz  x0, Las_done
     ldrb w9, [x0]
     cbz  w9, Las_done
+    mov  x19, x0
+    bl   _term_record                 // remembered for the recent list (term_hist.s)
+    mov  x0, x19
     bl   _mesh_send_text
     bl   _ui_rooms_changed
 Las_done:
     LEAVE 0
+
+// What you typed, and Home's commands as you type (term_hist.s, the same as the Mac's)
+// const char *am_hist_prev(const char *typing) — the line before (0: none); the first
+//   keeps what was being typed for am_hist_next to give back
+.globl _am_hist_prev
+_am_hist_prev:
+    mov  x1, x0
+    ADRL x8, _g_term_hist
+    ldr  x0, [x8]
+    cbz  x0, 1f
+    b    _th_prev
+1:  ret
+
+// const char *am_hist_next(void) — the line after (past the newest: the draft; 0: none)
+.globl _am_hist_next
+_am_hist_next:
+    ADRL x8, _g_term_hist
+    ldr  x0, [x8]
+    cbz  x0, 1f
+    b    _th_next
+1:  ret
+
+// void am_hist_reset(void) — not browsing any more
+.globl _am_hist_reset
+_am_hist_reset:
+    ADRL x8, _g_term_hist
+    ldr  x0, [x8]
+    cbz  x0, 1f
+    b    _th_reset
+1:  ret
+
+// const char *am_hist_line(long k) — the k-th line back (0: newest), or 0
+.globl _am_hist_line
+_am_hist_line:
+    mov  x1, x0
+    ADRL x8, _g_term_hist
+    ldr  x0, [x8]
+    cbz  x0, 1f
+    tbnz x1, #63, 2f
+    b    _th_entry
+2:  mov  x0, #0
+1:  ret
+
+// long am_sg_count(const char *typing) — Home's commands that match (0 outside Home)
+.globl _am_sg_count
+_am_sg_count:
+    b    _term_match
+
+// const char *am_sg_word(long i) — the i-th of them (after am_sg_count)
+.globl _am_sg_word
+_am_sg_word:
+    cmp  x0, #6
+    b.hs 1f
+    ADRL x8, _g_term_out
+    add  x8, x8, x0, lsl #4
+    ldr  x0, [x8]
+    ret
+1:  mov  x0, #0
+    ret
+
+// long am_sg_more(long i) — 1 if the i-th takes more words after it (complete with a space)
+.globl _am_sg_more
+_am_sg_more:
+    cmp  x0, #6
+    b.hs 1f
+    ADRL x8, _g_term_out
+    add  x8, x8, x0, lsl #4
+    ldr  x0, [x8, #8]
+    and  x0, x0, #1
+    ret
+1:  mov  x0, #0
+    ret
 
 // void am_home(const char *text) — a Home command from a button ("batteries",
 //   "name sensor 2 bedroom"), whichever room is showing
@@ -1158,12 +1234,6 @@ _fm_mod:
 _fm_tx_push:
     mov  x0, #0
     ret
-
-// "history …" (rules.s): the terminal-style input line is the Mac's (term.s)
-.globl _h_term_history
-_h_term_history:
-    ADRL x0, Li_hist_mac
-    b    _home_say0
 
 .globl _h_fm_repeat
 _h_fm_repeat:
@@ -1955,7 +2025,6 @@ Li_pick_info:          .asciz "Open People, tap someone, then Invite. From Main 
 Li_files_folder:       .asciz "\302\267 \360\237\223\202 On iPhone and iPad the shared folder is asmmesh\342\200\231s own: in the Files app, On My iPhone (or iPad) \342\200\272 asmmesh. Put files there; uploads from other phones land there too."
 .globl _fs_default_dir
 _fs_default_dir:       .asciz "%s/Documents"
-Li_hist_mac:           .asciz "\302\267 History and suggestions for typing are on the Mac for now."
 Li_mac_only:           .asciz "\302\267 That one is Mac-only (files page, AirDrop, FM radio)."
 Li_m_cmState:          .asciz "centralManagerDidUpdateState:"
 Li_m_cmDiscover:       .asciz "centralManager:didDiscoverPeripheral:advertisementData:RSSI:"

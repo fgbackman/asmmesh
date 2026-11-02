@@ -31,6 +31,15 @@ void am_select_room(long i);
 void am_send(const char *text);
 void am_home(const char *text);
 
+// what you typed, and Home's commands as you type (term_hist.s, as on the Mac)
+const char *am_hist_prev(const char *typing);   // the line before, or NULL
+const char *am_hist_next(void);                 // the line after (past the newest: the draft)
+void am_hist_reset(void);
+const char *am_hist_line(long k);               // k back from the newest, or NULL
+long am_sg_count(const char *typing);           // matches (0 outside Home)
+const char *am_sg_word(long i);
+long am_sg_more(long i);                        // 1: takes more words after it
+
 // people on the mesh
 long am_node_count(void);
 const char *am_node_nick(long i);

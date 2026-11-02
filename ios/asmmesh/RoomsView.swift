@@ -260,7 +260,45 @@ struct ChatView: View {
 
     private var inputBar: some View {
         let isHome = room?.kind == .home
+        let found = isHome ? mesh.suggestions(for: mesh.input) : []
+        return VStack(spacing: 6) {
+            if !found.isEmpty {                         // Home's commands that match
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(found, id: \.self) { s in
+                            Button { mesh.complete(s) } label: {
+                                Text(s.word + (s.more ? " …" : ""))
+                                    .font(.callout.monospaced())
+                                    .foregroundStyle(.primary)
+                                    .padding(.horizontal, 12).padding(.vertical, 6)
+                                    .background(Theme.cardHi, in: Capsule())
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+            }
+            inputRow(isHome, found)
+        }
+        .padding(.vertical, 8)
+        .background(Theme.bg)
+    }
+
+    private func inputRow(_ isHome: Bool, _ found: [Mesh.Suggestion]) -> some View {
+        let recent = mesh.recent()
         return HStack(spacing: 10) {
+            if !recent.isEmpty {                        // what you typed before
+                Menu {
+                    ForEach(recent, id: \.self) { line in
+                        Button(line) { mesh.input = line; am_hist_reset(); typing = true }
+                    }
+                } label: {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Theme.dim)
+                        .frame(width: 32, height: 40)
+                }
+            }
             if isHome {
                 Button { mesh.talk() } label: {
                     Image(systemName: mesh.talking ? "stop.fill" : "mic.fill")
@@ -277,6 +315,12 @@ struct ChatView: View {
                 .background(Theme.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .submitLabel(.send)
                 .onSubmit { mesh.send() }
+                .onKeyPress(.upArrow) { mesh.historyUp(); return .handled }      // a keyboard's
+                .onKeyPress(.downArrow) { mesh.historyDown(); return .handled }  //   ↑ and ↓
+                .onKeyPress(.tab) {
+                    guard let s = found.first else { return .ignored }
+                    mesh.complete(s); return .handled
+                }
             Button { mesh.send() } label: {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 17, weight: .bold))
@@ -287,8 +331,6 @@ struct ChatView: View {
             .disabled(mesh.input.isEmpty)
         }
         .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(Theme.bg)
     }
 }
 

@@ -346,6 +346,49 @@ final class Mesh: ObservableObject {
         coreLater { text.withCString { am_send($0) } }   // a command may ask something
     }
 
+    // MARK: what you typed, and suggestions (term_hist.s)
+
+    struct Suggestion: Hashable { let word: String; let more: Bool }
+
+    /// Home's commands that match what's typed (none outside Home, none once it's a whole one)
+    func suggestions(for text: String) -> [Suggestion] {
+        guard !text.isEmpty else { return [] }
+        let n = text.withCString { am_sg_count($0) }
+        var list: [Suggestion] = []
+        for i in 0..<max(0, n) {
+            guard let w = am_sg_word(i) else { continue }
+            let word = String(cString: w)
+            if word == text || word + " " == text { continue }
+            list.append(Suggestion(word: word, more: am_sg_more(i) != 0))
+        }
+        return list
+    }
+
+    func complete(_ s: Suggestion) {
+        input = s.word + (s.more ? " " : "")
+        am_hist_reset()
+    }
+
+    /// The last lines typed, newest first, each once
+    func recent(_ most: Int = 15) -> [String] {
+        var seen = Set<String>(), list: [String] = []
+        var k = 0
+        while list.count < most, let p = am_hist_line(k) {
+            let line = String(cString: p)
+            if seen.insert(line).inserted { list.append(line) }
+            k += 1
+        }
+        return list
+    }
+
+    func historyUp() {
+        if let p = input.withCString({ am_hist_prev($0) }) { input = String(cString: p) }
+    }
+
+    func historyDown() {
+        if let p = am_hist_next() { input = String(cString: p) }
+    }
+
     func home(_ command: String) {
         coreLater { command.withCString { am_home($0) } }
     }
