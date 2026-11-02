@@ -16,6 +16,8 @@ Version 0.3 adds:
 Version 0.4 adds the **Home room**: talk to your devices by typing or pressing **🎤 Talk** (Mesh › Talk, Cmd-T). Plain phrases: "kitchen lights off", "dim living room to 30%", "desk lamp blue", "all lights warm", "lock the front door", or a Shortcut's full name like "good night". "help" lists more; "devices" lists everything asmmesh knows.
 
 - **Philips Hue Bridge** — found automatically on your network. Press the round button on the bridge, then say "pair hue". Lights, rooms and zones: on/off, brightness, colours, warm/white/cool.
+  - **The old round v1 bridge** works too: it has no Bonjour and lost Philips' cloud in 2020, so asmmesh finds it by SSDP on the Wi-Fi. If it isn't found (or on iPhone, where SSDP needs an entitlement), type its address: "hue bridge 192.168.1.20".
+  - **Add a bulb by its serial** — the 6 letters and digits printed on the bulb or its label, as in the Hue app's "Add by serial number": "add hue light 1A2B3C" (up to 10, spaces between). Useful for a bulb paired to another bridge or reset. "add hue lights" searches for any new light. About a minute later asmmesh says what the bridge found and adds it to the lists.
 - **Hue bulbs without a bridge** — spotted over Bluetooth and driven directly (experimental; macOS asks to pair each bulb, and the bulb must be in pairing mode).
 - **SmartThings** — say "connect smartthings" and paste a personal access token (kept in your Keychain). Switches, dimmers, colour lights and locks.
 - **Apple Home / Matter** — through your Shortcuts: say a shortcut's full name and it runs. Shortcuts only ever run on their full name, never on a partial match.
@@ -135,7 +137,8 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
     src/home.s     Home room: device registry, help, device list, remote commands
     src/parse.s    plain-English commands: actions, choosing devices, running them per backend
     src/net.s      HTTP (NSURLSession delegate), JSON accessors, Keychain
-    src/hue.s      Hue Bridge (Bonjour, pairing, lights/rooms) and Hue Bluetooth bulbs
+    src/hue.s      Hue Bridge (Bonjour, SSDP for v1, pairing, lights/rooms, adding by serial) and Hue Bluetooth bulbs
+    src/hue_core.s Hue's bytes-only parts: serials typed, bridge addresses, telling a bridge's SSDP answer
     src/st.s       SmartThings (all capabilities, scenes, status) and Apple Home via Shortcuts
     src/lan.s      Bonjour: WLED, Elgato, Shelly, Nanoleaf, Home Assistant discovery, scanner network rows
     src/cloud.s    LIFX, Govee and Home Assistant

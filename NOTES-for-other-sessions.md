@@ -171,3 +171,14 @@ For where the bitchat work stands and what comes next, start with `docs/bitchat_
   and `controlTextDidChange:` (_term_changed) are in main.s's method table.
 - rules.s `_rules_words` hands the Lsimple words to the suggestions: a word added there is
   suggested automatically.
+
+## Hue: v1 bridge and adding by serial (Nov 2, branch claude/bitchat-roadmap)
+- `src/hue_core.s` (pure, qemu self-tests 188-190): `_hue_serials` (typed text -> the bridge's
+  `{"deviceid":[...]}` body, 6 hex chars each, max 10), `_hue_addr_ok`, `_ssdp_is_hue` ("IpBridge"
+  in SERVER or a `hue-bridgeid:` line).
+- hue.s: `_h_hue_add` ("add hue …", "search hue …", "find new hue …": POST /lights, then GET
+  /lights/new after 50 s, again every 20 s while `lastscan` is "active", 3 checks at most),
+  `_h_hue_bridge` ("hue bridge <ip>": a new address forgets the old username), `_hue_ssdp`
+  (udp.s calls it for every SSDP answer). `_hue_tick` opens the SSDP sockets (`_udp_init` is
+  now safe to call twice) when no bridge is known at 8 s.
+- The API was already v1 over http://, which the v1 bridge speaks; only finding it was missing.

@@ -109,8 +109,11 @@ Lus_done:
 
 // void _udp_init(void)
 .globl _udp_init
-_udp_init:
+_udp_init:                            // (Wi-Fi, TV and Hue start it: once is enough)
     ENTER 0
+    ADRL x8, _g_ssdp_fd
+    ldr  x9, [x8]
+    tbz  x9, #63, Lui_again
     mov  x0, #0
     bl   _udp_socket
     ADRL x8, _g_ssdp_fd
@@ -119,6 +122,7 @@ _udp_init:
     bl   _udp_socket
     ADRL x8, _g_wiz_fd
     str  x0, [x8]
+Lui_again:
     bl   _udp_discover
     LEAVE 0
 
@@ -331,6 +335,9 @@ Lsf_none:
 // void _ssdp_answer(void) — one M-SEARCH reply in _g_udp_buf from _g_udp_ip
 _ssdp_answer:
     ENTER 32
+    ADRL x0, _g_udp_buf               // a Hue bridge (the round v1 is only found this way)
+    ADRL x1, _g_udp_ip
+    bl   _hue_ssdp
     ADRL x0, _g_udp_ip
     bl   _ssdp_find
     mov  x20, x0

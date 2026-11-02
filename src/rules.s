@@ -156,6 +156,10 @@ Lsimple:
     .quad Lw_hist_off,       0, _h_term_history, 0
     .quad Lw_hist_clear,     0, _h_term_history, 2
     .quad Lw_bc_name,        1, _h_bitchat_name, 0
+    .quad Lw_hue_add,        1, _h_hue_add, 0
+    .quad Lw_hue_search,     1, _h_hue_add, 0
+    .quad Lw_hue_find,       1, _h_hue_add, 0
+    .quad Lw_hue_bridge,     1, _h_hue_bridge, 0
     .quad Lw_settings,       2, _h_services, 0
     .quad Lw_service_list,   2, _h_services, 0
     .quad Lw_enable,         1, _h_svc_switch, 1
@@ -2894,6 +2898,10 @@ Lw_any_trackers: .asciz "any trackers"
 Lw_trackers_near: .asciz "trackers nearby"
 Lw_trust:        .asciz "trust trackers"
 Lw_trust1:       .asciz "trust tracker"
+Lw_hue_add:      .asciz "add hue"
+Lw_hue_search:   .asciz "search hue"
+Lw_hue_find:     .asciz "find new hue"
+Lw_hue_bridge:   .asciz "hue bridge"
 Lw_trust2:       .asciz "these trackers are mine"
 Lw_trust3:       .asciz "this tracker is mine"
 Lw_weather:      .asciz "weather"

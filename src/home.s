@@ -1403,6 +1403,7 @@ Ls_help2:            .asciz "\302\267 TV: \342\200\234TV off\342\200\235, \342\2
 Ls_help3:            .asciz "\302\267 Home: \342\200\234set the thermostat to 70\342\200\235, \342\200\234heat to 68\342\200\235, \342\200\234cool to 74\342\200\235, \342\200\234thermostat auto\342\200\235, \342\200\234fan high\342\200\235, \342\200\234close the blinds\342\200\235, \342\200\234blinds 50%\342\200\235, \342\200\234start the vacuum\342\200\235, \342\200\234vacuum go home\342\200\235, \342\200\234close the garage\342\200\235, \342\200\234what's the temperature\342\200\235, \342\200\234is the front door locked\342\200\235."
 Ls_help4:            .asciz "\302\267 Safety: unlocking and opening a garage always ask on this Mac first and never work over the mesh. Shortcuts and scenes run only when you say their whole name, e.g. \342\200\234good night\342\200\235."
 Ls_help5:            .asciz "\302\267 Connect: \342\200\234pair hue\342\200\235 (press the bridge button first), \342\200\234connect smartthings\342\200\235, \342\200\234connect home assistant\342\200\235, \342\200\234connect lifx\342\200\235, \342\200\234connect govee\342\200\235, \342\200\234pair nanoleaf\342\200\235 (hold its power button 5 s first). WLED, Elgato, Shelly, Roku and WiZ on your Wi-Fi are found by themselves."
+Ls_help5h:           .asciz "\302\267 Hue: \342\200\234add hue light 1A2B3C\342\200\235 adds a bulb by the serial printed on it (up to 10, spaces between); \342\200\234add hue lights\342\200\235 searches for any new one. An old round (v1) bridge is found on the Wi-Fi by itself; if not, \342\200\234hue bridge 192.168.1.20\342\200\235."
 Ls_help6:            .asciz "\302\267 \342\200\234list devices\342\200\235 shows everything connected, room by room (also \342\200\234list lights\342\200\235, \342\200\234list tvs\342\200\235, \342\200\234list locks\342\200\235), \342\200\234status\342\200\235 or \342\200\234what's the kitchen\342\200\235 reports, \342\200\234refresh\342\200\235 looks again. Mesh \342\206\222 Mesh Scanner shows everything nearby, with Connect & Pair. Someone else's Mac: \342\200\234@Anna hallway on\342\200\235 \342\200\224 they're asked to allow it."
 Ls_help7:            .asciz "\302\267 More: \342\200\234help more\342\200\235 \342\200\224 weather, schedules and rules (\342\200\234at sunset porch light on\342\200\235), \342\200\234where are my headphones\342\200\235, tracker alerts, notifications to your phone, IFTTT, \342\200\234say \342\200\246\342\200\235."
 Ls_no_devices:       .asciz "\302\267 No devices yet. Say \342\200\234help\342\200\235 to see how to connect Hue, SmartThings, Home Assistant, LIFX, Govee and the rest."
@@ -1486,7 +1487,7 @@ Ls_replied:          .asciz "\302\267 %s replied: %s"
 .section __DATA,__const
 .p2align 3
 Lhelp:
-    .quad Ls_help1, Ls_help2, Ls_help3, Ls_help4, Ls_help5, Ls_help6, Ls_help7, 0
+    .quad Ls_help1, Ls_help2, Ls_help3, Ls_help4, Ls_help5, Ls_help5h, Ls_help6, Ls_help7, 0
 Lkinds:
     .quad Ls_k_unknown, Ls_k_huelight, Ls_k_huegroup, Ls_k_st, Ls_k_sc, Ls_k_ble
     .quad Ls_k_stscene, Ls_k_wled, Ls_k_elgato, Ls_k_shelly, Ls_k_nano, Ls_k_lifx

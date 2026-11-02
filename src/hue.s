@@ -28,6 +28,8 @@ _g_hb_bri:        .quad 0
 .zerofill __DATA,__bss,_g_hue_user,64,4
 .zerofill __DATA,__bss,_g_hue_url,320,4
 .zerofill __DATA,__bss,_g_hue_body,160,4
+.zerofill __DATA,__bss,_g_hue_search,160,4   // the last "add hue" search body
+_g_hue_tries:     .quad 0            // checks left for the lights a search found
 
 .section __TEXT,__const
 .p2align 3
@@ -121,7 +123,8 @@ _hue_tick:
     cbnz x9, Lht_done
     mov  x9, #1
     str  x9, [x8]
-    ADRL x0, Ls_GET
+    bl   _udp_init                    // SSDP: how a round v1 bridge (no Bonjour, no cloud
+    ADRL x0, Ls_GET                   //   since 2020) is found; udp.s calls _hue_ssdp
     ADRL x1, Ls_cloud_url
     mov  x2, #0
     mov  x3, #0
@@ -275,6 +278,247 @@ Lhp_nobridge:
     ADRL x0, Ls_hue_none
     bl   _home_say0
     LEAVE 0
+
+// void _hue_ssdp(const char *answer, const char *ip) — udp.s, every SSDP answer: a Hue
+//   bridge's (the round v1's too) is remembered if Hue is on and no bridge is known yet
+.globl _hue_ssdp
+_hue_ssdp:
+    ENTER 0
+    mov  x19, x0
+    mov  x20, x1
+    mov  x0, #SVC_HUE
+    bl   _svc_on
+    cbz  x0, 9f
+    ADRL x8, _g_hue_host
+    ldrb w9, [x8]
+    cbnz w9, 9f
+    mov  x0, x19
+    bl   _ssdp_is_hue
+    cbz  x0, 9f
+    mov  x0, x20
+    bl   _hue_addr_ok
+    cbz  x0, 9f
+    mov  x0, x20
+    bl   _hue_set_host
+9:  LEAVE 0
+
+// "hue bridge 192.168.1.20" — Home: a bridge by its address (a v1 bridge that wasn't found,
+//   or one on another subnet); "hue bridge" alone says which one is used
+.globl _h_hue_bridge
+_h_hue_bridge:
+    ENTER 0
+    mov  x19, x2
+    mov  x0, #SVC_HUE
+    bl   _svc_gate
+    cbz  x0, 9f
+    cbz  x19, 5f
+1:  ldrb w9, [x19]
+    cmp  w9, #' '
+    b.ne 2f
+    add  x19, x19, #1
+    b    1b
+2:  cbz  w9, 5f
+    mov  x0, x19
+    bl   _hue_addr_ok
+    cbz  x0, 4f
+    ADRL x8, _g_hue_host              // a new bridge: the old one's username won't do
+    mov  x0, x8
+    mov  x1, x19
+    bl   _strcmp
+    cbz  w0, 3f
+    ADRL x8, _g_hue_host
+    ldrb w9, [x8]
+    cbz  w9, 3f
+    strb wzr, [x8]
+    ADRL x8, _g_hue_user
+    strb wzr, [x8]
+    ADRL x0, Ls_key_user
+    ADRL x1, _g_hue_user
+    bl   _pref_set
+3:  mov  x0, x19
+    bl   _hue_set_host
+    LEAVE 0
+4:  ADRL x0, Ls_hue_bad_addr
+    bl   _home_say0
+    LEAVE 0
+5:  ADRL x8, _g_hue_host
+    ldrb w9, [x8]
+    cbz  w9, 6f
+    ADRL x0, Ls_hue_at
+    ADRL x1, _g_hue_host
+    bl   _home_say
+    bl   _hue_status
+    LEAVE 0
+6:  ADRL x0, Ls_hue_none
+    bl   _home_say0
+9:  LEAVE 0
+
+// "add hue light 1A2B3C" / "add hue lights" / "search hue lights" — Home: the bridge
+//   searches for the bulbs whose serials (printed on them) are given, or for any new
+//   light; a minute later we ask what it found (_hue_new_check)
+.globl _h_hue_add
+_h_hue_add:
+    ENTER 0
+    mov  x19, x1
+    mov  x0, #SVC_HUE
+    bl   _svc_gate
+    cbz  x0, 9f
+    ADRL x8, _g_hue_host
+    ldrb w9, [x8]
+    cbz  w9, Lha_nobridge
+    ADRL x8, _g_hue_user
+    ldrb w9, [x8]
+    cbz  w9, Lha_unpaired
+    ADRL x0, Ls_empty_h
+    cmp  x19, #0
+    csel x19, x0, x19, eq
+    mov  x0, x19
+    ADRL x1, _g_hue_search
+    mov  x2, #160
+    bl   _hue_serials
+    mov  x20, x0
+    cmp  x20, #-2
+    b.eq Lha_many
+    tbnz x20, #63, Lha_bad
+    ADRL x9, _g_hue_host
+    ADRL x10, _g_hue_user
+    stp  x9, x10, [sp]
+    ADRL x0, _g_hue_url
+    mov  x1, #320
+    ADRL x2, Lf_lights
+    bl   _snprintf
+    ADRL x0, Ls_POST
+    ADRL x1, _g_hue_url
+    ADRL x2, _g_hue_search
+    mov  x3, #0
+    ADRL x4, Ls_tag_add
+    bl   _http
+    ADRL x0, Ls_hue_searching_any
+    cbz  x20, 1f
+    ADRL x0, Ls_hue_searching
+1:  mov  x1, x20
+    bl   _home_say
+    mov  x9, #3                       // up to three checks, the first in 50 s
+    ADRL x8, _g_hue_tries
+    str  x9, [x8]
+    mov  x0, #50
+    bl   Lhue_check_in
+    LEAVE 0
+Lha_nobridge:
+    ADRL x0, Ls_hue_none
+    bl   _home_say0
+    LEAVE 0
+Lha_unpaired:
+    ADRL x0, Ls_pair_hint
+    bl   _home_say0
+    LEAVE 0
+Lha_many:
+    ADRL x0, Ls_hue_many
+    bl   _home_say0
+    LEAVE 0
+Lha_bad:
+    ADRL x0, Ls_hue_bad_serial
+    bl   _home_say0
+9:  LEAVE 0
+
+// void Lhue_check_in(long seconds) — _hue_new_check, that many seconds from now
+Lhue_check_in:
+    ENTER 0
+    MOVI x9, 1000000000
+    mul  x1, x0, x9
+    mov  x0, #0                       // DISPATCH_TIME_NOW
+    bl   _dispatch_time
+    LDGOT x1, __dispatch_main_q
+    mov  x2, #0
+    ADRL x3, _hue_new_check
+    bl   _dispatch_after_f
+    LEAVE 0
+
+// void _hue_new_check(void *unused) — main queue: what has the search found?
+_hue_new_check:
+    ENTER 0
+    ADRL x8, _g_hue_tries
+    ldr  x9, [x8]
+    cbz  x9, 9f
+    sub  x9, x9, #1
+    str  x9, [x8]
+    mov  x0, #SVC_HUE                 // switched off meanwhile
+    bl   _svc_on
+    cbz  x0, 9f
+    bl   _hue_paired
+    cbz  x0, 9f
+    ADRL x0, Lf_lights_new
+    ADRL x1, Ls_tag_new
+    bl   Lhl_get
+9:  LEAVE 0
+
+// void Lhue_new_take(NSDictionary *d) — {"lastscan":"active"|"<time>", "7":{"name":..}}
+Lhue_new_take:
+    ENTER 160                         // [96] names (160)
+    mov  x19, x0
+    ADRL x1, Ls_j_lastscan
+    bl   _jget
+    bl   _jstr
+    cbz  x0, 1f
+    ADRL x1, Ls_j_active
+    bl   _strcmp
+    cbnz w0, 1f
+    ADRL x8, _g_hue_tries             // still searching: look again in 20 s
+    ldr  x9, [x8]
+    cbz  x9, 1f
+    mov  x0, #20
+    bl   Lhue_check_in
+    LEAVE 160
+1:  ADRL x8, _g_hue_tries
+    str  xzr, [x8]
+    strb wzr, [sp, #96]
+    mov  x0, x19
+    bl   _jkeys
+    mov  x20, x0
+    bl   _jcount
+    mov  x21, x0
+    mov  x22, #0                      // i
+    mov  x23, #0                      // found
+2:  cmp  x22, x21
+    b.hs 5f
+    mov  x0, x20
+    mov  x1, x22
+    bl   _jat
+    mov  x24, x0
+    MSG0 Ls_UTF8String
+    cbz  x0, 4f
+    ADRL x1, Ls_j_lastscan
+    bl   _strcmp
+    cbz  w0, 4f
+    mov  x0, x19
+    mov  x2, x24
+    MSG1 Ls_objectForKey
+    ADRL x1, Ls_j_name
+    bl   _jget
+    bl   _jstr
+    cbz  x0, 4f
+    mov  x24, x0
+    cbz  x23, 3f
+    add  x0, sp, #96
+    ADRL x1, Ls_comma_sp
+    mov  x2, #160
+    bl   _strlcat
+3:  add  x0, sp, #96
+    mov  x1, x24
+    mov  x2, #160
+    bl   _strlcat
+    add  x23, x23, #1
+4:  add  x22, x22, #1
+    b    2b
+5:  cbz  x23, 6f
+    ADRL x0, Ls_hue_new_found
+    add  x1, sp, #96
+    bl   _home_say
+    bl   _hue_load                    // into the lists, and their rooms
+    LEAVE 160
+6:  ADRL x0, Ls_hue_new_none
+    bl   _home_say0
+    LEAVE 160
 
 // void _hue_load(void) — lights and rooms from the bridge
 .globl _hue_load
@@ -441,7 +685,17 @@ _hue_response:
     b.eq Lhx_lists
     cmp  w9, #'g'
     b.eq Lhx_lists
+    cmp  w9, #'n'
+    b.eq Lhx_new
     b    Lhx_set
+
+Lhx_new:                              // what a search found (an array: an error)
+    mov  x0, x20
+    bl   _jcount
+    cbnz x0, Lhx_set
+    mov  x0, x20
+    bl   Lhue_new_take
+    LEAVE 64
 
 Lhx_neterr:
     mov  x0, x22
@@ -1129,6 +1383,21 @@ Ls_tag_set:      .asciz "hs"
 Lf_pair:         .asciz "http://%s/api"
 Lf_lights:       .asciz "http://%s/api/%s/lights"
 Lf_groups:       .asciz "http://%s/api/%s/groups"
+Lf_lights_new:   .asciz "http://%s/api/%s/lights/new"
+Ls_tag_add:      .asciz "ha"
+Ls_tag_new:      .asciz "hn"
+Ls_j_lastscan:   .asciz "lastscan"
+Ls_j_active:     .asciz "active"
+Ls_empty_h:      .asciz ""
+Ls_comma_sp:     .asciz ", "
+Ls_hue_searching: .asciz "\302\267 The Hue Bridge is looking for %ld light(s) by serial. Keep them powered on and near the bridge or another Hue light; I\342\200\231ll say what it finds in about a minute."
+Ls_hue_searching_any: .asciz "\302\267 The Hue Bridge is looking for new lights (switch them on). I\342\200\231ll say what it finds in about a minute. A light already paired elsewhere needs its serial: \342\200\234add hue light 1A2B3C\342\200\235."
+Ls_hue_new_found: .asciz "\302\267 New on the Hue Bridge: %s."
+Ls_hue_new_none: .asciz "\302\267 The Hue Bridge found no new lights. Check the serial (6 letters and digits on the bulb or its label), that the light is on, and that it\342\200\231s near the bridge; switch it off and on 5 times to reset it, then try again."
+Ls_hue_bad_serial: .asciz "\302\267 A Hue serial is the 6 letters and digits printed on the bulb or its label, e.g. \342\200\234add hue light 1A2B3C\342\200\235 (several: separate with spaces)."
+Ls_hue_many:     .asciz "\302\267 The Hue Bridge looks for at most 10 serials at a time."
+Ls_hue_bad_addr: .asciz "\302\267 That doesn\342\200\231t look like an address. Use the bridge\342\200\231s IP, e.g. \342\200\234hue bridge 192.168.1.20\342\200\235 (your router lists it)."
+Ls_hue_at:       .asciz "\302\267 Hue Bridge at %s."
 Lf_light_state:  .asciz "http://%s/api/%s/lights/%s/state"
 Lf_group_action: .asciz "http://%s/api/%s/groups/%s/action"
 Lf_ble_id:       .asciz "ble-%llx"
