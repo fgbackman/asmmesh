@@ -160,7 +160,11 @@ For where the bitchat work stands and what comes next, start with `docs/bitchat_
 ## The input field as a terminal (Oct 31, branch claude/bitchat-roadmap)
 - New files: `src/term_core.s` (pure: history ring, saving, suggestion matching; runs under qemu)
   and `src/term.s` (Mac: monospaced field with a prompt, up/down history, suggestions in Home).
-  In the Makefile; not on iPhone.
+  In the Makefile. `src/term_hist.s` (Mac and iPhone): keeping rules, word list, `_h_term_history`,
+  `_term_init`/`_term_record`/`_term_match`. iPhone: `am_hist_*`/`am_sg_*` in ios_ui.s, chips and a
+  recent menu in RoomsView.swift.
+- Service switches: `refresh` (`_home_refresh`), `_cloud_load`, `_hue_tick` and `_rules_poll` check
+  them; a service switched off must not be contacted.
 - Self-tests 184-187. Defaults keys "termHistory" ("0" = don't keep) and "termHistoryLines".
   Home words "history", "history on", "history off", "history clear".
 - The controller is the field's delegate: `control:textView:doCommandBySelector:` (_term_cmd)

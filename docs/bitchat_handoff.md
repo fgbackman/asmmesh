@@ -18,7 +18,9 @@ for whoever picks the work up next.
 | Hardening 1 and 2 | Two deep reviews' fixes | Written, self-tests pass; **not yet tried on a Mac** |
 | Guard-fault fix | `LINK` macro clobbered its own register | Fixed (`4154d9e`); **waiting for the Mac to confirm** |
 | Milestone 3 | Private chat (Noise) | Not started |
-| (not bitchat) | Input line like a terminal: history, suggestions (`term_core.s`, `term.s`) | Written (`e3a229d`), self-tests 184–187 pass; **not yet seen on screen** |
+| (not bitchat) | Input line like a terminal: history, suggestions (`term_core.s`, `term_hist.s`, `term.s`) | Written, self-tests 184–187 pass; **not yet seen on screen** |
+| (not bitchat) | The same on iPhone: recent-lines menu, suggestion chips, keyboard ↑↓ Tab (`term_hist.s`, `ios_ui.s` `am_hist_*`/`am_sg_*`, `RoomsView.swift`) | Written; **the Swift has never been compiled** |
+| (not bitchat) | Service audit: switched-off services no longer reached by `refresh`, cloud loads, Hue discovery or rule polls | Written (`c1513aa`), self-tests pass |
 
 The last thing seen on the Mac (build of `29f15b4`): the guard caught a steady stream of faults
 at `bc_frame_in + 792`, address `0x2618`. That was the `LINK` macro bug (section 9), fixed in
@@ -94,6 +96,7 @@ How the wall is kept, concretely:
 | `tools/qemu/bcvectors.py` | makes the self-tests' packets (`… peer`, `… msg`, `… pin` for the other files) | — |
 | `tools/qemu/lint.py` | ENTER/LEAVE sizes and `LINK` registers (run.sh runs it first) | — |
 | `src/term_core.s` | not bitchat: the input line's history ring, saving it, matching Home's commands | yes |
+| `src/term_hist.s` | not bitchat: what may be saved, Home's word list, the `history` commands; Mac and iPhone | no |
 | `src/term.s` | not bitchat: the Mac's input line as a terminal (prompt, ↑↓ history, suggestions in Home) | no |
 
 Touched outside `bc_*`: `mesh.s` (bitchat room typing → `_bc_say`, `_room_drop`), `ui.s`
@@ -172,6 +175,9 @@ Then, with bitchat open on the iPhone (screen on, in front):
    "On bitchat" section. The Swift has never been compiled.
 8. The input line: monospaced with ❯; in Home, typing `bat` lists `batteries`… above it (Tab
    fills one in); ↑ walks back through what was sent, also after quitting and reopening.
+9. On iPhone: in Home, typing `bat` shows a `batteries` chip; the 🕘 button lists what was sent.
+10. Services: with Hue, LIFX, Govee, Home Assistant and SmartThings off, `refresh` says
+    "Refreshing" but nothing reaches them (no new devices, no errors from them).
 
 If the phone goes quiet on a link that stays up: check for a second asmmesh copy, then switch
 the phone's Bluetooth off and on in Settings › Bluetooth.
@@ -236,8 +242,6 @@ Left on purpose, or not fixable without more protocol:
 - Mesh Scanner rows for bitchat devices.
 - Cleanups: one shared byte-copy helper (there are four), drop dead link-layer code, a faster
   variable-time Ed25519 verify, a per-row-kind accessor for People.
-- The input line on iPhone (its field is SwiftUI: history and suggestions would be Swift, with
-  `term_core.s` underneath).
 
 ## 9. Gotchas learned the hard way
 

@@ -93,13 +93,14 @@ asmmesh can also talk to phones running [bitchat](https://github.com/permissionl
 
 Private bitchat chat (Noise) isn't done yet. How it works, how it was tested and what's next: `docs/bitchat_roadmap.md` and `docs/bitchat_handoff.md`.
 
-## Typing: history and suggestions (Mac)
+## Typing: history and suggestions
 
-The input line works like a terminal's: monospaced, with a ❯ prompt.
+On the Mac the input line works like a terminal's: monospaced, with a ❯ prompt.
 
 - **↑ and ↓** bring back what you typed, up to the last 100 lines; past the newest, ↓ gives back what you were in the middle of typing.
 - **In Home**, commands that match what you're typing appear above the line, those that start with it first. **Tab** fills in the chosen one, ↑ ↓ choose, **Esc** hides them; Enter sends what's typed.
-- **Remembered between launches** with `history on` (the default); `history off` keeps it only until asmmesh quits and deletes what was saved; `history clear` forgets everything; `history` says which. Lines typed in private rooms or the bitchat room, and anything with a token, key, topic or password in it, are never saved.
+- **Remembered between launches** with `history on` (the default); `history off` keeps it only until asmmesh quits and deletes what was saved; `history clear` forgets everything; `history` says which. Lines typed in private rooms or the bitchat room, and anything with a token, key, topic, password, Pushover setting or web address in it, are never saved.
+- **On iPhone** the 🕘 button by the input lists what you typed (newest first, tap to fill it in); in Home, matching commands show as chips above it (tap to fill in). A hardware keyboard's ↑ ↓ and Tab work as on the Mac. The `history` commands are the same.
 
 ## asmmesh for iPhone (ios/)
 
@@ -179,6 +180,7 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
                    announcing, the bitchat room, "bitchat …" in Home
     src/bc_defs.inc sizes and layouts shared by the bitchat files
     src/term_core.s the input line's history and command matching (bytes only)
+    src/term_hist.s the history's keeping rules, Home's word list, the history commands (Mac and iPhone)
     src/term.s     the input line as a terminal: prompt, up/down history, suggestions in Home (Mac)
     src/test.s     `asmmesh --selftest`
     src/util.s     objc_msgSend shortcuts, NSString helpers, chat formatting
