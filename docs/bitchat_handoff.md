@@ -144,9 +144,10 @@ tools/qemu/run.sh diff 300   # 300 random cases per check against bcwire.py
 ```
 
 Install once: `apt-get install gcc-aarch64-linux-gnu qemu-user`, `pip install cryptography`.
-For the Mac-only files, `clang -target arm64-apple-macos12 -c src/X.s -I src` (and
-`-target arm64-apple-ios15`) catches assembly errors, and `llvm-nm` on the objects finds missing
-symbols; nothing here can run CoreBluetooth, the Keychain or the UI.
+`sh tools/check_links.sh` assembles everything the Mac and the iPhone apps use and lists any
+symbol one calls that none of its files defines: the link errors, without Xcode (it caught a
+Mac-only `_h_term_history` that `rules.s`, shared with the iPhone, pointed at). Nothing here can
+run CoreBluetooth, the Keychain or the UI.
 
 **On the Mac (the next step):**
 
