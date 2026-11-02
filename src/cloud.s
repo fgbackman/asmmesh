@@ -241,11 +241,23 @@ Lci_auth:
 
 // void _cloud_load(void) — ask each connected service for its devices
 .globl _cloud_load
-_cloud_load:
+_cloud_load:                          // each only when its switch is on
     ENTER 0
+    mov  x0, #SVC_LIFX
+    bl   _svc_on
+    cbz  x0, Lcld_govee
     bl   _lifx_load
+Lcld_govee:
+    mov  x0, #SVC_GOVEE
+    bl   _svc_on
+    cbz  x0, Lcld_ha
     bl   _govee_load
+Lcld_ha:
+    mov  x0, #SVC_HA
+    bl   _svc_on
+    cbz  x0, Lcld_done
     bl   _ha_load
+Lcld_done:
     LEAVE 0
 
 _lifx_load:

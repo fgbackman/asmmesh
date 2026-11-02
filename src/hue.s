@@ -110,6 +110,9 @@ _hue_tick:
     ENTER 0
     cmp  x0, #8
     b.ne Lht_done
+    mov  x0, #SVC_HUE                 // Hue switched off: don't ask Philips where a bridge is
+    bl   _svc_on
+    cbz  x0, Lht_done
     ADRL x8, _g_hue_host
     ldrb w9, [x8]
     cbnz w9, Lht_done

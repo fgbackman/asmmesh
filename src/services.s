@@ -352,7 +352,7 @@ Lss_st:                               // its token comes from the Keychain: off 
     b    Lss_done
 Lss_cloud:
     ldr  x9, [x20]
-    tbnz x9, #ST_CLOUD, Lss_done
+    tbnz x9, #ST_CLOUD, Lss_cloud_more
     orr  x9, x9, #(1 << ST_CLOUD)
     str  x9, [x20]
     mov  x0, #0
@@ -361,6 +361,10 @@ Lss_cloud:
     mov  x1, #0
     ADRL x2, _svc_cloud_worker
     bl   _dispatch_async_f
+    b    Lss_done
+Lss_cloud_more:                       // another cloud switched on later: its token is
+    bl   _cloud_load                  //   already read, so just ask it now
+    bl   _ui_lists_changed
 Lss_done:
     LEAVE 0
 

@@ -2680,6 +2680,9 @@ Lpl2_loop:
     ADRL x8, _g_devs
     add  x9, x8, x21, lsl #DEV_SHIFT
     ldr  x10, [x9, #D_KIND]
+    ADRL x11, _g_kind_on              // its service switched off: don't poll it
+    ldrb w11, [x11, x10]
+    cbz  w11, Lpl2_next
     cmp  x10, #K_ST
     b.eq Lpl2_st
     cmp  x10, #K_HA

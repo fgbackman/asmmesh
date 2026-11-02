@@ -968,12 +968,32 @@ _home_refresh:
     ENTER 0
     ADRL x0, Ls_refreshing
     bl   _home_say0
+    mov  x0, #SVC_HUE                 // only the services switched on: one switched off
+    bl   _svc_on                      //   keeps its token in memory, but mustn't be asked
+    cbz  x0, Lhr_st
     bl   _hue_load
+Lhr_st:
+    mov  x0, #SVC_ST
+    bl   _svc_on
+    cbz  x0, Lhr_home
     bl   _st_load
+Lhr_home:
+    mov  x0, #SVC_HOME
+    bl   _svc_on
+    cbz  x0, Lhr_cloud
     bl   _sc_load
-    bl   _cloud_load
+Lhr_cloud:
+    bl   _cloud_load                  // each cloud checks its own switch
+    mov  x0, #SVC_WIFI
+    bl   _svc_on
+    mov  x19, x0
+    mov  x0, #SVC_TV
+    bl   _svc_on
+    orr  x0, x0, x19
+    cbz  x0, Lhr_done
     bl   _lan_refresh
     bl   _udp_discover
+Lhr_done:
     LEAVE 0
 
 // void _home_init(void) — greet, then start the backends
