@@ -9,11 +9,22 @@ counts only when they agree (see the top of `make_words.py`). Rebuilding also wr
 | ENABLE2K            | enable1.txt   | is it a valid word (no names, no abbreviations) | public domain                                       |
 | SCOWL               | 2020.12.07    | is it an ordinary dictionary word (sizes 10-50) | copyright Kevin Atkinson; free use with this notice kept (see SCOWL's README) |
 | wordfreq            | 3.1.1         | do people actually use it (Zipf frequency) | data CC BY-SA 4.0, code Apache 2.0 (Robyn Speer)         |
+| LDNOOBW `en`        | commit 5faf2ba | slurs and obscenities left out, with their inflections | CC BY 4.0 (Shutterstock and contributors)   |
+| `blocked.txt`       | here          | crude words LDNOOBW doesn't have (CRAP, PISS) | ours                                           |
+| `allowed.txt`       | here          | ordinary words LDNOOBW catches (BUTTER, ESCORT, SPICES), each with a reason | ours        |
 
 Get them:
 - ENABLE: https://raw.githubusercontent.com/dolph/dictionary/master/enable1.txt
 - SCOWL: https://downloads.sourceforge.net/project/wordlist/SCOWL/2020.12.07/scowl-2020.12.07.tar.gz
 - wordfreq: `pip install wordfreq==3.1.1`
+- LDNOOBW: https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/5faf2ba42d7b1c0977169ec3611df25a3c08eb13/en
+
+Contractions without their apostrophe (SHES, CANT, WONT) are left out when SCOWL's
+`english-contractions` lists the apostrophe form and it is at least 10 times as common.
+
+Check any sample of puzzles: `python3 samples.py 200 7 > samples.md` then
+`python3 check_samples.py samples.md` (every word fits its tiles, has the centre letter, is
+in its list, and nothing that fits is missing).
 
 Because the frequency cut-off uses wordfreq's data, the lists carry its CC BY-SA 4.0 terms:
 credit wordfreq when they ship, and share changes to them the same way.

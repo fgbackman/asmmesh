@@ -62,8 +62,14 @@ a game that counts them can't be trusted. Now three independent sources must agr
 | a valid word              | ENABLE2K (public domain)                 | names, abbreviations, misspellings         |
 | an ordinary word          | SCOWL sizes 10-50 (a spell checker's list) | archaic, technical and dialect words     |
 | a word people use         | wordfreq: Zipf 2.5 or more               | rare words (2.0 to 2.5: "also accepted")   |
+| fit for a family game     | LDNOOBW and `blocked.txt` (less `allowed.txt`) | slurs, obscenities, crude words, and their inflections |
+| not a contraction         | SCOWL's contraction lists, wordfreq      | SHES, CANT, WONT (she's, can't, won't)     |
 
-- Result: about 24,800 answers and 6,800 "also accepted" words, of 4 to 9 letters.
+- Result: 24,670 answers and 6,762 "also accepted" words, of 4 to 9 letters.
+- **200 sample puzzles** with every word, for anyone to review: `samples-200.md`. Checked by
+  `tools/ninefold/check_samples.py`, which shares no code with the generator: 7,664 words,
+  0 problems (and it does catch planted mistakes: a word without the centre letter, a tile
+  used twice, a missing word).
 - The mockups' puzzle has 21 answers and 4 "also accepted" words. Its full list is MOONLIGHT,
   LOOMING, LOOTING, TOOLING, HOMING, GLINT, GLOOM, IGLOO, LIGHT, LINGO, MIGHT, NIGHT, THING,
   THONG, GILT, GOON, LOGO, LONG, NIGH, TING, TONG, plus HOOTING, INGOT, MOLTING, HOLING.
@@ -71,8 +77,6 @@ a game that counts them can't be trusted. Now three independent sources must agr
   Rebuilding gives the same lists unless a source changes (versions pinned).
 - A game's `START` carries a hash of the lists: devices with different lists won't play
   together, so a mismatch can't decide a word.
-- Still to do: `blocked.txt` (slurs and the like) is empty and must be filled from a
-  reviewed list before the game ships.
 
 ## Across the mesh, by invitation only
 
@@ -137,7 +141,7 @@ all. Each player therefore makes a secret random **salt** for each round:
 1. **Generator** (pure, qemu self-tests): seed to puzzle, word check, scoring, commitments.
    Cross-checked against a Python copy, as the bitchat code was.
 2. **Word lists** (`tools/ninefold`) packed into the app (Mac and iPhone), with the credits
-   from `SOURCES.md`, and `blocked.txt` filled.
+   from `SOURCES.md`.
 3. **Mesh**: the game flag on room messages, the five packets, the reveal check, invitations
    through the existing invite flow.
 4. **Mac UI**: the game room view (grid panel and transcript), and Home commands.
