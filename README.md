@@ -94,7 +94,9 @@ asmmesh can also talk to phones running [bitchat](https://github.com/permissionl
 - **In Home:** `bitchat` (status), `bitchat people`, `bitchat name …`, `bitchat forget` (deletes this Mac's bitchat keys and everything heard), `bitchat advertise on/off` (let phones find this Mac too). None of these work from the mesh.
 - With two or more phones linked, this Mac passes bitchat packets on for them, as a bitchat phone would.
 
-Private bitchat chat (Noise) isn't done yet. How it works, how it was tested and what's next: `docs/bitchat_roadmap.md` and `docs/bitchat_handoff.md`.
+- **Private chats** (new, not yet tried with a phone): `bitchat chat Anna` or `bitchat chat 1a2b` (the start of their fingerprint), or **Message** next to them in People on iPhone, opens a room of its own, 🔒 and their name. It's end-to-end encrypted with Noise exactly as bitchat does it (`Noise_XX_25519_ChaChaPoly_SHA256`): only that person can read it, and only after their phone proves the key their fingerprint stands for. A message waits until a session is set up, is sent again until their phone says it arrived, and "✓ delivered" shows when it did; up to 88 bytes per message, longer text goes in pieces. Up to 8 chats; they're local rooms, never saved or sent on asmmesh's mesh, and go when bitchat is switched off.
+
+How it works, how it was tested and what's next: `docs/bitchat_roadmap.md` and `docs/bitchat_handoff.md`.
 
 ## Typing: history and suggestions
 
@@ -180,8 +182,9 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
     src/bc_packet.s bitchat packets: reading, what a signature covers, signing ours, duplicates, relaying
     src/bc_zlib.s  bitchat's compressed payloads, through libz
     src/bc_peer.s  bitchat people and chat: announces, leaves, messages, pinned keys, cleaning names and text
+    src/bc_noise.s bitchat's private chats: Noise XX, the transport and its replay window, the message payload
     src/bc_ble.s   the Bluetooth link to bitchat phones (switch "bitchat", off by default), walled off; keys,
-                   announcing, the bitchat room, "bitchat …" in Home
+                   announcing, the bitchat room, private chats (sessions, outbox, rooms), "bitchat …" in Home
     src/bc_defs.inc sizes and layouts shared by the bitchat files
     src/term_core.s the input line's history and command matching (bytes only)
     src/term_hist.s the history's keeping rules, Home's word list, the history commands (Mac and iPhone)

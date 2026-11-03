@@ -196,3 +196,13 @@ For where the bitchat work stands and what comes next, start with `docs/bitchat_
 - Commands: "hue bridges", "hue bridge <ip>", "forget hue bridge N" (devices set to kind 0),
   "add hue light X on N". Mac menu: Mesh › Add Hue Lights… (`_hue_add_dialog`). iPhone:
   `HueView.swift`, `am_hue_host/name/paired`.
+
+## bitchat private chats, Milestone 3 (Nov 3)
+- `src/bc_noise.s` (pure, qemu self-tests 192-195): Noise XX as bitchat does it; `tools/qemu/bcnoise.py` is
+  the Python copy (matches the `noiseprotocol` package); `bcvectors.py noise` makes the test vectors.
+- `src/bc_ble.s` end: sessions (`_g_bc_nz`, 16), outbox (`_g_bc_ob`, 32), chat slots (8) -> rooms with ids
+  `BCPM_FIRST` (5)..12. `LOCAL_ROOMS` is 13 now (ids 1..12 local) and `ROOM_MAX` 25: every "local room"
+  check in mesh/ident/listed/ui covers the chats without other changes.
+- mesh.s `_mesh_send_text`: typing in a chat room -> `_bc_pm_say`. `Lbc_read`: 0x10/0x11 for us ->
+  `Lbc_noise_in` (not relayed). `Lbc_keys_wipe` -> `Lbc_pm_wipe`; `_bc_tick` -> `Lbc_pm_tick`.
+- Home: `bitchat chat <name|hex>` (`_h_bitchat_chat`); iPhone `am_bc_hexid`, PeopleView "Message".

@@ -6,7 +6,9 @@
 // callbacks pass through asmmesh's controller, and nothing here calls the mesh,
 // rooms, Home devices, rules or asmmesh's keys. Packets are read (bc_packet.s) and
 // counted ("bitchat" in Home says what was heard); announces and leaves keep a list of
-// bitchat people (bc_peer.s), shown in People with a bitchat badge. Nothing else yet.
+// bitchat people (bc_peer.s), shown in People with a bitchat badge. Public chat is the
+// bitchat room; private chats (Milestone 3, the end of this file) are rooms of their own,
+// end-to-end encrypted with Noise (bc_noise.s).
 //
 // Our bitchat identity (Milestone 1): an X25519 key and an Ed25519 key of its own, random,
 // in its own Keychain item ("asmmesh.bitchat"), never derived from or linked to the
@@ -687,7 +689,20 @@ Lbc_read:
     mov  x3, x24
     bl   _bc_seen
     cbnz x0, 8f
-    cbnz x24, 4f
+    cmp  x22, #0x10                       // a private chat's handshake or message for us:
+    ccmp x22, #0x11, #4, ne               //   ours to read, not to pass on
+    b.ne 5f
+    ADRL x8, _g_bc_dp
+    ldr  x9, [x8, #DP_RCPT]
+    cbz  x9, 4f
+    ldr  x9, [x9]
+    ADRL x10, _g_bc_myid
+    ldr  x10, [x10]
+    cmp  x9, x10
+    b.ne 4f
+    bl   Lbc_noise_in
+    b    8f
+5:  cbnz x24, 4f
     mov  x0, x21                          // signatures: 15 a second per link, so one link's
     mov  x1, #L_SIZE                      //   flood can't starve the others
     ADRL x9, _g_bc_links
@@ -1322,6 +1337,7 @@ Lkr_stale:
 //   still under way is ignored when it answers, and its buffer wiped after it
 Lbc_keys_wipe:
     ENTER 0
+    bl   Lbc_pm_wipe                      // private chats: sessions, outbox, rooms
     ADRL x8, _g_bc_keys
     str  xzr, [x8]
     ADRL x8, _g_bc_kcgen
@@ -1554,6 +1570,7 @@ _bc_tick:
     b.ne 9f
     mov  x0, #0                           // pins changed: saved, every 10 s at most
     bl   Lbc_pins_save
+    bl   Lbc_pm_tick                      // private chats: handshakes, the outbox
     bl   Lbc_wall_ms
     mov  x1, x0
     ADRL x0, _g_bc_peers
@@ -2881,7 +2898,7 @@ Lf_bc_me:     .asciz "\302\267 this Mac on bitchat: \342\200\234%s\342\200\235 \
 Lf_bc_limited: .asciz "\302\267 %ld packets left unchecked: more than 30 a second came in"
 Lf_bc_chat_n: .asciz "\302\267 bitchat room: %ld messages shown, %ld sent; %ld packets passed on for other bitchat users"
 Lf_bc_people_n: .asciz "\302\267 bitchat people: %ld around (%ld announces taken, %ld refused); say \342\200\234bitchat people\342\200\235"
-Ls_bc_people_hdr: .asciz "\302\267 bitchat people (walled off: a name and a fingerprint, nothing more):"
+Ls_bc_people_hdr: .asciz "\302\267 bitchat people (walled off: a name and a fingerprint; \342\200\234bitchat chat\342\200\235 and a name or fingerprint opens a private, encrypted chat):"
 Lf_bc_person: .asciz "\302\267 %s \342\200\224 %s"
 Ls_bc_nobody: .asciz "\302\267 no bitchat people heard yet"
 Lf_bc_new:    .asciz "\302\267 bitchat: %s is around (%s)"
@@ -2912,3 +2929,1226 @@ Ls_adv_on:    .asciz "\302\267 advertising bitchat's service: on (say \342\200\2
 Ls_adv_off:   .asciz "\302\267 advertising bitchat's service: off. This Mac still links to bitchat phones it finds; \342\200\234bitchat advertise on\342\200\235 lets them find it too"
 Ls_wall:      .asciz "\302\267 bitchat is walled off: what it sends is only counted for now, and can't reach your rooms, devices or keys"
 Ls_only_here: .asciz "\302\267 bitchat's settings can only be changed on this Mac, not from the mesh"
+
+// ===========================================================================
+// Private chats (Milestone 3): Noise sessions with bitchat people (bc_noise.s), each chat
+// its own local room (ids BCPM_FIRST.. : never sent on the mesh, never saved), an outbox
+// that waits for a session and sends again until bitchat says "delivered".
+//
+//   in    0x10 handshakes and 0x11 sealed messages addressed to us. A handshake that ends
+//         with a static key whose hash isn't the sender's peer id is thrown away (bitchat's
+//         peerIdentityMismatch). Both sides starting at once: the lower peer id stays the
+//         initiator, as bitchat. A new message 1 never stops a working transport; only a
+//         completed handshake replaces it. Transports are used for 24 hours at most.
+//   out   unsigned, to the recipient, TTL 7, through every bitchat link (as bitchat).
+//   wall  what's typed in a private room is only ever sealed and sent to that person;
+//         nothing from bitchat runs as a command or reaches asmmesh's mesh.
+// ===========================================================================
+
+.set NZ_MAXS,       16          // sessions
+.set OB_N,          32          // the outbox
+.set OB_PEER,       0
+.set OB_STATE,      8           // 0 free, 1 waiting for a session, 2 sent, waiting for "delivered"
+.set OB_TRIES,      16
+.set OB_AT,         24          // when last sent or tried (ms)
+.set OB_ID,         32          // the message id, 36 characters and a 0
+.set OB_TLEN,       72
+.set OB_TEXT,       80          // up to BT_PM_MAX bytes
+.set OB_SIZE,       192
+.set BT_PM_MAX,     88          // bytes per private message: the sealed packet stays within 182
+.set RX_N,          64          // ids of messages taken lately (peer, first 8 bytes of SHA-256(id))
+.set PM_HS_TIMEOUT, 15000       // a handshake not done in 15 s is dropped
+.set PM_RESEND,     20000       // no "delivered" in 20 s: sent again
+.set PM_TRIES,      4           // times a message is sent before we say it wasn't delivered
+.set PM_WAIT_TRIES, 6           // handshakes tried for a waiting message
+.set PM_SESSION,    86400000    // a transport is used for 24 hours (as bitchat)
+
+.data
+.p2align 3
+_g_bc_chat_pos: .quad 0         // the next chat slot handed out when all are taken
+_g_bc_rxpos:    .quad 0
+.zerofill __DATA,__bss,_g_bc_nz,(NZ_MAXS * NZ_SIZE),4      // the sessions
+.zerofill __DATA,__bss,_g_bc_ob,(OB_N * OB_SIZE),4         // the outbox
+.zerofill __DATA,__bss,_g_bc_chats,(PM_CHATS * 16),4       // chat slot: peer id, last used
+.zerofill __DATA,__bss,_g_bc_rxids,(RX_N * 16),4
+.zerofill __DATA,__bss,_g_bc_hsrl,RL_SIZE,4                // handshakes: 30 a minute
+.zerofill __DATA,__bss,_g_bc_pmrl,RL_SIZE,4                // sealed messages read: 50 a second
+.zerofill __DATA,__bss,_g_bc_rcpt,8,4                      // who our directed packet is for
+.zerofill __DATA,__bss,_g_bc_nzout,640,4                   // a handshake message or sealed bytes
+.zerofill __DATA,__bss,_g_bc_nzin,640,4                    // what one opened to
+.zerofill __DATA,__bss,_g_bc_nzpm,320,4                    // a payload being sealed
+
+.text
+.p2align 2
+
+// uint8 *Lnz_find(uint64 peer) -> its session, or 0
+Lnz_find:
+    cbz  x0, 2f
+    ADRL x9, _g_bc_nz
+    mov  x10, #0
+1:  cmp  x10, #NZ_MAXS
+    b.hs 2f
+    ldr  x11, [x9, #NZ_PEER]
+    cmp  x11, x0
+    b.eq 3f
+    add  x9, x9, #NZ_SIZE
+    add  x10, x10, #1
+    b    1b
+2:  mov  x0, #0
+    ret
+3:  mov  x0, x9
+    ret
+
+// uint8 *Lnz_get(uint64 peer) -> its session, a new one if needed (a free slot, else the
+//   one least lately used, wiped)
+Lnz_get:
+    ENTER 0
+    mov  x19, x0
+    bl   Lnz_find
+    cbnz x0, 9f
+    ADRL x20, _g_bc_nz
+    mov  x21, x20                         // the best so far
+    mov  x22, #-1                         // its last use (unsigned: -1 is the most)
+    mov  x9, #0
+1:  cmp  x9, #NZ_MAXS
+    b.hs 3f
+    mov  x10, #NZ_SIZE
+    madd x11, x9, x10, x20
+    ldr  x12, [x11, #NZ_PEER]
+    cbz  x12, 2f                          // free
+    ldr  x12, [x11, #NZ_USED]
+    cmp  x12, x22
+    b.hs 21f
+    mov  x22, x12
+    mov  x21, x11
+21: add  x9, x9, #1
+    b    1b
+2:  mov  x21, x11
+3:  mov  x0, x21
+    mov  x1, #NZ_SIZE
+    bl   _bc_wipe
+    str  x19, [x21, #NZ_PEER]
+    mov  x0, x21
+9:  LEAVE 0
+
+// uint8 *Lbc_peer_by_id(uint64 id) -> the person in the table, or 0
+Lbc_peer_by_id:
+    ADRL x9, _g_bc_peers
+    mov  x10, #0
+1:  cmp  x10, #BT_N
+    b.hs 2f
+    add  x11, x9, x10, lsl #BT_SHIFT
+    ldr  x12, [x11, #BT_HEARD]
+    cbz  x12, 11f
+    ldr  x12, [x11, #BT_ID]
+    cmp  x12, x0
+    b.eq 3f
+11: add  x10, x10, #1
+    b    1b
+2:  mov  x0, #0
+    ret
+3:  mov  x0, x11
+    ret
+
+// long Lbc_send_to(long type, uint64 peer, const uint8 *p, long n) -> links it went to:
+//   unsigned, to that person, through every link (as bitchat sends 0x10 and 0x11)
+Lbc_send_to:
+    ENTER 0
+    mov  x19, x0
+    mov  x20, x1
+    mov  x21, x2
+    mov  x22, x3
+    ADRL x8, _g_bc_keys
+    ldr  x9, [x8]
+    cmp  x9, #KS_READY
+    b.ne 9f
+    ADRL x8, _g_bc_rcpt
+    str  x20, [x8]
+    ADRL x23, _g_bc_mydp
+    mov  x0, x23
+    mov  x1, #DP_SIZE
+    bl   _bc_wipe
+    mov  x9, #1
+    str  x9, [x23, #DP_VER]
+    str  x19, [x23, #DP_TYPE]
+    mov  x9, #7
+    str  x9, [x23, #DP_TTL]
+    bl   Lbc_wall_ms
+    str  x0, [x23, #DP_TS]
+    ADRL x9, _g_bc_myid
+    str  x9, [x23, #DP_SENDER]
+    ADRL x9, _g_bc_rcpt
+    str  x9, [x23, #DP_RCPT]
+    str  x21, [x23, #DP_PAY]
+    str  x22, [x23, #DP_PLEN]
+    mov  x0, x23
+    mov  x1, #0                           // not signed (bitchat doesn't sign these)
+    ADRL x2, _g_bc_out
+    mov  x3, #512
+    bl   _bc_build
+    cmp  x0, #0
+    b.le 9f
+    mov  x1, x0
+    ADRL x0, _g_bc_out
+    bl   _bc_frame_len
+    cmp  x0, #0
+    b.le 9f
+    mov  x1, x0
+    ADRL x0, _g_bc_out
+    bl   _bc_broadcast
+    LEAVE 0
+9:  mov  x0, #0
+    LEAVE 0
+
+// void Lbc_nz_initiate(uint64 peer) — start a handshake with them, unless one is under way
+//   (less than PM_HS_TIMEOUT old) or the handshake budget is spent
+Lbc_nz_initiate:
+    ENTER 32                              // [96] the ephemeral secret
+    mov  x19, x0
+    bl   Lbc_wall_ms
+    mov  x20, x0
+    mov  x0, x19
+    bl   Lnz_get
+    mov  x21, x0
+    ldr  x9, [x21, #NZ_ACTIVE]
+    cbz  x9, 1f
+    ldr  x9, [x21, #NZ_HSAT]
+    sub  x9, x20, x9
+    mov  x10, #PM_HS_TIMEOUT
+    cmp  x9, x10
+    b.lo 9f
+1:  ADRL x0, _g_bc_hsrl
+    mov  x1, x20
+    mov  x2, #30
+    mov  x3, #60000
+    bl   _bc_rate_ok
+    cbz  x0, 9f
+    mov  x0, #0
+    mov  x1, #32
+    add  x2, sp, #96
+    bl   _SecRandomCopyBytes
+    cbnz w0, 8f
+    mov  x0, x21
+    mov  x1, x19
+    mov  x2, #0                           // initiator
+    mov  x3, x20
+    bl   _nz_start
+    str  x20, [x21, #NZ_USED]
+    mov  x0, x21
+    ADRL x1, _g_bc_sk
+    ADRL x2, _g_bc_xpub
+    add  x3, sp, #96
+    ADRL x4, _g_bc_nzout
+    bl   _nz_write
+    mov  x22, x0
+    tbnz x22, #63, 8f
+    mov  x0, #0x10
+    mov  x1, x19
+    ADRL x2, _g_bc_nzout
+    mov  x3, x22
+    bl   Lbc_send_to
+8:  add  x0, sp, #96
+    mov  x1, #32
+    bl   _bc_wipe
+9:  LEAVE 32
+
+// long Lbc_nz_trusted(uint8 *s) -> 1 if the handshake just done proves who they are: the
+//   hash of the static key they proved is their peer id, and it's the Noise key their
+//   announce gave, if we have it. Otherwise its transport is thrown away.
+Lbc_nz_trusted:
+    ENTER 32                              // [96] SHA-256
+    mov  x19, x0
+    add  x0, x19, #NZ_RS
+    mov  x1, #32
+    add  x2, sp, #96
+    bl   _bc_sha256
+    ldr  x9, [sp, #96]
+    ldr  x10, [x19, #NZ_PEER]
+    cmp  x9, x10
+    b.ne 8f
+    mov  x0, x10
+    bl   Lbc_peer_by_id
+    cbz  x0, 7f
+    add  x0, x0, #BT_XPUB
+    add  x1, x19, #NZ_RS
+    mov  x2, #32
+    bl   _bc_memeq
+    cbz  x0, 8f
+7:  mov  x0, #1
+    LEAVE 32
+8:  add  x0, x19, #NZ_TSEND               // not who they say: no transport
+    mov  x1, #(NZ_WIN + 128 - NZ_TSEND)
+    bl   _bc_wipe
+    str  xzr, [x19, #NZ_EST]
+    ldr  x0, [x19, #NZ_PEER]
+    ADRL x1, Lf_pm_mismatch
+    bl   Lbc_note_id
+    mov  x0, #0
+    LEAVE 32
+
+// void Lbc_note_id(uint64 id, const char *fmt) — fmt with their fingerprint's first four
+//   characters, in Home
+Lbc_note_id:
+    ENTER 32                              // [96] hex
+    mov  x19, x1
+    str  x0, [sp, #112]
+    add  x0, sp, #112
+    mov  x1, #2
+    add  x2, sp, #96
+    bl   _hex_enc
+    mov  x0, x19
+    add  x1, sp, #96
+    bl   Lbc_note
+    LEAVE 32
+
+// void Lbc_noise_in(void) — a 0x10 or 0x11 for us, read into _g_bc_dp
+Lbc_noise_in:
+    ENTER 32                              // [96] an ephemeral secret
+    ADRL x8, _g_bc_dp
+    ldr  x9, [x8, #DP_SENDER]
+    ldr  x19, [x9]                        // x19: who it's from
+    ldr  x20, [x8, #DP_PAY]
+    ldr  x21, [x8, #DP_PLEN]
+    ldr  x9, [x8, #DP_TYPE]
+    ADRL x10, _g_bc_myid
+    ldr  x10, [x10]
+    cmp  x19, x10                         // "from us": nothing to do with it
+    b.eq 9f
+    cbz  x19, 9f
+    cmp  x9, #0x11
+    b.eq Lni_sealed
+    bl   Lbc_wall_ms
+    mov  x22, x0                          // x22: now
+    ADRL x0, _g_bc_hsrl                   // handshakes: 30 a minute, all of them
+    mov  x1, x22
+    mov  x2, #30
+    mov  x3, #60000
+    bl   _bc_rate_ok
+    cbz  x0, 9f
+    cmp  x21, #NZ_MSG1
+    b.eq Lni_m1
+    mov  x0, x19                          // messages 2 and 3: only to a handshake of ours
+    bl   Lnz_find
+    cbz  x0, 9f
+    mov  x23, x0
+    mov  x0, x23
+    ADRL x1, _g_bc_sk
+    mov  x2, x20
+    mov  x3, x21
+    bl   _nz_read
+    tbnz x0, #63, Lni_bad
+    cmp  x0, #1
+    b.eq Lni_done                         // message 3 read: done
+    mov  x0, x23                          // message 2 read: our message 3, and done
+    ADRL x1, _g_bc_sk
+    ADRL x2, _g_bc_xpub
+    mov  x3, #0
+    ADRL x4, _g_bc_nzout
+    bl   _nz_write
+    cmp  x0, #NZ_MSG3
+    b.ne Lni_bad
+    mov  x3, x0
+    mov  x0, #0x10
+    mov  x1, x19
+    ADRL x2, _g_bc_nzout
+    bl   Lbc_send_to
+Lni_done:
+    str  x22, [x23, #NZ_USED]
+    str  x22, [x23, #NZ_ESTAT]
+    mov  x0, x23
+    bl   Lbc_nz_trusted
+    cbz  x0, 9f
+    mov  x0, x19
+    bl   Lbc_ob_flush
+    b    9f
+Lni_bad:
+    mov  x0, x23                          // that handshake is over; a transport stays
+    bl   _nz_drop
+    b    9f
+Lni_m1:                                   // they start one
+    mov  x0, x19
+    bl   Lnz_get
+    mov  x23, x0
+    ldr  x9, [x23, #NZ_ACTIVE]            // ours crossed theirs: the lower id keeps starting
+    cbz  x9, 1f
+    ldr  x9, [x23, #NZ_ROLE]
+    cbnz x9, 1f
+    ADRL x10, _g_bc_myid
+    ldr  x10, [x10]
+    rev  x10, x10                         // as bitchat compares them: as hex, so big-endian
+    rev  x11, x19
+    cmp  x10, x11
+    b.lo 9f                               // ours is lower: theirs is ignored
+1:  mov  x0, x23
+    mov  x1, x19
+    mov  x2, #1                           // responder
+    mov  x3, x22
+    bl   _nz_start
+    str  x22, [x23, #NZ_USED]
+    mov  x0, x23
+    ADRL x1, _g_bc_sk
+    mov  x2, x20
+    mov  x3, x21
+    bl   _nz_read
+    tbnz x0, #63, Lni_bad
+    mov  x0, #0
+    mov  x1, #32
+    add  x2, sp, #96
+    bl   _SecRandomCopyBytes
+    cbnz w0, Lni_bad
+    mov  x0, x23
+    ADRL x1, _g_bc_sk
+    ADRL x2, _g_bc_xpub
+    add  x3, sp, #96
+    ADRL x4, _g_bc_nzout
+    bl   _nz_write
+    mov  x24, x0
+    add  x0, sp, #96
+    mov  x1, #32
+    bl   _bc_wipe
+    cmp  x24, #NZ_MSG2
+    b.ne Lni_bad
+    mov  x0, #0x10
+    mov  x1, x19
+    ADRL x2, _g_bc_nzout
+    mov  x3, x24
+    bl   Lbc_send_to
+    b    9f
+Lni_sealed:
+    bl   Lbc_wall_ms
+    mov  x22, x0
+    mov  x0, x19
+    bl   Lnz_find
+    mov  x23, x0
+    cbz  x23, Lni_nosession
+    ldr  x9, [x23, #NZ_EST]
+    cbz  x9, Lni_nosession
+    ldr  x9, [x23, #NZ_ESTAT]             // older than a day: a new one first
+    sub  x9, x22, x9
+    MOVI x10, PM_SESSION
+    cmp  x9, x10
+    b.hi Lni_expired
+    ADRL x0, _g_bc_pmrl                   // sealed messages: 50 a second, all of them
+    mov  x1, x22
+    mov  x2, #50
+    mov  x3, #1000
+    bl   _bc_rate_ok
+    cbz  x0, 9f
+    cmp  x21, #600
+    b.hi 9f
+    mov  x0, x23
+    mov  x1, x20
+    mov  x2, x21
+    ADRL x3, _g_bc_nzin
+    bl   _nz_open
+    tbnz x0, #63, 9f                      // not theirs, or a replay: dropped, nothing else
+    mov  x24, x0
+    cbz  x24, 9f
+    str  x22, [x23, #NZ_USED]
+    ADRL x8, _g_bc_nzin
+    ldrb w9, [x8]
+    cmp  w9, #0x01
+    b.eq 5f
+    cmp  w9, #0x03
+    b.ne 9f
+    mov  x0, x19                          // "delivered"
+    add  x1, x8, #1
+    sub  x2, x24, #1
+    bl   Lbc_ob_delivered
+    b    9f
+5:  mov  x0, x19
+    mov  x1, x24
+    bl   Lbc_pm_took
+    b    9f
+Lni_expired:
+    str  xzr, [x23, #NZ_EST]
+Lni_nosession:                            // no session to read it with: start one (they'll
+    mov  x0, x19                          //   send it again until we say "delivered")
+    bl   Lbc_nz_initiate
+9:  LEAVE 32
+
+// void Lbc_pm_took(uint64 peer, long n) — a private message from them, opened into
+//   _g_bc_nzin: into their chat, once (by its id), and "delivered" goes back
+Lbc_pm_took:
+    ENTER 864                             // [96] id, idlen, text, tlen [128] SHA-256
+                                          // [160] the text cleaned [800] the ack [848] fp
+    mov  x19, x0
+    ADRL x0, _g_bc_nzin
+    mov  x1, x1
+    add  x2, sp, #96
+    bl   _nz_pm_read
+    tbnz x0, #63, 9f
+    ldr  x20, [sp, #104]                  // the id: at most 40 bytes (bitchat: a UUID)
+    cbz  x20, 9f
+    cmp  x20, #40
+    b.hi 9f
+    add  x0, sp, #800                     // "delivered", with their id
+    mov  w9, #0x03
+    strb w9, [x0]
+    add  x0, x0, #1
+    ldr  x1, [sp, #96]
+    mov  x2, x20
+    bl   _memcpy
+    mov  x0, x19
+    bl   Lnz_find
+    cbz  x0, 1f
+    add  x1, sp, #800
+    add  x2, x20, #1
+    ADRL x3, _g_bc_nzout
+    bl   _nz_seal
+    cmp  x0, #0
+    b.le 1f
+    mov  x3, x0
+    mov  x0, #0x11
+    mov  x1, x19
+    ADRL x2, _g_bc_nzout
+    bl   Lbc_send_to
+1:  ldr  x0, [sp, #96]                    // taken already? (sent again before our ack got there)
+    mov  x1, x20
+    add  x2, sp, #128
+    bl   _bc_sha256
+    ldr  x21, [sp, #128]
+    ADRL x8, _g_bc_rxids
+    mov  x9, #0
+2:  cmp  x9, #RX_N
+    b.hs 3f
+    add  x10, x8, x9, lsl #4
+    ldp  x11, x12, [x10]
+    add  x9, x9, #1
+    cmp  x11, x19
+    b.ne 2b
+    cmp  x12, x21
+    b.eq 9f
+    b    2b
+3:  ADRL x8, _g_bc_rxpos
+    ldr  x9, [x8]
+    add  x10, x9, #1
+    and  x10, x10, #(RX_N - 1)
+    str  x10, [x8]
+    ADRL x8, _g_bc_rxids
+    add  x10, x8, x9, lsl #4
+    stp  x19, x21, [x10]
+    mov  x0, x19                          // their chat
+    mov  x1, #1
+    bl   Lbc_chat_for
+    tbnz x0, #63, 9f
+    mov  x22, x0
+    ldr  x0, [sp, #112]                   // the text: cut between characters, cleaned
+    ldr  x1, [sp, #120]
+    mov  x2, #600
+    bl   _bc_utf8_cut
+    mov  x21, x0
+    add  x0, sp, #160
+    ldr  x1, [sp, #112]
+    mov  x2, x21
+    bl   _bc_text_clean
+    add  x9, sp, #160
+    strb wzr, [x9, x21]
+    mov  x0, x19
+    add  x1, sp, #848
+    bl   Lbc_who
+    str  x0, [sp]
+    add  x9, sp, #160
+    str  x9, [sp, #8]
+    ADRL x0, _g_bc_line
+    mov  x1, #720
+    ADRL x2, Lf_pm_said
+    bl   _snprintf
+    mov  x0, x22
+    ADRL x1, _g_bc_line
+    mov  w2, #0
+    bl   _room_line
+9:  LEAVE 864
+
+// const char *Lbc_who(uint64 peer, char *buf /*16*/) -> "Anna (1a2b)" (their name as
+//   announced, cleaned, if we have them; "bitchat (1a2b)" if not), into a static buffer
+Lbc_who:
+    ENTER 32                              // [96] hex
+    mov  x19, x0
+    mov  x20, x1
+    str  x19, [sp, #112]
+    add  x0, sp, #112
+    mov  x1, #2
+    add  x2, sp, #96
+    bl   _hex_enc
+    mov  x0, x19
+    bl   Lbc_peer_by_id
+    ADRL x9, Ls_pm_someone
+    cbz  x0, 1f
+    add  x9, x0, #BT_NICK
+1:  str  x9, [sp]
+    add  x9, sp, #96
+    str  x9, [sp, #8]
+    ADRL x0, _g_bc_who
+    mov  x1, #64
+    ADRL x2, Lf_pm_who
+    bl   _snprintf
+    ADRL x0, _g_bc_who
+    LEAVE 32
+
+// long Lbc_chat_for(uint64 peer, long make) -> the room of our chat with them, or -1. With
+//   make, a chat slot (the least lately used goes if all are taken) and its room are made.
+Lbc_chat_for:
+    ENTER 16
+    mov  x19, x0
+    mov  x20, x1
+    bl   Lbc_wall_ms
+    mov  x23, x0
+    ADRL x21, _g_bc_chats
+    mov  x22, #0
+1:  cmp  x22, #PM_CHATS
+    b.hs 3f
+    add  x9, x21, x22, lsl #4
+    ldr  x9, [x9]
+    cmp  x9, x19
+    b.eq 5f
+    add  x22, x22, #1
+    b    1b
+3:  cbz  x20, 8f                          // a new chat: a free slot, else the oldest
+    mov  x22, #0
+31: cmp  x22, #PM_CHATS
+    b.hs 32f
+    add  x9, x21, x22, lsl #4
+    ldr  x9, [x9]
+    cbz  x9, 4f
+    add  x22, x22, #1
+    b    31b
+32: mov  x22, #0                          // all taken: the least lately used
+    mov  x10, #0
+    mov  x11, #-1
+33: cmp  x10, #PM_CHATS
+    b.hs 34f
+    add  x12, x21, x10, lsl #4
+    ldr  x12, [x12, #8]
+    cmp  x12, x11
+    b.hs 331f
+    mov  x11, x12
+    mov  x22, x10
+331: add  x10, x10, #1
+    b    33b
+34: mov  x0, x22
+    bl   Lbc_chat_drop
+4:  add  x9, x21, x22, lsl #4
+    str  x19, [x9]
+5:  add  x9, x21, x22, lsl #4
+    str  x23, [x9, #8]
+    add  x0, x22, #BCPM_FIRST
+    bl   _room_find
+    tbz  x0, #63, 9f
+    cbz  x20, 8f
+    mov  x0, x19                          // its room: "🔒 Anna (1a2b)"
+    add  x1, sp, #96
+    bl   Lbc_who
+    str  x0, [sp]
+    ADRL x0, _g_bc_line
+    mov  x1, #(ROOMNAME_MAX + 1)
+    ADRL x2, Lf_pm_room
+    bl   _snprintf
+    ADRL x0, _g_bc_line                   // (cut between characters)
+    mov  x1, #(ROOMNAME_MAX + 1)
+    bl   _strnlen
+    mov  x1, x0
+    ADRL x0, _g_bc_line
+    mov  x2, #ROOMNAME_MAX
+    bl   _bc_utf8_cut
+    ADRL x9, _g_bc_line
+    strb wzr, [x9, x0]
+    add  x0, x22, #BCPM_FIRST
+    ADRL x1, _g_bc_line
+    mov  x2, #0                           // never saved
+    bl   _room_add
+    tbnz x0, #63, 8f
+    mov  x19, x0
+    bl   _ui_rooms_changed
+    mov  x0, x19
+    ADRL x1, Ls_pm_intro
+    mov  w2, #1
+    bl   _room_line
+    mov  x0, x19
+9:  LEAVE 16
+8:  mov  x0, #-1
+    LEAVE 16
+
+// void Lbc_chat_drop(long slot) — that chat and its room go (its transcript too)
+Lbc_chat_drop:
+    ENTER 0
+    mov  x19, x0
+    ADRL x8, _g_bc_chats
+    add  x9, x8, x19, lsl #4
+    stp  xzr, xzr, [x9]
+    add  x0, x19, #BCPM_FIRST
+    bl   _room_find
+    tbnz x0, #63, 9f
+    mov  x20, x0
+    ADRL x8, _g_cur_room                  // looking at it, or a room after it: go to Main
+    ldr  x9, [x8]
+    cmp  x9, x20
+    b.lo 1f
+    mov  x0, #0
+    bl   _ui_select_room
+1:  mov  x0, x20
+    bl   _room_drop
+    bl   _ui_rooms_changed
+9:  LEAVE 0
+
+// void Luuid(char *out /*37*/) — a random id the way bitchat makes them (UUID, upper case)
+Luuid:
+    ENTER 32                              // [96] 16 random bytes
+    mov  x19, x0
+    mov  x0, #0
+    mov  x1, #16
+    add  x2, sp, #96
+    bl   _SecRandomCopyBytes
+    cbz  w0, 1f
+    add  x0, sp, #96                      // no SecRandom: arc4random will do for an id
+    mov  x1, #16
+    bl   _arc4random_buf
+1:  ldrb w9, [sp, #102]                   // version 4, variant 10
+    and  w9, w9, #0x0f
+    orr  w9, w9, #0x40
+    strb w9, [sp, #102]
+    ldrb w9, [sp, #104]
+    and  w9, w9, #0x3f
+    orr  w9, w9, #0x80
+    strb w9, [sp, #104]
+    ADRL x12, Ls_hexup
+    mov  x9, #0                           // byte
+    mov  x10, #0                          // where
+2:  cmp  x9, #16
+    b.hs 4f
+    cmp  x9, #4                           // dashes before bytes 4, 6, 8, 10
+    ccmp x9, #6, #4, ne
+    ccmp x9, #8, #4, ne
+    ccmp x9, #10, #4, ne
+    b.ne 3f
+    mov  w11, #'-'
+    strb w11, [x19, x10]
+    add  x10, x10, #1
+3:  add  x13, sp, #96
+    ldrb w11, [x13, x9]
+    lsr  w13, w11, #4
+    ldrb w13, [x12, x13]
+    strb w13, [x19, x10]
+    and  w13, w11, #0xf
+    ldrb w13, [x12, x13]
+    add  x10, x10, #1
+    strb w13, [x19, x10]
+    add  x10, x10, #1
+    add  x9, x9, #1
+    b    2b
+4:  strb wzr, [x19, x10]
+    LEAVE 32
+
+// long Lbc_ob_send(uint8 *e) -> 1 if sent: an outbox entry, sealed for its person
+Lbc_ob_send:
+    ENTER 0
+    mov  x19, x0
+    ldr  x0, [x19, #OB_PEER]
+    bl   Lnz_find
+    cbz  x0, 8f
+    mov  x20, x0
+    ldr  x9, [x20, #NZ_EST]
+    cbz  x9, 8f
+    add  x0, x19, #OB_ID
+    mov  x1, #36
+    add  x2, x19, #OB_TEXT
+    ldr  x3, [x19, #OB_TLEN]
+    ADRL x4, _g_bc_nzpm
+    bl   _nz_pm_make
+    cmp  x0, #0
+    b.le 8f
+    mov  x2, x0
+    mov  x0, x20
+    ADRL x1, _g_bc_nzpm
+    ADRL x3, _g_bc_nzout
+    bl   _nz_seal
+    cmp  x0, #0
+    b.le 8f
+    mov  x3, x0
+    mov  x0, #0x11
+    ldr  x1, [x19, #OB_PEER]
+    ADRL x2, _g_bc_nzout
+    bl   Lbc_send_to
+    mov  x21, x0
+    mov  x9, #2
+    str  x9, [x19, #OB_STATE]
+    ldr  x9, [x19, #OB_TRIES]
+    add  x9, x9, #1
+    str  x9, [x19, #OB_TRIES]
+    bl   Lbc_wall_ms
+    str  x0, [x19, #OB_AT]
+    str  x0, [x20, #NZ_USED]
+    cmp  x21, #0
+    cset x0, ne
+    LEAVE 0
+8:  mov  x0, #0
+    LEAVE 0
+
+// void Lbc_ob_flush(uint64 peer) — a session with them is up: whatever waits goes
+Lbc_ob_flush:
+    ENTER 0
+    mov  x19, x0
+    ADRL x20, _g_bc_ob
+    mov  x21, #0
+1:  cmp  x21, #OB_N
+    b.hs 9f
+    mov  x9, #OB_SIZE
+    madd x22, x21, x9, x20
+    add  x21, x21, #1
+    ldr  x9, [x22, #OB_STATE]
+    cmp  x9, #1
+    b.ne 1b
+    ldr  x9, [x22, #OB_PEER]
+    cmp  x9, x19
+    b.ne 1b
+    str  xzr, [x22, #OB_TRIES]
+    mov  x0, x22
+    bl   Lbc_ob_send
+    b    1b
+9:  LEAVE 0
+
+// void Lbc_ob_delivered(uint64 peer, const char *id, long n) — bitchat says it arrived
+Lbc_ob_delivered:
+    ENTER 64                              // [96] the start of the text
+    mov  x19, x0
+    mov  x20, x1
+    mov  x21, x2
+    cmp  x21, #36
+    b.ne 9f
+    ADRL x22, _g_bc_ob
+    mov  x23, #0
+1:  cmp  x23, #OB_N
+    b.hs 9f
+    mov  x9, #OB_SIZE
+    madd x24, x23, x9, x22
+    add  x23, x23, #1
+    ldr  x9, [x24, #OB_STATE]
+    cbz  x9, 1b
+    ldr  x9, [x24, #OB_PEER]
+    cmp  x9, x19
+    b.ne 1b
+    add  x0, x24, #OB_ID
+    mov  x1, x20
+    mov  x2, #36
+    bl   _bc_memeq
+    cbz  x0, 1b
+    add  x0, x24, #OB_TEXT                // "✓ delivered: the start of it…"
+    ldr  x1, [x24, #OB_TLEN]
+    mov  x2, #24
+    bl   _bc_utf8_cut
+    mov  x21, x0                          // (memcpy may change x2)
+    add  x0, sp, #96
+    add  x1, x24, #OB_TEXT
+    mov  x2, x21
+    bl   _memcpy
+    ldr  x0, [x24, #OB_TLEN]
+    cmp  x0, x21
+    ADRL x10, Ls_ellipsis
+    ADRL x11, Ls_empty_bc
+    csel x10, x10, x11, hi
+    str  x10, [sp, #8]
+    add  x9, sp, #96
+    strb wzr, [x9, x21]
+    str  x9, [sp]
+    mov  x0, x24
+    mov  x1, #OB_SIZE
+    bl   _bc_wipe
+    mov  x0, x19
+    mov  x1, #0
+    bl   Lbc_chat_for
+    tbnz x0, #63, 9f
+    mov  x19, x0
+    ADRL x0, _g_bc_line
+    mov  x1, #720
+    ADRL x2, Lf_pm_delivered
+    bl   _snprintf
+    mov  x0, x19
+    ADRL x1, _g_bc_line
+    mov  w2, #1
+    bl   _room_line
+9:  LEAVE 64
+
+// void _bc_pm_say(uint64 room id, const char *text) — typed into a private room (mesh.s):
+//   in pieces of BT_PM_MAX bytes, each into the outbox and sealed for that person alone
+.globl _bc_pm_say
+_bc_pm_say:
+    ENTER 144                             // [96] a piece, for showing it
+    mov  x19, x1
+    sub  x9, x0, #BCPM_FIRST
+    cmp  x9, #(PM_CHATS - 1)
+    b.hi 9f
+    ADRL x8, _g_bc_chats
+    add  x8, x8, x9, lsl #4
+    ldr  x24, [x8]                        // x24: who
+    cbz  x24, 9f
+    mov  x0, x24
+    mov  x1, #0
+    bl   Lbc_chat_for
+    mov  x22, x0                          // x22: the room
+    tbnz x22, #63, 9f
+    mov  x0, #SVC_BITCHAT
+    bl   _svc_on
+    ADRL x1, Ls_bc_say_off
+    cbz  x0, 8f
+    ADRL x8, _g_bc_keys
+    ldr  x9, [x8]
+    cmp  x9, #KS_READY
+    ADRL x1, Ls_bc_say_nokeys
+    b.ne 8f
+    mov  x0, #0
+    bl   _bc_link_count
+    ADRL x1, Ls_bc_say_nolink
+    cbz  x0, 8f
+    mov  x0, x19
+    bl   _strlen
+    mov  x20, x0
+1:  cbz  x20, 7f
+    ldrb w9, [x19]
+    cmp  w9, #' '
+    b.ne 2f
+    add  x19, x19, #1
+    sub  x20, x20, #1
+    b    1b
+2:  mov  x0, x19
+    mov  x1, x20
+    mov  x2, #BT_PM_MAX
+    bl   _bc_msg_split
+    mov  x21, x0
+    cbnz x21, 21f
+    mov  x21, #1
+21: bl   Lbc_ob_free                      // an outbox entry
+    mov  x23, x0
+    cbz  x23, Lps_full
+    str  x24, [x23, #OB_PEER]
+    mov  x9, #1
+    str  x9, [x23, #OB_STATE]
+    bl   Lbc_wall_ms
+    str  x0, [x23, #OB_AT]
+    add  x0, x23, #OB_ID
+    bl   Luuid
+    str  x21, [x23, #OB_TLEN]
+    add  x0, x23, #OB_TEXT
+    mov  x1, x19
+    mov  x2, x21
+    bl   _memcpy
+    add  x0, sp, #96                      // "you: piece"
+    mov  x1, x19
+    mov  x2, x21
+    bl   _memcpy
+    add  x9, sp, #96
+    strb wzr, [x9, x21]
+    str  x9, [sp]
+    ADRL x0, _g_bc_line
+    mov  x1, #720
+    ADRL x2, Lf_bc_you
+    bl   _snprintf
+    mov  x0, x22
+    ADRL x1, _g_bc_line
+    mov  w2, #0
+    bl   _room_line
+    mov  x0, x23                          // a session up: sent now; else when one is
+    bl   Lbc_ob_send
+    cbnz x0, 3f
+    ldr  x9, [x23, #OB_STATE]
+    cmp  x9, #2
+    b.eq 3f
+    mov  x0, x24
+    bl   Lbc_nz_initiate
+3:  add  x19, x19, x21
+    sub  x20, x20, x21
+    b    1b
+7:  mov  x0, x24
+    bl   Lnz_find
+    cbnz x0, 9f
+    mov  x0, x24
+    bl   Lbc_nz_initiate
+    b    9f
+Lps_full:
+    ADRL x1, Ls_pm_full
+8:  mov  x0, x22
+    mov  w2, #1
+    bl   _room_line
+9:  LEAVE 144
+
+// uint8 *Lbc_ob_free(void) -> a free outbox entry, or 0
+Lbc_ob_free:
+    ADRL x9, _g_bc_ob
+    mov  x10, #0
+1:  cmp  x10, #OB_N
+    b.hs 2f
+    ldr  x11, [x9, #OB_STATE]
+    cbz  x11, 3f
+    add  x9, x9, #OB_SIZE
+    add  x10, x10, #1
+    b    1b
+2:  mov  x0, #0
+    ret
+3:  mov  x0, x9
+    ret
+
+// void Lbc_pm_tick(void) — each second: stuck handshakes dropped, messages sent again or
+//   given up on (said in their chat)
+Lbc_pm_tick:
+    ENTER 16
+    bl   Lbc_wall_ms
+    mov  x19, x0
+    ADRL x20, _g_bc_nz
+    mov  x21, #0
+1:  cmp  x21, #NZ_MAXS
+    b.hs 3f
+    mov  x9, #NZ_SIZE
+    madd x22, x21, x9, x20
+    add  x21, x21, #1
+    ldr  x9, [x22, #NZ_ACTIVE]
+    cbz  x9, 1b
+    ldr  x9, [x22, #NZ_HSAT]
+    sub  x9, x19, x9
+    mov  x10, #PM_HS_TIMEOUT
+    cmp  x9, x10
+    b.lo 1b
+    mov  x0, x22
+    bl   _nz_drop
+    b    1b
+3:  ADRL x20, _g_bc_ob
+    mov  x21, #0
+4:  cmp  x21, #OB_N
+    b.hs 9f
+    mov  x9, #OB_SIZE
+    madd x22, x21, x9, x20
+    add  x21, x21, #1
+    ldr  x23, [x22, #OB_STATE]
+    cbz  x23, 4b
+    ldr  x9, [x22, #OB_AT]
+    sub  x9, x19, x9
+    mov  x10, #PM_RESEND
+    cmp  x9, x10
+    b.lo 4b
+    ldr  x9, [x22, #OB_TRIES]
+    cmp  x23, #2
+    b.eq 5f
+    cmp  x9, #PM_WAIT_TRIES               // waiting for a session: try again, or give up
+    b.hs 6f
+    add  x9, x9, #1
+    str  x9, [x22, #OB_TRIES]
+    str  x19, [x22, #OB_AT]
+    ldr  x0, [x22, #OB_PEER]
+    bl   Lbc_nz_initiate
+    b    4b
+5:  cmp  x9, #PM_TRIES                    // sent, nothing back: again, or give up
+    b.hs 6f
+    mov  x0, x22
+    bl   Lbc_ob_send
+    cbnz x0, 4b
+    mov  x9, #1                           // no session any more: wait for one
+    str  x9, [x22, #OB_STATE]
+    str  x19, [x22, #OB_AT]
+    ldr  x0, [x22, #OB_PEER]
+    bl   Lbc_nz_initiate
+    b    4b
+6:  ldr  x0, [x22, #OB_PEER]              // "not delivered: …"
+    mov  x1, #0
+    bl   Lbc_chat_for
+    mov  x23, x0
+    add  x0, x22, #OB_TEXT
+    ldr  x1, [x22, #OB_TLEN]
+    mov  x2, #40
+    bl   _bc_utf8_cut
+    add  x9, x22, #OB_TEXT
+    strb wzr, [x9, x0]                    // (the entry is wiped right after)
+    str  x9, [sp]
+    tbnz x23, #63, 7f
+    ADRL x0, _g_bc_line
+    mov  x1, #720
+    ADRL x2, Lf_pm_undelivered
+    bl   _snprintf
+    mov  x0, x23
+    ADRL x1, _g_bc_line
+    mov  w2, #1
+    bl   _room_line
+7:  mov  x0, x22
+    mov  x1, #OB_SIZE
+    bl   _bc_wipe
+    b    4b
+9:  LEAVE 16
+
+// void Lbc_pm_wipe(void) — bitchat off or forgotten: sessions, outbox, chats and their
+//   rooms, gone
+Lbc_pm_wipe:
+    ENTER 0
+    mov  x19, #0
+1:  cmp  x19, #PM_CHATS
+    b.hs 2f
+    mov  x0, x19
+    bl   Lbc_chat_drop
+    add  x19, x19, #1
+    b    1b
+2:  ADRL x0, _g_bc_nz
+    mov  x1, #(NZ_MAXS * NZ_SIZE)
+    bl   _bc_wipe
+    ADRL x0, _g_bc_ob
+    mov  x1, #(OB_N * OB_SIZE)
+    bl   _bc_wipe
+    ADRL x0, _g_bc_rxids
+    mov  x1, #(RX_N * 16)
+    bl   _bc_wipe
+    ADRL x0, _g_bc_nzout
+    mov  x1, #640
+    bl   _bc_wipe
+    ADRL x0, _g_bc_nzin
+    mov  x1, #640
+    bl   _bc_wipe
+    ADRL x0, _g_bc_nzpm
+    mov  x1, #320
+    bl   _bc_wipe
+    LEAVE 0
+
+// "bitchat chat Anna" / "bitchat chat 1a2b" — Home: open (or make) a private chat with a
+//   bitchat person, by name or by the start of their fingerprint (4 hex digits at least)
+.globl _h_bitchat_chat
+_h_bitchat_chat:
+    ENTER 64                              // [96] the hex typed
+    mov  x19, x2
+    ADRL x8, _g_remote_active             // never over the mesh (the wall)
+    ldr  x9, [x8]
+    cbnz x9, Lhc_remote
+    mov  x0, #SVC_BITCHAT
+    bl   _svc_gate
+    cbz  x0, 9f
+    bl   _bc_people_n
+    cbz  x0, Lhc_nobody
+    cbz  x19, Lhc_how
+1:  ldrb w9, [x19]
+    cmp  w9, #' '
+    b.ne 2f
+    add  x19, x19, #1
+    b    1b
+2:  cbz  w9, Lhc_how
+    mov  x20, #0                          // the hex digits typed (spaces left out), if all are
+    mov  x9, #0
+3:  ldrb w10, [x19, x9]
+    cbz  w10, 5f
+    add  x9, x9, #1
+    cmp  w10, #' '
+    b.eq 3b
+    orr  w11, w10, #0x20
+    sub  w12, w10, #'0'
+    cmp  w12, #9
+    b.ls 4f
+    sub  w12, w11, #'a'
+    cmp  w12, #5
+    b.hi 41f
+4:  cmp  x20, #16
+    b.hs 41f
+    add  x13, sp, #96
+    strb w11, [x13, x20]
+    add  x20, x20, #1
+    b    3b
+41: mov  x20, #0                          // not hex: a name
+5:  add  x9, sp, #96
+    strb wzr, [x9, x20]
+    mov  x21, #0                          // the person found
+    mov  x22, #0                          // how many fit
+    mov  x23, #0
+6:  mov  x0, x23
+    bl   _bc_person
+    cbz  x0, 8f
+    add  x23, x23, #1
+    mov  x24, x0
+    cmp  x20, #4                          // by fingerprint
+    b.lo 7f
+    add  x0, x24, #BT_ID
+    mov  x1, #8
+    add  x2, sp, #128
+    bl   _hex_enc
+    add  x0, sp, #128
+    add  x1, sp, #96
+    mov  x2, x20
+    bl   _strncmp
+    cbnz w0, 6b
+    b    71f
+7:  add  x0, x24, #BT_NICK                // by name (case aside)
+    mov  x1, x19
+    bl   _strcasecmp
+    cbnz w0, 6b
+71: mov  x21, x24
+    add  x22, x22, #1
+    b    6b
+8:  cbz  x22, Lhc_none
+    cmp  x22, #1
+    b.hi Lhc_many
+    ldr  x0, [x21, #BT_ID]
+    mov  x1, #1
+    bl   Lbc_chat_for
+    tbnz x0, #63, Lhc_full
+    mov  x20, x0
+    bl   _ui_select_room
+    ldr  x0, [x21, #BT_ID]                // a session soon, so the first message goes quickly
+    bl   Lnz_find
+    cbz  x0, 81f
+    ldr  x9, [x0, #NZ_EST]
+    cbnz x9, 9f
+81: ldr  x0, [x21, #BT_ID]
+    bl   Lbc_nz_initiate
+    b    9f
+Lhc_remote:
+    ADRL x0, Ls_bc_local
+    bl   _home_say0
+    b    9f
+Lhc_nobody:
+    ADRL x0, Ls_pm_nobody
+    bl   _home_say0
+    b    9f
+Lhc_how:
+    ADRL x0, Ls_pm_how
+    bl   _home_say0
+    b    9f
+Lhc_none:
+    ADRL x0, Ls_pm_none
+    bl   _home_say0
+    b    9f
+Lhc_many:
+    ADRL x0, Ls_pm_many
+    bl   _home_say0
+    b    9f
+Lhc_full:
+    ADRL x0, Ls_bc_noroom
+    bl   _home_say0
+9:  LEAVE 64
+
+// for the iPhone's People tab: the k-th person's peer id as hex ("bitchat chat <it>")
+.globl _am_bc_hexid
+_am_bc_hexid:                             // const char *am_bc_hexid(long k)
+    ENTER 0
+    bl   _bc_person
+    cbz  x0, 1f
+    add  x0, x0, #BT_ID
+    mov  x1, #8
+    ADRL x2, _g_bc_hexid
+    bl   _hex_enc
+    ADRL x0, _g_bc_hexid
+    LEAVE 0
+1:  ADRL x0, Ls_bc_empty
+    LEAVE 0
+
+.data
+.p2align 3
+.zerofill __DATA,__bss,_g_bc_who,64,4
+.zerofill __DATA,__bss,_g_bc_hexid,24,4
+
+.section __TEXT,__cstring,cstring_literals
+Ls_hexup:       .asciz "0123456789ABCDEF"
+Ls_pm_someone:  .asciz "bitchat"
+Lf_pm_who:      .asciz "%s (%.4s)"
+Lf_pm_room:     .asciz "\360\237\224\222 %s"
+Lf_pm_said:     .asciz "%s: %s"
+Lf_pm_delivered: .asciz "\342\234\223 delivered: %s%s"
+Lf_pm_undelivered: .asciz "\302\267 not delivered (no answer from them): %s"
+Lf_pm_mismatch: .asciz "\302\267 bitchat: a private chat with %s was refused: the key it proved isn\342\200\231t the one that id stands for."
+Ls_ellipsis:    .asciz "\342\200\246"
+Ls_empty_bc:    .asciz ""
+Ls_pm_intro:    .asciz "\302\267 A private bitchat chat: end-to-end encrypted with Noise, as bitchat does it. Only this person can read it; nothing typed here runs as a command or goes on asmmesh\342\200\231s mesh. A message waits until a session is set up, and \342\234\223 says when it arrived."
+Ls_pm_full:     .asciz "\302\267 Too many private messages waiting: try again in a little while."
+Ls_pm_nobody:   .asciz "\302\267 Nobody on bitchat yet (\342\200\234bitchat people\342\200\235 lists who\342\200\231s around)."
+Ls_pm_how:      .asciz "\302\267 Say \342\200\234bitchat chat\342\200\235 and their name, or the start of their fingerprint (\342\200\234bitchat people\342\200\235 shows both), e.g. \342\200\234bitchat chat 1a2b\342\200\235."
+Ls_pm_none:     .asciz "\302\267 Nobody on bitchat by that name or fingerprint (\342\200\234bitchat people\342\200\235 lists them)."
+Ls_pm_many:     .asciz "\302\267 More than one person fits: use the start of their fingerprint (\342\200\234bitchat people\342\200\235 shows it)."

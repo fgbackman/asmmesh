@@ -151,6 +151,7 @@ Lsimple:
     .quad Lw_bc_ann_on,      0, _h_bitchat_quiet, 0
     .quad Lw_bc_ann_off,     0, _h_bitchat_quiet, 1
     .quad Lw_bc_name,        0, _h_bitchat_name, 0
+    .quad Lw_bc_chat,        1, _h_bitchat_chat, 0
     .quad Lw_hist,           0, _h_term_history, 3
     .quad Lw_hist_on,        0, _h_term_history, 1
     .quad Lw_hist_off,       0, _h_term_history, 0
@@ -2865,6 +2866,7 @@ Lw_bc_forget:    .asciz "bitchat forget"
 Lw_bc_ann_on:    .asciz "bitchat announce on"
 Lw_bc_ann_off:   .asciz "bitchat announce off"
 Lw_bc_name:      .asciz "bitchat name"
+Lw_bc_chat:      .asciz "bitchat chat"
 Lw_hist:         .asciz "history"
 Lw_hist_on:      .asciz "history on"
 Lw_hist_off:     .asciz "history off"

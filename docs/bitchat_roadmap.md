@@ -208,11 +208,20 @@ Announce payload is TLV: `0x01` nickname, `0x02` Noise public key, `0x03` Ed2551
 - **Nearby** means a link of ours is tied to that person (the TTL isn't signed, so hop counts aren't shown); otherwise "through others".
 - **Smaller:** "disable all" switches bitchat off; "is around" lines are 3 a minute at most; a new link triggers an announce no sooner than 3 s after the last; long writes must arrive without gaps (test 177); fragment sets stay with their link, 2 per link (test 178); a corrupt Keychain entry leaves no key bytes behind; "bitchat forget" also clears the duplicate filter, fragments, pins and the bitchat room; switching off resets "advertise on" and "announce off"; the identity read keeps its own Keychain status (no shared status can make asmmesh replace its identity).
 
-**Milestone 3 — private chat** (`src/bc_noise.s`)
-- Noise XX handshake over `0x10`, sessions keyed by peer ID, rekeying, and replay protection.
-- Read bitchat's `NoiseEncryptionService.swift` for the inner payload types (private message, delivery ack, read receipt) and copy them exactly.
-- Each private chat opens as its own room, like asmmesh invites do now. Mark which conversations are Noise-encrypted.
-- Outbox: retry until a delivery ack arrives (bitchat: 100 per peer, 24 h, 8 tries).
+**Milestone 3 — private chat** (`src/bc_noise.s`, the end of `src/bc_ble.s`) — written Nov 3; Noise tested under qemu, **not yet tried with a phone**
+- What bitchat does (commit `04995f6`, `NoiseProtocol.swift`, `NoiseSession.swift`, `NoiseSessionManager.swift`, `BLENoisePacketHandler.swift`, `BLEService.swift`, `Packets.swift`):
+  - `Noise_XX_25519_ChaChaPoly_SHA256`, empty prologue, empty handshake payloads: messages of 32, 96 and 64 bytes in `0x10` packets, unsigned, to the recipient, TTL 7.
+  - Transport in `0x11`: the nonce in front as 4 bytes big-endian, ChaCha20-Poly1305 with no associated data, a 1024-message replay window, nonces up to 2³²−2, a session used for 24 h.
+  - Their static key must not be one of 8 low-order points, and SHA-256 of it must start with their peer id (`peerIdentityMismatch`).
+  - Both sides starting at once: the lower peer id (compared as hex) keeps the initiator role. A new message 1 never tears down a working transport.
+  - Inner payloads: type byte, then for `0x01` private message the TLVs `0x00` message id (a UUID) and `0x01` text; `0x03` delivered and `0x02` read receipt carry the id.
+- Done here:
+  - `bc_noise.s` (pure): handshake, split, seal/open with the window (a plain sliding window; bitchat's own appears to shift bits within a byte the wrong way, which would only affect its own replay checks, not what we exchange), payload make/read. `tools/qemu/bcnoise.py` copies bitchat; it matches the `noiseprotocol` package byte for byte; self-tests 192–195 check the assembly against it.
+  - `bc_ble.s`: 16 sessions; `0x10`/`0x11` for us are read, not relayed; the identity check, also against the Noise key in their announce; 30 handshakes a minute and 50 sealed messages a second at most; fresh ephemeral keys from `SecRandomCopyBytes`, wiped after use.
+  - Rooms: ids 5–12 (`BCPM_FIRST`), local like Home (`LOCAL_ROOMS` 13, `ROOM_MAX` 25), so no mesh packet can land in one and they're never saved.
+  - Outbox: 32 messages; one waits up to 2 minutes for a session, is sent again every 20 s up to 4 times until "delivered", then "not delivered" is said. Delivered acks are sent for every message taken; a message seen again (same id) is acked but not shown twice.
+  - `bitchat chat <name | fingerprint>` (never over the mesh); iPhone: **Message** in People.
+- Not done: read receipts (we don't send them, and theirs aren't shown), courier/favourites, files, groups, verification (`0x10`/`0x11` payload types), sessions surviving a restart.
 
 **Later / maybe**
 - Favourites and courier mail (`0x04`), source routing, files (`0x22`), group messages (`0x25`), voice (`0x29`).

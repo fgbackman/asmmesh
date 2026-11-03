@@ -124,7 +124,7 @@
 .set N_NICK,        40       // 24 bytes, NUL-terminated
 
 // room table: 64-byte entries; room 0 is Main (id 0)
-.set ROOM_MAX,      17       // Main, 3 local rooms, bitchat's while it's on, 12 private
+.set ROOM_MAX,      25       // Main, 3 local rooms, bitchat's, 8 bitchat private chats, 12 private
 .set ROOM_SHIFT,    6
 .set R_ID,          0
 .set R_UNREAD,      8
@@ -146,7 +146,9 @@
 .set NEWS_ID,       3        // the local News room: headlines from gateway Macs
 .set BITCHAT_ID,    4        // the local bitchat room: public chat with bitchat phones, there
                              //   only while bitchat is on (bc_ble.s adds and removes it)
-.set LOCAL_ROOMS,   5        // ids 1..4 are local rooms, never sent on the mesh
+.set BCPM_FIRST,    5        // private bitchat chats (bc_ble.s): ids 5..12, local like the rest
+.set PM_CHATS,      8
+.set LOCAL_ROOMS,   13       // ids 1..12 are local rooms, never sent on the mesh, never saved
 .set T_NEWS,        7        // +12 zero[8] +20 sender[8] +28 nlen +29 nick, mode, headline
 .set T_WEBREQ,      8        // +12 gateway[8] (0 any) +20 sender[8] +28 nlen +29 nick, then web.s body
 .set T_WEBPART,     9        // +12 requester[8] +20 gateway[8] +28 nlen (0), then web.s body

@@ -17,7 +17,7 @@ for whoever picks the work up next.
 | Milestone 2 | Public chat both ways, relaying | Written, self-tests pass; **not yet tried on a Mac** |
 | Hardening 1 and 2 | Two deep reviews' fixes | Written, self-tests pass; **not yet tried on a Mac** |
 | Guard-fault fix | `LINK` macro clobbered its own register | Fixed (`4154d9e`); **waiting for the Mac to confirm** |
-| Milestone 3 | Private chat (Noise) | Not started |
+| Milestone 3 | Private chat (Noise) | Written: Noise matches an independent library byte for byte (self-tests 192–195); **not yet tried with a phone** |
 | (not bitchat) | Input line like a terminal: history, suggestions (`term_core.s`, `term_hist.s`, `term.s`) | Written, self-tests 184–187 pass; **not yet seen on screen** |
 | (not bitchat) | The same on iPhone: recent-lines menu, suggestion chips, keyboard ↑↓ Tab (`term_hist.s`, `ios_ui.s` `am_hist_*`/`am_sg_*`, `RoomsView.swift`) | Written; **the Swift has never been compiled** |
 | (not bitchat) | Service audit: switched-off services no longer reached by `refresh`, cloud loads, Hue discovery or rule polls | Written (`c1513aa`), self-tests pass |
@@ -221,6 +221,13 @@ Left on purpose, or not fixable without more protocol:
    section, run `make selftest` and the checklist again, then merge. (README is up to date on
    the branch: bitchat, typing, files.)
 
+**Milestone 3: private chat** — written; see `docs/bitchat_roadmap.md` for what was done. To try:
+1. Phone and Mac linked, each in the other's People. `bitchat chat <their name>` on the Mac: a 🔒 room opens.
+2. Type in it: the phone shows it as a private message from the Mac's bitchat name; the Mac shows "✓ delivered".
+3. From the phone, message the Mac privately: it shows in the same room.
+4. `disable bitchat`: the 🔒 rooms go. On again: a new chat sets up a new session.
+
+The original plan, for reference:
 **Milestone 3: private chat** (`src/bc_noise.s`, new)
 - `Noise_XX_25519_ChaChaPoly_SHA256` handshake over `0x10`, sessions per peer, rekeying, replay
   windows; the primitives are all in `bc_crypto.s` already.

@@ -546,6 +546,9 @@ _mesh_send_text:
     b.eq Lst_news
     cmp  x9, #BITCHAT_ID
     b.eq Lst_bitchat
+    sub  x10, x9, #BCPM_FIRST             // a private bitchat chat
+    cmp  x10, #(PM_CHATS - 1)
+    b.ls Lst_bcpm
     cmp  x9, #HOME_ID
     b.ne Lst_mesh
     mov  x0, x20                      // Home: a device command, stays on this Mac
@@ -563,6 +566,11 @@ Lst_news:
 Lst_bitchat:
     mov  x0, x20                      // bitchat: chat text only, never a command
     bl   _bc_say
+    LEAVE 0
+Lst_bcpm:
+    mov  x0, x9                       // sealed for that person alone, never a command
+    mov  x1, x20
+    bl   _bc_pm_say
     LEAVE 0
 Lst_mesh:
     mov  x0, x20                      // a device command typed here? run it in Home

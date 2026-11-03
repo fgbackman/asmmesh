@@ -59,6 +59,7 @@ const char *am_nick(void);
 long am_bc_count(void);
 const char *am_bc_nick(long k);
 char *am_bc_line(long k, char *buf);       // buf: 128 bytes
+const char *am_bc_hexid(long k);            // their peer id as hex ("bitchat chat <it>")
 char *am_status(void);
 
 // actions; each shows its own prompt

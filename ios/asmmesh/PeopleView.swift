@@ -72,6 +72,9 @@ struct PeopleView: View {
                                         Text(b.line).font(.footnote).foregroundStyle(Theme.dim)
                                     }
                                     Spacer()
+                                    Button("Message") { mesh.home("bitchat chat \(b.hexID)") }   // a private room
+                                        .buttonStyle(.bordered)
+                                        .disabled(b.hexID.isEmpty)
                                 }
                             }
                         }

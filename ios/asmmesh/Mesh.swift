@@ -11,7 +11,7 @@ struct Line: Identifiable {
 }
 
 enum RoomKind {
-    case main, home, web, news, bitchat, privateRoom
+    case main, home, web, news, bitchat, bitchatChat, privateRoom
 
     var symbol: String {
         switch self {
@@ -20,6 +20,7 @@ enum RoomKind {
         case .web: return "safari.fill"
         case .news: return "newspaper.fill"
         case .bitchat: return "antenna.radiowaves.left.and.right"
+        case .bitchatChat: return "lock.shield.fill"
         case .privateRoom: return "lock.fill"
         }
     }
@@ -30,6 +31,7 @@ enum RoomKind {
         case .web: return Theme.grey
         case .news: return Theme.yellow
         case .bitchat: return Theme.orange
+        case .bitchatChat: return Theme.orange
         case .privateRoom: return Theme.purple
         }
     }
@@ -40,6 +42,7 @@ enum RoomKind {
         case .web: return "Pages through a Mac with internet"
         case .news: return "Headlines from Macs with internet"
         case .bitchat: return "Public chat with bitchat phones"
+        case .bitchatChat: return "Private bitchat chat, end-to-end encrypted"
         case .privateRoom: return "Invite-only"
         }
     }
@@ -59,6 +62,7 @@ struct Room: Identifiable, Equatable {
         case 2: return .web
         case 3: return .news
         case 4: return .bitchat
+        case 5...12: return .bitchatChat            // bc_ble.s: BCPM_FIRST.. (local, never saved)
         default: return .privateRoom
         }
     }
@@ -80,11 +84,13 @@ struct JoinRequest: Identifiable, Equatable {
     let room: String
 }
 
-/// Someone heard on bitchat (bc_ble.s): only shown, never invited, found or messaged.
+/// Someone heard on bitchat (bc_ble.s): never invited or found; a private chat with them
+/// is its own room (Noise, end-to-end), opened with "bitchat chat <hexID>".
 struct BitchatPerson: Identifiable, Equatable {
     let id: Int
     let name: String
     let line: String         // "bitchat · 1a2b 3c4d 5e6f 7a8b · nearby", with a warning if needed
+    let hexID: String        // their peer id, 16 hex digits
 }
 
 struct Person: Identifiable, Equatable {
@@ -257,7 +263,8 @@ final class Mesh: ObservableObject {
         var line = [CChar](repeating: 0, count: 128)
         for k in 0..<am_bc_count() {
             am_bc_line(k, &line)
-            b.append(BitchatPerson(id: k, name: cstr(am_bc_nick(k)), line: String(cString: line)))
+            b.append(BitchatPerson(id: k, name: cstr(am_bc_nick(k)), line: String(cString: line),
+                                   hexID: String(cString: am_bc_hexid(k))))
         }
         if b != bitchatPeople { bitchatPeople = b }
         var s: [Sensor] = []
