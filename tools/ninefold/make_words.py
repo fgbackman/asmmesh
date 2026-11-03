@@ -32,10 +32,15 @@
 #      a word is still a real word (ORCA, BRIE, LIDO): it is extra.
 # Any other real word with Zipf >= EXTRA_ZIPF is EXTRA; rarer ones aren't accepted.
 #
-# TASTE. family.txt is every word in answers or extra that is, exactly as written, in
+# TASTE. family.txt is decided by a dictionary, not by a list's reputation. Candidates are
+# words in answers or extra that are, exactly as written, in
 #   - LDNOOBW's English list (slurs and obscenities; CC BY 4.0), or
 #   - family-extra.txt (ours: inflections LDNOOBW doesn't list and crude words, each one
 #     written out in full).
+# Each candidate's Wiktionary page (fetch_wiktionary.py) is read by judge_family.py: it is
+# hidden only if Wiktionary labels its first meaning, or half or more of its meanings,
+# vulgar, offensive, derogatory or a slur (words/family-judged.tsv, with the counts). So
+# BUTT, ESCORT, SKEET and SNATCH show; CUNT and the slurs don't.
 # Those words stay real words: with the filter off they count like any other.
 #
 # Usage: python3 make_words.py <enable1.txt> <scowl-2020.12.07/final> <ldnoobw en> <out dir>
@@ -86,7 +91,15 @@ def main(enable_path, scowl_dir, ldnoobw_path, out_dir):
             extra.append(w)
 
     listed = words_in(ldnoobw_path) | words_in(os.path.join(here, 'family-extra.txt'))
-    family = sorted(w for w in set(answers) | set(extra) if w in listed)
+    judged = {}                                   # judge_family.py: Wiktionary's own labels
+    jpath = os.path.join(here, 'words', 'family-judged.tsv')
+    if os.path.exists(jpath):
+        for line in open(jpath).read().splitlines()[1:]:
+            cols = line.split('\t')
+            judged[cols[0]] = cols[1]
+    # a listed word is hidden unless Wiktionary's labels say it isn't offensive; a word
+    # not judged yet stays hidden until it is (fetch_wiktionary.py, judge_family.py)
+    family = sorted(w for w in set(answers) | set(extra) if w in listed and judged.get(w, 'hide') == 'hide')
 
     os.makedirs(out_dir, exist_ok=True)
     for fname, rows in (('answers.txt', answers), ('extra.txt', extra),

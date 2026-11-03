@@ -71,11 +71,17 @@ The rules are in `tools/ninefold/make_words.py`, the sources and licences in
   Edge cases left for review: PECS, UNDIES, AFTERS (plural-only nouns, like PANTS, which
   goes), TIGHTS and ARREARS.
 - Result: 16,272 answers and 9,543 "also accepted" words, of 4 to 9 letters.
-- **Family filter** (a game setting, on by default, the same on every device): hides the 98
-  words in `words/family.txt`, taken from LDNOOBW's reviewed list or `family-extra.txt`
-  exactly as written there, never guessed variants. With the filter off they count.
-  Still to come: judging it by Wiktionary's own labels (BUTT, ESCORT, SKEET would then stay
-  visible), which needs `kaikki.org` or `en.wiktionary.org`.
+- **Family filter** (a game setting, on by default, the same on every device): judged by
+  a dictionary's own labels. Candidates come from LDNOOBW's list and `family-extra.txt`;
+  each one's Wiktionary page is read (`fetch_wiktionary.py`, `judge_family.py`), and it is
+  hidden only if Wiktionary labels its first meaning, or half or more of its meanings,
+  vulgar, offensive, derogatory or a slur. 37 words are hidden (the slurs, CUNT, FUCK,
+  SHIT, PISS, WHORE, CRAP, TURD...); 61 candidates show (BUTT, ESCORT, SNATCH, SKEET, SCAT,
+  FINGERING, the anatomy words). Every decision and its count is in
+  `words/family-judged.tsv`. With the filter off, all of them count.
+  Not hidden, because Wiktionary doesn't label them vulgar: serious words (RAPE, INCEST)
+  and plain sexual vocabulary (PORN, ORGASM). If a family game should leave those out too,
+  that's a second, stricter setting: a taste decision, to be made as one.
 - **Measured against people's choices**: `benchmark.py` runs the lists on 595 puzzles whose
   answers were chosen by hand. 96.9% of our answers are words those editors listed; of
   their words, we accept 85.6% once plurals and contractions (excluded by rule) are set

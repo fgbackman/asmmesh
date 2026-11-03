@@ -13,8 +13,9 @@ setting). They stay real words, and count with the filter off (see the top of
 | SCOWL               | 2020.12.07    | is it an ordinary dictionary word (sizes 10-50) | copyright Kevin Atkinson; free use with this notice kept (see SCOWL's README) |
 | wordfreq            | 3.1.1         | do people actually use it (Zipf frequency) | data CC BY-SA 4.0, code Apache 2.0 (Robyn Speer)         |
 | WordNet             | 3.0 (via NLTK 3.10.4) | plurals and -s forms: what a word's base is, and whether it's a word of its own | WordNet licence (Princeton): free use, keep the notice |
-| LDNOOBW `en`        | commit 5faf2ba | the family filter only: words hidden as written there, never variants | CC BY 4.0 (Shutterstock and contributors) |
-| `family-extra.txt`  | here          | the family filter only: forms LDNOOBW lacks (RAPED) and crude words, each in full | ours |
+| Wiktionary          | pages fetched 3 Nov 2026 (`words/wiktionary.json`) | the family filter: each candidate's labels decide | CC BY-SA 4.0 (Wiktionary contributors) |
+| LDNOOBW `en`        | commit 5faf2ba | the family filter's candidates (Wiktionary decides) | CC BY 4.0 (Shutterstock and contributors) |
+| `family-extra.txt`  | here          | more candidates: forms LDNOOBW lacks (RAPED) and crude words, each in full | ours |
 
 Get them:
 - ENABLE: https://raw.githubusercontent.com/dolph/dictionary/master/enable1.txt
@@ -27,6 +28,9 @@ Get them:
 
 Contractions without their apostrophe (SHES, CANT, WONT) are left out when SCOWL's
 `english-contractions` lists the apostrophe form and it is at least 10 times as common.
+
+Re-judge the family filter after the candidates change: `python3 fetch_wiktionary.py`
+(anywhere with internet), then `python3 judge_family.py` and `make_words.py` again.
 
 Measure the lists against puzzles people chose: `python3 benchmark.py <puzzles.csv>`
 (letters, center, solutions columns; that file isn't kept here, it's someone else's work).
