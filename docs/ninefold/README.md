@@ -16,13 +16,15 @@ word list, and nothing is scraped or republished.
 | Results       | `results.png` | The nine-letter word, the ranking, every word revealed and checked   |
 
 The puzzle in the mockups is real, made the way the game will make them: "moonlight" with G
-in the centre, 42 words in the ENABLE list.
+in the centre, 21 answers and 4 rarer words also accepted.
 
 ## Rules
 
 - A word is 4 to 9 letters, uses the centre letter, and uses each tile at most once.
-- Words come from one fixed list built into the app (ENABLE, public domain). The same list on
-  every device means everyone agrees on what counts.
+- Words come from two fixed lists built into the app, the same on every device, so everyone
+  agrees on what counts. No single source decides (see "Which words count" below):
+  - **answers**: the words a round counts, reveals and says you missed;
+  - **also accepted**: real but rarer words. They score, but nobody is shown them as missed.
 - A round lasts 4 minutes (the host can choose 2, 4 or 8). A game is 1 to 5 rounds.
 - Points:
 
@@ -42,14 +44,35 @@ in the centre, 42 words in the ENABLE list.
 - The host picks a random 64-bit **seed**. The puzzle comes from the seed alone, so only the
   seed travels, and every Mac and iPhone builds the same grid.
 - From the seed:
-  1. A 9-letter word with no other 9-letter anagram in the list.
-  2. A centre letter that leaves between 25 and 80 words.
+  1. A 9-letter answer with no other 9-letter anagram among the answers.
+  2. A centre letter that leaves between 15 and 60 answers.
   3. The order of the other eight tiles.
 - The generator is pure code with self-tests (like `term_core.s` and `bc_noise.s`): the same
   seed must give the same puzzle on every build.
-- The list is about 173,000 words, roughly 1.7 MB as text. It can be packed much smaller
-  (a trie, or only the words of 4 to 9 letters, about 110,000). Bundled in the app, never
-  downloaded.
+- Puzzles are made from the answers only. A centre letter must leave 15 to 60 answers.
+
+## Which words count
+
+A plain Scrabble list (ENABLE) is full of words nobody uses (TIGLON, LOGION, THOLING), and
+a game that counts them can't be trusted. Now three independent sources must agree
+(`tools/ninefold/make_words.py`, sources and licences in `tools/ninefold/SOURCES.md`):
+
+| Test                      | Source                                   | Rules out                                  |
+|---------------------------|------------------------------------------|--------------------------------------------|
+| a valid word              | ENABLE2K (public domain)                 | names, abbreviations, misspellings         |
+| an ordinary word          | SCOWL sizes 10-50 (a spell checker's list) | archaic, technical and dialect words     |
+| a word people use         | wordfreq: Zipf 2.5 or more               | rare words (2.0 to 2.5: "also accepted")   |
+
+- Result: about 24,800 answers and 6,800 "also accepted" words, of 4 to 9 letters.
+- The mockups' puzzle has 21 answers and 4 "also accepted" words. Its full list is MOONLIGHT,
+  LOOMING, LOOTING, TOOLING, HOMING, GLINT, GLOOM, IGLOO, LIGHT, LINGO, MIGHT, NIGHT, THING,
+  THONG, GILT, GOON, LOGO, LONG, NIGH, TING, TONG, plus HOOTING, INGOT, MOLTING, HOLING.
+- Every word left out is in `REPORT.txt` with its reason, so anyone can check a decision.
+  Rebuilding gives the same lists unless a source changes (versions pinned).
+- A game's `START` carries a hash of the lists: devices with different lists won't play
+  together, so a mismatch can't decide a word.
+- Still to do: `blocked.txt` (slurs and the like) is empty and must be filled from a
+  reviewed list before the game ships.
 
 ## Across the mesh, by invitation only
 
@@ -68,7 +91,7 @@ relaying and duplicate filter, and stay within the 240-byte packet limit:
 
 | Packet   | Sent by      | Carries                                                                                  |
 |----------|--------------|------------------------------------------------------------------------------------------|
-| `START`  | host         | seed, round, round length, start time (10 s ahead), the players' ids                     |
+| `START`  | host         | seed, round, round length, start time (10 s ahead), the players' ids, the word lists' hash |
 | `READY`  | each player  | "I have built the puzzle"; the round starts when all are ready, or after 30 s            |
 | `CLAIM`  | finder       | word length, a 16-byte commitment, the time found                                        |
 | `REVEAL` | each player  | after the round: their words (one byte each: an index into the puzzle's word list), their salt |
@@ -113,7 +136,8 @@ all. Each player therefore makes a secret random **salt** for each round:
 
 1. **Generator** (pure, qemu self-tests): seed to puzzle, word check, scoring, commitments.
    Cross-checked against a Python copy, as the bitchat code was.
-2. **Word list** packed into the app (Mac and iPhone), with its licence note.
+2. **Word lists** (`tools/ninefold`) packed into the app (Mac and iPhone), with the credits
+   from `SOURCES.md`, and `blocked.txt` filled.
 3. **Mesh**: the game flag on room messages, the five packets, the reveal check, invitations
    through the existing invite flow.
 4. **Mac UI**: the game room view (grid panel and transcript), and Home commands.

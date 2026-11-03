@@ -1,0 +1,3 @@
+# Words Ninefold never uses, whatever the sources say: one per line, lower case. For slurs
+# and words that would be unkind in a family game. Empty for now: fill it (and run
+# make_words.py again) before the game ships, ideally from a reviewed list.

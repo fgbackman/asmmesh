@@ -7,7 +7,8 @@
 <!-- Ninefold: an invite-only word game over asmmesh's mesh. These are mockups, not the
      game: open with #invite, #play, #mac or #results (tools render each to a PNG).
      The puzzle shown is real: generated from the ENABLE word list (public domain),
-     "moonlight" with G in the centre, 42 words. -->
+     "moonlight" with G in the centre: 21 answers, 4 rarer words also accepted
+     (tools/ninefold: ENABLE, SCOWL and wordfreq must all agree). -->
 <style>
 :root{
   --bg:#121315; --card:#222427; --hi:#2e2f33; --dim:#9e9e9e; --fg:#f2f2f2;
@@ -176,7 +177,7 @@ html,body{margin:0;background:#0a0a0b;color:var(--fg);font:15px/1.35 var(--sans)
   <div class="found">
     <h3>Your words · 10</h3>
     <div class="chips">
-      <span class="chip first">LOOMING</span><span class="chip">LIGHT</span><span class="chip first">TIGLON</span><span class="chip">NIGHT</span><span class="chip">GLOOM</span><span class="chip">IGLOO</span><span class="chip first">INGOT</span><span class="chip">LONG</span><span class="chip">GOON</span><span class="chip">LOGO</span>
+      <span class="chip first">LOOMING</span><span class="chip">LIGHT</span><span class="chip first">GLINT</span><span class="chip">NIGHT</span><span class="chip">GLOOM</span><span class="chip">IGLOO</span><span class="chip first">INGOT</span><span class="chip">LONG</span><span class="chip">GOON</span><span class="chip">LOGO</span>
     </div>
   </div>
   <div class="feed">
@@ -257,12 +258,14 @@ html,body{margin:0;background:#0a0a0b;color:var(--fg);font:15px/1.35 var(--sans)
   </div>
   <div class="verify">✓ every word checked against the hash its finder sent when they found it</div>
   <div class="found">
-    <h3>42 words in all · the 30 longest</h3>
+    <h3>All 21 words · 19 found between you</h3>
     <div class="chips">
-      <span class="chip first">TOOLING</span><span class="chip">HOOTING</span><span class="chip">LOOTING</span><span class="chip">MOLTING</span><span class="chip first">LOOMING</span><span class="chip" style="opacity:.4">MOOTING</span><span class="chip" style="opacity:.4">THOLING</span><span class="chip">HOLING</span><span class="chip">HOMING</span><span class="chip first">TIGLON</span><span class="chip" style="opacity:.4">LOGION</span><span class="chip">MOOING</span><span class="chip">GLOOM</span><span class="chip">IGLOO</span><span class="chip first">INGOT</span><span class="chip">LIGHT</span><span class="chip">LINGO</span><span class="chip">MIGHT</span><span class="chip">NIGHT</span><span class="chip">THING</span><span class="chip">THONG</span><span class="chip" style="opacity:.4">TIGON</span><span class="chip">GLINT</span><span class="chip">LONG</span><span class="chip">LOGO</span><span class="chip">GOON</span><span class="chip">GILT</span><span class="chip">NIGH</span><span class="chip" style="opacity:.4">GLIM</span><span class="chip">TONG</span>
+      <span class="chip">MOONLIGHT</span><span class="chip first">LOOMING</span><span class="chip">LOOTING</span><span class="chip first">TOOLING</span><span class="chip">HOMING</span><span class="chip first">GLINT</span><span class="chip">GLOOM</span><span class="chip">IGLOO</span><span class="chip">LIGHT</span><span class="chip">LINGO</span><span class="chip">MIGHT</span><span class="chip">NIGHT</span><span class="chip">THING</span><span class="chip">THONG</span><span class="chip">GILT</span><span class="chip">GOON</span><span class="chip">LOGO</span><span class="chip">LONG</span><span class="chip" style="opacity:.4">NIGH</span><span class="chip" style="opacity:.4">TING</span><span class="chip">TONG</span>
     </div>
+    <h3 style="margin-top:10px">Also accepted (rarer) · 3 found</h3>
+    <div class="chips"><span class="chip" style="box-shadow:inset 0 0 0 1px #5a5a5e;background:transparent">HOOTING</span><span class="chip" style="box-shadow:inset 0 0 0 1px #5a5a5e;background:transparent">INGOT</span><span class="chip" style="box-shadow:inset 0 0 0 1px #5a5a5e;background:transparent">MOLTING</span><span class="chip" style="box-shadow:inset 0 0 0 1px #5a5a5e;background:transparent;opacity:.4">HOLING</span></div>
   </div>
-  <div class="legend"><span>orange ring: you found it first</span><span>faded: nobody found it</span></div>
+  <div class="legend"><span>orange ring: you were first</span><span>faded: nobody found it</span><span>outline: also accepted</span></div>
   <div class="btns"><div class="btn">Leave</div><div class="btn go">Next round (3 of 3)</div></div>
 </div>
 </section>
