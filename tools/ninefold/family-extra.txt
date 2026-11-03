@@ -43,3 +43,6 @@ pissed
 pisses
 turd
 turds
+# a slur, in lower case (Mongol, the people, is a name and isn't in the lists)
+mongol
+mongols

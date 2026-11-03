@@ -16,7 +16,7 @@ word list, and nothing is scraped or republished.
 | Results       | `results.png` | The nine-letter word, the ranking, every word revealed and checked   |
 
 The puzzle in the mockups is real, made the way the game will make them: "moonlight" with G
-in the centre, 21 answers and 4 rarer words also accepted.
+in the centre, 19 answers and 7 rarer words also accepted.
 
 ## Rules
 
@@ -53,36 +53,37 @@ in the centre, 21 answers and 4 rarer words also accepted.
 
 ## Which words count
 
-A plain Scrabble list (ENABLE) is full of words nobody uses (TIGLON, LOGION, THOLING), and
-a game that counts them can't be trusted. Now three independent sources must agree
-(`tools/ninefold/make_words.py`, sources and licences in `tools/ninefold/SOURCES.md`):
+Accuracy decides what is a word; taste is a separate, visible layer (the family filter).
+The rules are in `tools/ninefold/make_words.py`, the sources and licences in
+`tools/ninefold/SOURCES.md`.
 
-| Test                      | Source                                   | Rules out                                  |
-|---------------------------|------------------------------------------|--------------------------------------------|
-| a valid word              | ENABLE2K (public domain)                 | names, abbreviations, misspellings         |
-| an ordinary word          | SCOWL sizes 10-50 (a spell checker's list) | archaic, technical and dialect words     |
-| a word people use         | wordfreq: Zipf 2.5 or more               | rare words (2.0 to 2.5: "also accepted")   |
-| not a contraction         | SCOWL's contraction lists, wordfreq      | SHES, CANT, WONT (she's, can't, won't)     |
+| Test                        | Source                                      | Rules out                                      |
+|-----------------------------|---------------------------------------------|------------------------------------------------|
+| a valid word                | ENABLE2K (public domain)                    | names, abbreviations, misspellings             |
+| an ordinary word            | SCOWL sizes 10-60 (spell-checker lists)     | archaic, technical, dialect words (TOLA, AIRT) |
+| not a plural or -s form     | WordNet 3.0's grammar                       | OATS, CARS, YEARS, PARENTS, RUNS; PANTS too    |
+| not a contraction           | SCOWL's contraction lists, wordfreq         | SHES, CANT, WONT                               |
+| an answer: common, British  | wordfreq Zipf 2.75 or more; SCOWL British   | rarer words and COLOR: those are "also accepted" |
+| an answer: not a name       | SCOWL's name lists                          | ANNA, LOGAN as answers (ORCA, BRIE still count) |
 
-- Result: 24,784 answers and 6,778 "also accepted" words, of 4 to 9 letters.
-- **Accuracy first, taste second.** Those lists say only what is a word. The **family
-  filter** is a game setting (on by default, chosen by the host and the same on every
-  device). It hides the 117 words in `words/family.txt`: words on LDNOOBW's reviewed list,
-  or in `family-extra.txt`, exactly as written there, never guessed variants, so it can't
-  catch a real word like BUTTER by accident. With the filter off they count like any other.
-- Still to come: judging the filter by a dictionary's own labels. A word would be hidden
-  only when Wiktionary marks its main meaning, or most of its meanings, vulgar, offensive or
-  a slur. BUTT, ESCORT, SNATCH and SKEET would then stay visible. That needs `kaikki.org` or
-  `en.wiktionary.org`, which this environment can't reach yet.
-- **200 sample puzzles** with every word, for anyone to review: `samples-200.md`. Checked by
-  `tools/ninefold/check_samples.py`, which shares no code with the generator: 7,591 words,
-  0 problems (and it does catch planted mistakes: a word without the centre letter, a tile
-  used twice, a missing word).
-- The mockups' puzzle has 21 answers and 4 "also accepted" words. Its full list is MOONLIGHT,
-  LOOMING, LOOTING, TOOLING, HOMING, GLINT, GLOOM, IGLOO, LIGHT, LINGO, MIGHT, NIGHT, THING,
-  THONG, GILT, GOON, LOGO, LONG, NIGH, TING, TONG, plus HOOTING, INGOT, MOLTING, HOLING.
-- Every word left out is in `REPORT.txt` with its reason, so anyone can check a decision.
-  Rebuilding gives the same lists unless a source changes (versions pinned).
+- **No plurals**, and no verb -s forms (they're spelled the same). Words that only look
+  plural stay: NEWS, SERIES, LENS, BONUS, ALWAYS, ALAS, PHYSICS, POLITICS, OURS.
+  Edge cases left for review: PECS, UNDIES, AFTERS (plural-only nouns, like PANTS, which
+  goes), TIGHTS and ARREARS.
+- Result: 16,272 answers and 9,543 "also accepted" words, of 4 to 9 letters.
+- **Family filter** (a game setting, on by default, the same on every device): hides the 98
+  words in `words/family.txt`, taken from LDNOOBW's reviewed list or `family-extra.txt`
+  exactly as written there, never guessed variants. With the filter off they count.
+  Still to come: judging it by Wiktionary's own labels (BUTT, ESCORT, SKEET would then stay
+  visible), which needs `kaikki.org` or `en.wiktionary.org`.
+- **Measured against people's choices**: `benchmark.py` runs the lists on 595 puzzles whose
+  answers were chosen by hand. 96.9% of our answers are words those editors listed; of
+  their words, we accept 85.6% once plurals and contractions (excluded by rule) are set
+  aside. Most of the rest are rarer words below our cut-offs (THROE, EWER, TIRO).
+- **200 sample puzzles** with every word: `samples-200.md`, checked by
+  `tools/ninefold/check_samples.py` (separate code): 7,957 words, 0 problems. It catches
+  planted mistakes (a word without the centre letter, a tile used twice, a missing word).
+- The mockups' puzzle has 19 answers and 7 also accepted (one of those hidden by the filter).
 - A game's `START` carries a hash of the lists: devices with different lists won't play
   together, so a mismatch can't decide a word.
 
