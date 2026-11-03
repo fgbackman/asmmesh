@@ -126,3 +126,38 @@
 .set PN_SIZE,       (PN_HDR + PN_N * PN_ESIZE)
 .set PN_NEW,        6           // new people a minute, at most
 .set PN_PERIOD,     60000
+
+// Noise sessions (bc_noise.s): one per bitchat person we chat with privately. The
+// handshake's state and the transport's are kept apart, so a working transport stays in
+// use while a new handshake (message 1 is unauthenticated) runs, and is only replaced when
+// that one completes.
+.set NZ_PEER,       0           // their peer id; 0: a free slot
+.set NZ_ACTIVE,     8           // 1 while a handshake runs
+.set NZ_ROLE,       16          // 0 initiator, 1 responder
+.set NZ_STEP,       24          // handshake messages done (0-3)
+.set NZ_EST,        32          // 1 once there are transport keys
+.set NZ_HAVEK,      40          // the handshake has a cipher key
+.set NZ_N,          48          // its nonce
+.set NZ_SENDN,      56          // transport: next nonce we send
+.set NZ_HI,         64          //   highest nonce received
+.set NZ_ESTAT,      72          // when the transport was made (ms, the caller's clock)
+.set NZ_HSAT,       80          // when the handshake started
+.set NZ_USED,       88          // last sent or received
+.set NZ_TRIES,      96          // handshakes we started lately (the caller's)
+.set NZ_CK,         128         // 32 each from here
+.set NZ_H,          160
+.set NZ_K,          192
+.set NZ_E,          224         // our ephemeral secret
+.set NZ_EPUB,       256
+.set NZ_RE,         288
+.set NZ_HRS,        320         // their static key, as this handshake says
+.set NZ_RS,         352         // as the transport's handshake said
+.set NZ_TSEND,      384
+.set NZ_TRECV,      416
+.set NZ_WIN,        448         // 1024 bits: nonce n seen <=> bit (n mod 1024), for n > HI - 1024
+.set NZ_SIZE,       576
+.set NZ_WINDOW,     1024
+.set NZ_MSG1,       32          // XX message sizes with empty payloads, as bitchat sends
+.set NZ_MSG2,       96
+.set NZ_MSG3,       64
+.set NZ_OVER,       20          // a transport message: 4 nonce bytes + 16 tag bytes more

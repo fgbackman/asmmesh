@@ -34,6 +34,7 @@ extern long bc_packet_selftest(void) F(bc_packet_selftest) __attribute__((weak))
 extern long bc_peer_selftest(void) F(bc_peer_selftest) __attribute__((weak));
 extern long term_selftest(void) F(term_selftest) __attribute__((weak));
 extern long hue_core_selftest(void) F(hue_core_selftest) __attribute__((weak));
+extern long bc_noise_selftest(void) F(bc_noise_selftest) __attribute__((weak));
 extern long bc_decode(const void *, long, void *, void *, long) F(bc_decode);
 extern long bc_sign_data(const void *, void *, long) F(bc_sign_data);
 extern long bc_verify(const void *, const void *, void *, long) F(bc_verify);
@@ -108,8 +109,9 @@ static long unhex(const char *s, unsigned char *p) {
 }
 
 int main(int argc, char **argv) {
+    setvbuf(stdout, NULL, _IONBF, 0);   /* a crash shows right after the last test that ran */
     if (argc > 1 && !strcmp(argv[1], "selftest")) {
-        long f = bc_selftest() + bc_link_selftest() + bc_packet_selftest() + bc_peer_selftest() + term_selftest() + hue_core_selftest();
+        long f = bc_selftest() + bc_link_selftest() + bc_packet_selftest() + bc_peer_selftest() + term_selftest() + hue_core_selftest() + bc_noise_selftest();
         printf("%ld failed\n", f);
         return f != 0;
     }

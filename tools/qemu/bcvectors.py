@@ -1,6 +1,6 @@
 # bcvectors.py — prints, as assembly, the test packets of bc_packet.s's self-tests (155-164);
 # with `peer` those of bc_peer.s (165-172), with `msg` its public-message ones (173-175),
-# with `pin` its pin and replay ones (181-183).
+# with `pin` its pin and replay ones (181-183), with `noise` bc_noise.s's (192-195).
 # Run it again, and paste over the vectors in the .s file, if bcwire.py changes.
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -176,5 +176,30 @@ def pin_vectors():
           % (len(ann1), len(m1), len(mold), len(mfut), len(leave), len(crowd[0])))
     assert all(len(x) == len(ann1) for x in (ann2, other) + tuple(crowd))
 
+
+# ---- bc_noise.s (self-tests 192-195): `bcvectors.py noise`
+def noise_vectors():
+    import bcnoise as bn
+    si, sr = bytes(range(1, 33)), bytes(range(33, 65))
+    ei, er = bytes(range(65, 97)), bytes(range(97, 129))
+    (m1, m2, m3), (a_send, a_recv), (b_send, b_recv), h = bn.handshake(si, sr, ei, er)
+    pm = bn.private_message('6F1C4A2E-0B7D-4E8A-9C3F-2D5E7A1B9C04', 'hi from asmmesh')
+    assert bn.read_private_message(pm)[1] == b'hi from asmmesh'
+    c0 = a_send.seal(pm)                       # initiator to responder, nonce 0
+    c1 = a_send.seal(b'\x03' + b'6F1C4A2E-0B7D-4E8A-9C3F-2D5E7A1B9C04')   # a delivered ack, nonce 1
+    r0 = b_send.seal(b'\x02' + b'X')          # responder to initiator, nonce 0
+    assert b_recv.open(c0) == pm and b_recv.open(c1)[0] == 3 and a_recv.open(r0) == b'\x02X'
+    for name, b, note in (('Lnv_si', si, 'initiator static secret'), ('Lnv_sr', sr, 'responder static secret'),
+                          ('Lnv_ei', ei, 'initiator ephemeral secret'), ('Lnv_er', er, 'responder ephemeral secret'),
+                          ('Lnv_spi', bn.pub(si), 'initiator static public'), ('Lnv_spr', bn.pub(sr), 'responder static public'),
+                          ('Lnv_m1', m1, 'XX message 1: -> e'), ('Lnv_m2', m2, 'XX message 2: <- e, ee, s, es'),
+                          ('Lnv_m3', m3, 'XX message 3: -> s, se'), ('Lnv_hh', h, 'the handshake hash'),
+                          ('Lnv_pm', pm, 'a private message: id, "hi from asmmesh"'),
+                          ('Lnv_c0', c0, 'it, sealed by the initiator (nonce 0)'),
+                          ('Lnv_c1', c1, 'a delivered ack, sealed by the initiator (nonce 1)'),
+                          ('Lnv_r0', r0, 'a read receipt "X", sealed by the responder (nonce 0)')):
+        out(name, b, note)
+    print('.set NV_PM_N, %d\n.set NV_C0_N, %d\n.set NV_C1_N, %d\n.set NV_R0_N, %d' % (len(pm), len(c0), len(c1), len(r0)))
+
 if __name__ == '__main__':
-    {'peer': peer_vectors, 'msg': msg_vectors, 'pin': pin_vectors}.get(sys.argv[1] if sys.argv[1:] else '', packet_vectors)()
+    {'peer': peer_vectors, 'msg': msg_vectors, 'pin': pin_vectors, 'noise': noise_vectors}.get(sys.argv[1] if sys.argv[1:] else '', packet_vectors)()
