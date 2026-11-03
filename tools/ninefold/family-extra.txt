@@ -1,0 +1,45 @@
+# Words the family filter hides that LDNOOBW doesn't list as written: forms of words it does
+# list, and crude words. Each written out in full; nothing is matched by pattern, so a real
+# word can't be caught by accident. One per line, lower case; '#' starts a comment.
+raped
+rapes
+rapists
+sluts
+whores
+cunts
+fucked
+fucker
+fuckers
+fucks
+shits
+niggers
+niggas
+faggots
+fags
+dicks
+bitching
+bastards
+assholes
+blowjobs
+dildos
+hookers
+milfs
+orgasms
+penises
+vaginas
+nipples
+nudes
+twats
+vibrators
+cums
+tits
+# crude, though no slur list has them
+arse
+arses
+crap
+crappy
+piss
+pissed
+pisses
+turd
+turds

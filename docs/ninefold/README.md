@@ -62,12 +62,20 @@ a game that counts them can't be trusted. Now three independent sources must agr
 | a valid word              | ENABLE2K (public domain)                 | names, abbreviations, misspellings         |
 | an ordinary word          | SCOWL sizes 10-50 (a spell checker's list) | archaic, technical and dialect words     |
 | a word people use         | wordfreq: Zipf 2.5 or more               | rare words (2.0 to 2.5: "also accepted")   |
-| fit for a family game     | LDNOOBW and `blocked.txt` (less `allowed.txt`) | slurs, obscenities, crude words, and their inflections |
 | not a contraction         | SCOWL's contraction lists, wordfreq      | SHES, CANT, WONT (she's, can't, won't)     |
 
-- Result: 24,670 answers and 6,762 "also accepted" words, of 4 to 9 letters.
+- Result: 24,784 answers and 6,778 "also accepted" words, of 4 to 9 letters.
+- **Accuracy first, taste second.** Those lists say only what is a word. The **family
+  filter** is a game setting (on by default, chosen by the host and the same on every
+  device). It hides the 117 words in `words/family.txt`: words on LDNOOBW's reviewed list,
+  or in `family-extra.txt`, exactly as written there, never guessed variants, so it can't
+  catch a real word like BUTTER by accident. With the filter off they count like any other.
+- Still to come: judging the filter by a dictionary's own labels. A word would be hidden
+  only when Wiktionary marks its main meaning, or most of its meanings, vulgar, offensive or
+  a slur. BUTT, ESCORT, SNATCH and SKEET would then stay visible. That needs `kaikki.org` or
+  `en.wiktionary.org`, which this environment can't reach yet.
 - **200 sample puzzles** with every word, for anyone to review: `samples-200.md`. Checked by
-  `tools/ninefold/check_samples.py`, which shares no code with the generator: 7,664 words,
+  `tools/ninefold/check_samples.py`, which shares no code with the generator: 7,591 words,
   0 problems (and it does catch planted mistakes: a word without the centre letter, a tile
   used twice, a missing word).
 - The mockups' puzzle has 21 answers and 4 "also accepted" words. Its full list is MOONLIGHT,

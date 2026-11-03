@@ -249,6 +249,7 @@ arouses
 arpeggio
 arpeggios
 arrangers
+arses
 arsonists
 arthritic
 arthropod
@@ -520,6 +521,7 @@ billets
 billionth
 billow
 billows
+bimbos
 binged
 binges
 binned
@@ -537,6 +539,7 @@ bisected
 bisecting
 bisects
 bisque
+bitched
 bitterest
 bittern
 bivalve
@@ -638,6 +641,7 @@ bombast
 bonbon
 bondsman
 bonehead
+boners
 bongos
 bongs
 bonnets
@@ -796,6 +800,7 @@ bussing
 busybody
 busyness
 buttering
+buttes
 buttock
 buxom
 buyouts
@@ -1594,6 +1599,7 @@ diatribes
 dibble
 dices
 dicing
+dicker
 dicta
 dictum
 diddle
@@ -2119,6 +2125,7 @@ feelers
 feigns
 feldspar
 felines
+fellatio
 felonious
 felted
 felts
@@ -2585,6 +2592,7 @@ grittier
 gritting
 grommet
 grooving
+gropes
 grossest
 grossness
 grottoes
@@ -3719,6 +3727,7 @@ monetise
 monetized
 moneybags
 moneyed
+mongers
 mongrels
 monikers
 monocle
@@ -4351,6 +4360,7 @@ platen
 platitude
 plaudits
 playbill
+playboys
 playpen
 plazas
 pleasured
@@ -4915,6 +4925,7 @@ rigours
 rile
 riles
 rimes
+rimming
 rinds
 ringers
 ringlets
@@ -5249,6 +5260,8 @@ severally
 severest
 severs
 sews
+sexed
+sexing
 sexless
 sextant
 sextet
@@ -5486,6 +5499,7 @@ smudges
 smudging
 smugly
 smugness
+smuts
 smutty
 snagging
 snakebite
@@ -5608,6 +5622,7 @@ spheroid
 sphinxes
 spicier
 spiciness
+spicing
 spiffy
 spigot
 spillage
@@ -5866,6 +5881,7 @@ swaddled
 swaddling
 swarthy
 swash
+swastikas
 swathe
 swathed
 swats

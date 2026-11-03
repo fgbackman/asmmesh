@@ -9,6 +9,7 @@ from collections import Counter
 here = sys.path[0]
 ANS = [w.strip() for w in open(here + '/words/answers.txt') if w.strip()]
 EXT = [w.strip() for w in open(here + '/words/extra.txt') if w.strip()]
+FAMILY = {w.strip() for w in open(here + '/words/family.txt') if w.strip()}
 
 def fits(word, tiles):
     need, have = Counter(word), Counter(tiles)
@@ -41,11 +42,15 @@ def main(n, seed):
     print('Made by `tools/ninefold/samples.py %d %d` from `words/answers.txt` and `words/extra.txt`.' % (n, seed))
     print('Rule: words of 4-9 letters, using the centre letter, each tile at most once.')
     print('"Also accepted" words are real but rarer: they score, but are never shown as missed.')
+    print('Every word is listed, accurate or not to taste. Words the family filter would hide')
+    print('(a game setting, on by default) are named again on their own line, so nothing is out of view.')
     print('`tools/ninefold/check_samples.py` checks this file independently.\n')
     for i, (nine, ch, answers, extra) in enumerate(out, 1):
         print('## %d. %s (centre %s): %d answers' % (i, nine.upper(), ch.upper(), len(answers)))
         print(', '.join(w.upper() for w in answers))
-        print('Also accepted (%d): %s\n' % (len(extra), ', '.join(w.upper() for w in extra) or '-'))
+        print('Also accepted (%d): %s' % (len(extra), ', '.join(w.upper() for w in extra) or '-'))
+        hidden = [w for w in answers + extra if w in FAMILY]
+        print('Family filter hides (%d): %s\n' % (len(hidden), ', '.join(w.upper() for w in hidden) or '-'))
 
 if __name__ == '__main__':
     main(int(sys.argv[1]), int(sys.argv[2]))

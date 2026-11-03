@@ -9,6 +9,7 @@ import re, sys
 here = sys.path[0]
 answers = set(open(here + '/words/answers.txt').read().split())
 extra = set(open(here + '/words/extra.txt').read().split())
+family = set(open(here + '/words/family.txt').read().split())
 
 def counts(w):
     c = [0] * 26
@@ -21,7 +22,7 @@ def fits(w, tiles):
     return all(cw[i] <= tiles[i] for i in range(26))
 
 text = open(sys.argv[1]).read()
-heads = list(re.finditer(r'^## (\d+)\. ([A-Z]{9}) \(centre ([A-Z])\): (\d+) answers\n(.*)\nAlso accepted \((\d+)\): (.*)$', text, re.M))
+heads = list(re.finditer(r'^## (\d+)\. ([A-Z]{9}) \(centre ([A-Z])\): (\d+) answers\n(.*)\nAlso accepted \((\d+)\): (.*)\nFamily filter hides \((\d+)\): (.*)$', text, re.M))
 problems, n_words = [], 0
 for m in heads:
     num, nine, centre = m.group(1), m.group(2).lower(), m.group(3).lower()
@@ -38,6 +39,10 @@ for m in heads:
         if centre not in w: problems.append('%s: %s: no centre letter' % (num, w))
         if not fits(w, tiles): problems.append('%s: %s: uses a tile too often' % (num, w))
         if w not in src: problems.append('%s: %s: not in %s.txt' % (num, w, name))
+    hidden = [] if m.group(9) == '-' else [w.lower() for w in m.group(9).split(', ')]
+    if int(m.group(8)) != len(hidden): problems.append('%s: family count wrong' % num)
+    if set(hidden) != {w for w in listed + listed_x if w in family}:
+        problems.append('%s: family filter line is wrong' % num)
     want = {w for w in answers if 4 <= len(w) <= 9 and centre in w and fits(w, tiles)}
     want_x = {w for w in extra if 4 <= len(w) <= 9 and centre in w and fits(w, tiles)}
     for w in sorted(want - set(listed)): problems.append('%s: missing answer %s' % (num, w))
