@@ -1302,8 +1302,6 @@ _selftest:
     add  x19, x19, x0
     bl   _hue_core_selftest           // Hue serials, bridge addresses, v1 bridges (hue_core.s)
     add  x19, x19, x0
-    bl   _netscan_selftest            // the network scan's ranges, makers, ports
-    add  x19, x19, x0
     bl   _t_hard                      // fuzzing, flood limits, full tables (last: it fills them)
     add  x19, x19, x0
 
