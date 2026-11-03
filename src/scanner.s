@@ -77,11 +77,13 @@ Lf_b_pair:   .double 16.0, 12.0, 160.0, 30.0
 Lf_b_setup:  .double 180.0, 12.0, 110.0, 30.0
 Lf_b_bt:     .double 294.0, 12.0, 190.0, 30.0
 Lf_b_again:  .double 488.0, 12.0, 120.0, 30.0
+Lf_seg:      .double 640.0, 14.0, 260.0, 26.0
 Lc_w_name:   .double 170.0
 Lc_w_kind:   .double 150.0
 Lc_w_sig:    .double 70.0
 Lc_w_seen:   .double 110.0
 Lc_w_det:    .double 300.0
+Lc_w_via:    .double 90.0
 Lc_12:       .double 12.0
 Lc_11:       .double 11.0
 
@@ -206,7 +208,7 @@ Lss_show:
     LEAVE 0
 
 _build_scanner:
-    ENTER 0
+    ENTER 32                          // [96] the filter's three labels
     CLS  Ls_NSWindow
     MSG0 Ls_alloc
     mov  x19, x0
@@ -286,6 +288,11 @@ _build_scanner:
     LDD  d0, Lc_w_name
     bl   _add_col
     mov  x0, x21
+    ADRL x1, Ls_c_via
+    ADRL x2, Ls_h_via
+    LDD  d0, Lc_w_via
+    bl   _add_col
+    mov  x0, x21
     ADRL x1, Ls_c_kind
     ADRL x2, Ls_h_kind
     LDD  d0, Lc_w_kind
@@ -359,6 +366,63 @@ _build_scanner:
     ldp  d0, d1, [x8]
     ldp  d2, d3, [x8, #16]
     bl   _mk_button
+    // All | Bluetooth | Wi-Fi: which rows the list shows (scan_core.s's filter)
+    ADRL x0, Lsg_all
+    bl   _nsstr
+    str  x0, [sp, #96]
+    ADRL x0, Lsg_bt
+    bl   _nsstr
+    str  x0, [sp, #104]
+    ADRL x0, Lsg_wifi
+    bl   _nsstr
+    str  x0, [sp, #112]
+    CLS  Lsg_NSArray
+    add  x2, sp, #96
+    mov  x3, #3
+    MSG2 Lsg_arrayWithObjects
+    mov  x22, x0
+    CLS  Lsg_NSSegmentedControl
+    mov  x23, x0
+    ADRL x0, Lsg_action
+    bl   _sel_registerName
+    mov  x5, x0
+    mov  x0, x23
+    mov  x2, x22
+    mov  x3, #0                       // select one
+    ADRL x8, _g_ctl
+    ldr  x4, [x8]
+    MSG4 Lsg_segmented
+    cbz  x0, 9f
+    mov  x22, x0
+    SELX1 Lsg_setFrame
+    mov  x0, x22
+    ADRL x8, Lf_seg
+    ldp  d0, d1, [x8]
+    ldp  d2, d3, [x8, #16]
+    bl   _objc_msgSend
+    ADRL x8, _g_scan_filter
+    ldr  x2, [x8]
+    mov  x0, x22
+    MSG1 Lsg_setSelected
+    mov  x0, x20
+    mov  x2, x22
+    MSG1 Ls_addSubview
+9:  LEAVE 32
+
+// - scanFilter:(NSSegmentedControl *)sender — All / Bluetooth / Wi-Fi
+.globl _scan_filter_changed
+_scan_filter_changed:
+    ENTER 0
+    mov  x0, x2
+    MSG0 Lsg_selectedSegment
+    bl   _scan_set_filter
+    ADRL x8, _g_scan_table            // the rows are numbered anew: nothing selected
+    ldr  x0, [x8]
+    cbz  x0, 1f
+    mov  x2, #0
+    MSG1 Lsg_deselectAll
+1:  bl   _scanner_selected
+    bl   _ui_lists_changed
     LEAVE 0
 
 // ---------------------------------------------------------------------------
@@ -927,12 +991,14 @@ Ls_c_hops:            .asciz "hops"
 Ls_c_seen:            .asciz "last"
 Ls_c_kind:            .asciz "kind"
 Ls_c_det:             .asciz "details"
+Ls_c_via:             .asciz "via"
 Ls_h_name:            .asciz "Name"
 Ls_h_sig:             .asciz "Signal"
 Ls_h_hops:            .asciz "Hops"
 Ls_h_seen:            .asciz "Where"
 Ls_h_kind:            .asciz "Kind"
 Ls_h_det:             .asciz "Details"
+Ls_h_via:             .asciz "Via"
 Ls_f_num:             .asciz "%ld"
 Ls_f_dbm:             .asciz "%ld dBm"
 Ls_f_secs:            .asciz "%lds ago"
@@ -954,6 +1020,18 @@ Ls_b_pair:            .asciz "Connect & Pair"
 Ls_b_setup:           .asciz "Set Up"
 Ls_b_bt:              .asciz "Bluetooth Settings\342\200\246"
 Ls_b_again:           .asciz "Look Again"
+Lsg_all:              .asciz "All"
+Lsg_bt:               .asciz "Bluetooth"
+Lsg_wifi:             .asciz "Wi-Fi & internet"
+Lsg_NSArray:          .asciz "NSArray"
+Lsg_NSSegmentedControl: .asciz "NSSegmentedControl"
+Lsg_arrayWithObjects: .asciz "arrayWithObjects:count:"
+Lsg_segmented:        .asciz "segmentedControlWithLabels:trackingMode:target:action:"
+Lsg_action:           .asciz "scanFilter:"
+Lsg_setFrame:         .asciz "setFrame:"
+Lsg_setSelected:      .asciz "setSelectedSegment:"
+Lsg_selectedSegment:  .asciz "selectedSegment"
+Lsg_deselectAll:      .asciz "deselectAll:"
 Ls_pick:              .asciz "Pick a row to see everything it says about itself. Connect & Pair reads a Bluetooth device's maker, model, firmware and battery (macOS asks first if it needs pairing) or connects a paired headset or keyboard; Set Up pairs a Hue Bridge or Nanoleaf, connects Home Assistant, opens the Home app for HomeKit and Matter devices, or opens a device's web page."
 Ls_k_mesh:            .asciz "Mac (asmmesh)"
 Ls_home_ready:        .asciz "\302\267 %s is already connected \342\200\224 in Home, try \342\200\234%s status\342\200\235."

@@ -127,6 +127,8 @@ struct ScanRow: Identifiable, Equatable {
     let kind: String
     let signal: String
     let last: String
+    let via: String                 // "Bluetooth", "Bluetooth (paired)", "Wi-Fi", "Internet"
+    var bluetooth: Bool { via.hasPrefix("Bluetooth") }
 }
 
 struct QRText: Identifiable {
@@ -282,7 +284,8 @@ final class Mesh: ObservableObject {
             rows.append(ScanRow(id: i, name: String(cString: am_scan_cell(i, 110)),     // 'n'
                                 kind: String(cString: am_scan_cell(i, 107)),            // 'k'
                                 signal: String(cString: am_scan_cell(i, 115)),          // 's'
-                                last: String(cString: am_scan_cell(i, 108))))           // 'l'
+                                last: String(cString: am_scan_cell(i, 108)),            // 'l'
+                                via: String(cString: am_scan_cell(i, 118))))            // 'v'
         }
         if rows != scan { scan = rows }
         listedNow()

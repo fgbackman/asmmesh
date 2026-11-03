@@ -8,6 +8,7 @@ struct NearbyView: View {
     @State private var naming: Sensor?
     @State private var newName = ""
     @State private var picked: ScanRow?
+    @State private var showing = 0            // 0 all, 1 Bluetooth, 2 Wi-Fi & internet
 
     var body: some View {
         NavigationStack {
@@ -59,29 +60,17 @@ struct NearbyView: View {
                     }
 
                     SectionTitle(text: "Everything around")
-                    ForEach(mesh.scan) { r in
-                        Button { picked = r } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: symbol(for: r.kind))
-                                    .foregroundStyle(Theme.blue)
-                                    .frame(width: 22)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(r.name.isEmpty ? "Unnamed" : r.name)
-                                        .font(.subheadline.weight(.semibold))
-                                        .lineLimit(1)
-                                    Text(r.kind).font(.caption).foregroundStyle(Theme.dim).lineLimit(1)
-                                }
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    Text(r.signal).font(.caption.monospacedDigit()).foregroundStyle(Theme.dim)
-                                    Text(r.last).font(.caption2).foregroundStyle(Theme.dim)
-                                }
-                            }
-                            .padding(.horizontal, 14).padding(.vertical, 10)
-                            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
+                    Picker("Show", selection: $showing) {
+                        Text("All").tag(0)
+                        Text("Bluetooth").tag(1)
+                        Text("Wi-Fi & internet").tag(2)
+                    }
+                    .pickerStyle(.segmented)
+                    if showing != 2 {
+                        scanGroup("Bluetooth", rows: mesh.scan.filter(\.bluetooth))
+                    }
+                    if showing != 1 {
+                        scanGroup("Wi-Fi & internet", rows: mesh.scan.filter { !$0.bluetooth })
                     }
                 }
                 .padding()
@@ -106,6 +95,50 @@ struct NearbyView: View {
                 Text("Then use it in Home and in rules, like “when bedroom gets above 78 turn on the fan”.")
             }
         }
+    }
+
+    @ViewBuilder
+    private func scanGroup(_ title: String, rows: [ScanRow]) -> some View {
+        HStack {
+            Image(systemName: title == "Bluetooth" ? "dot.radiowaves.left.and.right" : "wifi")
+            Text("\(title) · \(rows.count)")
+            Spacer()
+        }
+        .font(.caption.weight(.semibold)).foregroundStyle(Theme.dim)
+        .padding(.horizontal, 4).padding(.top, 4)
+        if rows.isEmpty {
+            Text(title == "Bluetooth" ? "Nothing on Bluetooth yet." : "Nothing on the network yet: switch on Wi-Fi lights & plugs or TVs & speakers in Settings to look.")
+                .font(.caption).foregroundStyle(Theme.dim)
+                .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 4)
+        }
+        ForEach(rows) { r in
+            scanRow(r)
+        }
+    }
+
+    private func scanRow(_ r: ScanRow) -> some View {
+        Button { picked = r } label: {
+            HStack(spacing: 12) {
+                Image(systemName: r.bluetooth ? "dot.radiowaves.left.and.right" : symbol(for: r.kind))
+                    .foregroundStyle(Theme.blue)
+                    .frame(width: 22)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(r.name.isEmpty ? "Unnamed" : r.name)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    Text(r.kind).font(.caption).foregroundStyle(Theme.dim).lineLimit(1)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(r.signal).font(.caption.monospacedDigit()).foregroundStyle(Theme.dim)
+                    Text(r.last).font(.caption2).foregroundStyle(Theme.dim)
+                }
+            }
+            .padding(.horizontal, 14).padding(.vertical, 10)
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

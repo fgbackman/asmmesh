@@ -168,6 +168,7 @@ Lmethods:
     .quad Ls_m_pairNano,    _nano_pair,         Ls_ty_v1
     .quad Ls_m_refreshHome, _scan_refresh,      Ls_ty_v1
     .quad Ls_m_scanPair,    _scan_pair,         Ls_ty_v1
+    .quad Ls_m_scanFilter,  _scan_filter_changed, Ls_ty_v1
     .quad Ls_m_scanSetUp,   _scan_setup,        Ls_ty_v1
     .quad Ls_m_scanBT,      _bt_settings,       Ls_ty_v1
     .quad Ls_m_netData,     _net_data,          Ls_ty_v3
@@ -1772,6 +1773,7 @@ Ls_m_connectGovee:     .asciz "connectGovee:"
 Ls_m_pairNano:         .asciz "pairNanoleaf:"
 Ls_m_refreshHome:      .asciz "refreshDevices:"
 Ls_m_scanPair:         .asciz "scanConnectPair:"
+Ls_m_scanFilter:       .asciz "scanFilter:"
 Ls_m_scanSetUp:        .asciz "scanSetUp:"
 Ls_m_scanBT:           .asciz "scanBluetoothSettings:"
 Ls_connectha_item:     .asciz "Connect Home Assistant\342\200\246"

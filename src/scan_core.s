@@ -12,14 +12,156 @@
 .zerofill __DATA,__bss,_g_scan_text,1024,4
 .globl _g_scan_tmp
 .zerofill __DATA,__bss,_g_scan_tmp,160,4
+.p2align 3
+.globl _g_scan_filter
+_g_scan_filter: .quad 0               // 0 everything, 1 Bluetooth, 2 Wi-Fi and internet
+
+.section __DATA,__const
+.p2align 3
+Ls_via_tab: .quad Ls_dash, Ls_via_bt, Ls_via_wifi, Ls_via_net
 
 .text
 .p2align 2
 
 
-// long _scan_rows(void)
+// Every row says how it's reached (_scan_via: Bluetooth, Wi-Fi, the internet), and the
+// list can show just one of them (_scan_set_filter): _scan_rows and _scan_row count only
+// the rows that pass, so the Mac's table, the details, both buttons and the iPhone's list
+// all follow the filter.
+
+// long _scan_rows(void) -> rows that pass the filter
 .globl _scan_rows
 _scan_rows:
+    ENTER 0
+    ADRL x8, _g_scan_filter
+    ldr  x9, [x8]
+    cbz  x9, Lscan_all_go
+    bl   Lscan_all
+    mov  x19, x0                      // every row
+    mov  x20, #0                      // raw row
+    mov  x21, #0                      // passing
+1:  cmp  x20, x19
+    b.hs 2f
+    mov  x0, x20
+    bl   Lscan_raw
+    bl   Lscan_keep
+    add  x21, x21, x0
+    add  x20, x20, #1
+    b    1b
+2:  mov  x0, x21
+    LEAVE 0
+Lscan_all_go:
+    bl   Lscan_all
+    LEAVE 0
+
+// (long type, long index) _scan_row(long row) — the row-th row that passes the filter
+.globl _scan_row
+_scan_row:
+    ENTER 0
+    ADRL x8, _g_scan_filter
+    ldr  x9, [x8]
+    cbz  x9, Lscan_raw_go
+    tbnz x0, #63, 8f
+    mov  x22, x0                      // wanted
+    bl   Lscan_all
+    mov  x19, x0
+    mov  x20, #0
+    mov  x21, #0
+1:  cmp  x20, x19
+    b.hs 8f
+    mov  x0, x20
+    bl   Lscan_raw
+    mov  x23, x0
+    mov  x24, x1
+    bl   Lscan_keep
+    add  x20, x20, #1
+    cbz  x0, 1b
+    cmp  x21, x22
+    b.eq 3f
+    add  x21, x21, #1
+    b    1b
+3:  mov  x0, x23
+    mov  x1, x24
+    LEAVE 0
+8:  mov  x0, #-1
+    mov  x1, #0
+    LEAVE 0
+Lscan_raw_go:
+    bl   Lscan_raw
+    LEAVE 0
+
+// long _scan_via(long type, long index) -> 1 Bluetooth, 2 Wi-Fi (the local network),
+//   3 the internet (a cloud service, or Shortcuts), 0 none
+.globl _scan_via
+_scan_via:
+    cmp  x0, #5
+    b.eq 2f
+    cmp  x0, #2                       // Bonjour, UPnP: Wi-Fi
+    b.eq 1f
+    cmp  x0, #3
+    b.eq 1f
+    tbnz x0, #63, 9f
+    cmp  x0, #5
+    b.hi 9f
+    mov  x0, #1                       // the mesh, Bluetooth LE, paired Bluetooth
+    ret
+1:  mov  x0, #2
+    ret
+2:  ADRL x8, _g_devs                  // a device asmmesh controls: by its kind
+    add  x8, x8, x1, lsl #DEV_SHIFT
+    ldr  x9, [x8, #D_KIND]
+    mov  x0, #1
+    cmp  x9, #K_HUE_BLE
+    b.eq 3f
+    cmp  x9, #K_BLES
+    b.eq 3f
+    mov  x0, #3
+    cmp  x9, #K_ST
+    b.eq 3f
+    cmp  x9, #K_ST_SCENE
+    b.eq 3f
+    cmp  x9, #K_SHORTCUT
+    b.eq 3f
+    cmp  x9, #K_LIFX
+    b.eq 3f
+    cmp  x9, #K_GOVEE
+    b.eq 3f
+    mov  x0, #2
+3:  ret
+9:  mov  x0, #0
+    ret
+
+// long Lscan_keep(long type, long index) -> 1 if it passes the filter (1 Bluetooth only,
+//   2 Wi-Fi and internet only)
+Lscan_keep:
+    mov  x15, x30
+    bl   _scan_via
+    mov  x30, x15
+    ADRL x8, _g_scan_filter
+    ldr  x9, [x8]
+    cbz  x9, 1f
+    cmp  x9, #1
+    b.ne 2f
+    cmp  x0, #1
+    cset x0, eq
+    ret
+2:  cmp  x0, #2
+    cset x0, hs
+    ret
+1:  mov  x0, #1
+    ret
+
+// void _scan_set_filter(long f) — 0 everything, 1 Bluetooth, 2 Wi-Fi and internet
+.globl _scan_set_filter
+_scan_set_filter:
+    cmp  x0, #2
+    csel x0, xzr, x0, hi
+    ADRL x8, _g_scan_filter
+    str  x0, [x8]
+    ret
+
+// long Lscan_all(void) -> every row, whatever the filter
+Lscan_all:
     ENTER 0
     ADRL x8, _g_node_count
     ldr  x19, [x8]
@@ -38,10 +180,9 @@ _scan_rows:
     add  x0, x19, x0
     LEAVE 0
 
-// (long type, long index) _scan_row(long row) — type 0 mesh 1 BLE 2 Bonjour 3 UPnP 4 paired
-//   5 a device asmmesh controls (index into the registry), -1 none
-.globl _scan_row
-_scan_row:
+// (long type, long index) Lscan_raw(long row) — whatever the filter: type 0 mesh 1 BLE
+//   2 Bonjour 3 UPnP 4 paired 5 a device asmmesh controls (index into the registry), -1 none
+Lscan_raw:
     ENTER 0
     mov  x19, x0
     tbnz x19, #63, Lsr_none
@@ -144,6 +285,8 @@ _scan_cell:
     bl   _scan_row
     mov  x22, x0
     mov  x23, x1
+    cmp  w21, #'v'                    // how it's reached
+    b.eq Lsv_via
     cmp  x22, #0
     b.eq Lsv_node
     cmp  x22, #1
@@ -158,6 +301,19 @@ _scan_cell:
     b.eq Lsv_home
     mov  x0, x19
     LEAVE 16
+
+Lsv_via:
+    mov  x0, x22
+    mov  x1, x23
+    bl   _scan_via
+    ADRL x9, Ls_via_tab
+    cmp  x0, #3
+    csel x0, xzr, x0, hi
+    ldr  x0, [x9, x0, lsl #3]
+    cmp  x22, #4                      // paired with this device
+    b.ne 1f
+    ADRL x0, Ls_via_paired
+1:  LEAVE 16
 
 Lsv_home:
     cmp  w21, #'n'
@@ -709,6 +865,10 @@ Ls_f_dbm:             .asciz "%ld dBm"
 Ls_f_secs:            .asciz "%lds ago"
 Ls_f_mins:            .asciz "%ldm ago"
 Ls_dash:              .asciz "\342\200\224"
+Ls_via_bt:            .asciz "Bluetooth"
+Ls_via_paired:        .asciz "Bluetooth (paired)"
+Ls_via_wifi:          .asciz "Wi-Fi"
+Ls_via_net:           .asciz "Internet"
 Ls_now:               .asciz "now"
 Ls_unnamed:           .asciz "(unnamed)"
 Ls_pick:              .asciz "Pick a row to see everything it says about itself. Connect & Pair reads a Bluetooth device's maker, model, firmware and battery (macOS asks first if it needs pairing) or connects a paired headset or keyboard; Set Up pairs a Hue Bridge or Nanoleaf, connects Home Assistant, opens the Home app for HomeKit and Matter devices, or opens a device's web page."
