@@ -17,7 +17,22 @@ struct SettingsView: View {
                 VStack(spacing: 12) {
                     SectionTitle(text: "Connect")
                     VStack(spacing: 0) {
-                        ConnectRow(title: "Hue Bridge", subtitle: "Press its button, then tap", symbol: "lightbulb.fill", color: Theme.orange) { coreLater { am_pair_hue() } }
+                        NavigationLink {
+                            HueView()
+                        } label: {
+                            HStack(spacing: 14) {
+                                IconBadge(symbol: "lightbulb.fill", color: Theme.orange, size: 36)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Philips Hue").font(.headline).foregroundStyle(.primary)
+                                    Text("Bridges, pairing, adding lights by serial").font(.caption).foregroundStyle(Theme.dim)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.footnote).foregroundStyle(Theme.dim)
+                            }
+                            .padding(14)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                         Divider().overlay(Theme.bg)
                         ConnectRow(title: "SmartThings", subtitle: "Paste a personal access token", symbol: "square.grid.2x2.fill", color: Theme.blue) { coreLater { am_connect_st() } }
                         Divider().overlay(Theme.bg)

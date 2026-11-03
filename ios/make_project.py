@@ -13,7 +13,7 @@ CORE = """mesh ident crypto util ble near home parse rules net hue st cloud lan 
 extras find sens_decode sensors spin spinui alerts voice services handoff bt limits guard web fm_html fm_pack fm_util fm_io files scan_core listed seek
 bc_crypto bc_link bc_ble bc_packet bc_zlib bc_peer term_core term_hist hue_core""".split()
 SWIFT = ["App.swift", "Bridge.swift", "Mesh.swift", "RoomsView.swift", "PeopleView.swift",
-         "NearbyView.swift", "SettingsView.swift", "SpinView.swift", "FindView.swift"]
+         "NearbyView.swift", "SettingsView.swift", "SpinView.swift", "FindView.swift", "HueView.swift"]
 FRAMEWORKS = ["CoreBluetooth", "Security", "CoreLocation", "Speech", "AVFoundation", "NearbyInteraction"]
 BUNDLE_ID = "com.fbackman.asmmesh.ios"
 

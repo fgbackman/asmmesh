@@ -31,6 +31,11 @@ void am_select_room(long i);
 void am_send(const char *text);
 void am_home(const char *text);
 
+// Hue bridges (hue.s): b 0-3; host "" when that slot is empty
+const char *am_hue_host(long b);
+const char *am_hue_name(long b);
+long am_hue_paired(long b);
+
 // what you typed, and Home's commands as you type (term_hist.s, as on the Mac)
 const char *am_hist_prev(const char *typing);   // the line before, or NULL
 const char *am_hist_next(void);                 // the line after (past the newest: the draft)

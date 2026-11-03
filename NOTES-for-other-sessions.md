@@ -182,3 +182,17 @@ For where the bitchat work stands and what comes next, start with `docs/bitchat_
   (udp.s calls it for every SSDP answer). `_hue_tick` opens the SSDP sockets (`_udp_init` is
   now safe to call twice) when no bridge is known at 8 s.
 - The API was already v1 over http://, which the v1 bridge speaks; only finding it was missing.
+
+## Hue: several bridges (Nov 3)
+- hue.s keeps up to 4 bridges in `_g_hue_br` (HB_HOST/USER/ID/NAME/NEW, 192 bytes each);
+  `_g_hue_cur` is the one talked to; `HUE_HOST`/`HUE_USER` macros (x16/x17 scratch) give its
+  fields. Every request tag ends in the bridge's digit ("hl1"); `_hue_response` sets
+  `_g_hue_cur` from it. Defaults: hueHost/hueUser/hueId/hueName for bridge 1 (unchanged keys),
+  hueHost2…hueName4 for the others.
+- Device ids: bridge 1 keeps the plain light/group id ("3"); others are "2:3" (`_hue_devid`,
+  `_hue_split` in hue_core.s, self-test 191).
+- A new address gets a slot marked HB_NEW and `GET /api/config` (no username needed); its
+  `bridgeid` merges it into a known slot (the bridge moved) or it's announced as new.
+- Commands: "hue bridges", "hue bridge <ip>", "forget hue bridge N" (devices set to kind 0),
+  "add hue light X on N". Mac menu: Mesh › Add Hue Lights… (`_hue_add_dialog`). iPhone:
+  `HueView.swift`, `am_hue_host/name/paired`.

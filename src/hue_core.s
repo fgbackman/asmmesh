@@ -45,16 +45,21 @@ Lhc_word_is:
 4:  mov  x0, #0
     ret
 
-// long _hue_serials(const char *text, char *out, long cap) -> how many serials (0-10) with
-//   out the bridge's search body ({} for 0: search for any new light), -1 a word that isn't
-//   a serial (out ""), -2 more than 10, -3 cap too small. Words like "light", "bulb",
-//   "serial", "code", "and" are skipped; separators are spaces, commas and semicolons.
+// long _hue_serials(const char *text, char *out, long cap, long *bridge) -> how many
+//   serials (0-10) with out the bridge's search body ({} for 0: search for any new light),
+//   -1 a word that isn't a serial (out ""), -2 more than 10, -3 cap too small. Words like
+//   "light", "bulb", "serial", "code", "on", "bridge" are skipped; a lone digit 1-4 is which
+//   bridge (*bridge, 0 if none given; bridge may be 0). Separators: spaces, commas, ';'.
 .globl _hue_serials
 _hue_serials:
-    ENTER 32                              // [96] count
+    ENTER 32                              // [96] count  [104] bridge out
     mov  x19, x0
     mov  x20, x1
     mov  x21, x2
+    str  x3, [sp, #104]
+    cbz  x3, 1f
+    str  xzr, [x3]
+1:
     cmp  x21, #(16 + HS_MAX * 9 + 4)      // room for all ten
     b.lo Lhs_small
     strb wzr, [x20]
@@ -106,7 +111,20 @@ Lhs_word:                                 // skip separators
     cbz  x0, 6b
     add  x19, x19, x24
     b    Lhs_word
-7:  cmp  x24, #6                          // a serial: 6 hex digits
+7:  cmp  x24, #1                          // a lone digit 1-4: which bridge
+    b.ne 71f
+    ldrb w9, [x19]
+    sub  w9, w9, #'0'
+    cmp  w9, #1
+    b.lo Lhs_bad
+    cmp  w9, #4
+    b.hi Lhs_bad
+    ldr  x10, [sp, #104]
+    cbz  x10, 70f
+    str  x9, [x10]
+70: add  x19, x19, #1
+    b    Lhs_word
+71: cmp  x24, #6                          // a serial: 6 hex digits
     b.ne Lhs_bad
     mov  x9, #0
 8:  cmp  x9, #6
@@ -177,6 +195,46 @@ Lhs_many:
 Lhs_small:
     mov  x0, #-3
     LEAVE 32
+
+// void _hue_devid(long b, const char *raw, char *out /*64*/) — a light or room's id in the
+//   device list: the bridge's own id for the first bridge ("3", as before more than one
+//   was possible), "2:3" for bridge 2 and so on (leaf)
+.globl _hue_devid
+_hue_devid:
+    mov  x9, #0
+    cbz  x0, 1f
+    add  w10, w0, #'1'
+    strb w10, [x2]
+    mov  w10, #':'
+    strb w10, [x2, #1]
+    mov  x9, #2
+1:  ldrb w10, [x1], #1
+    strb w10, [x2, x9]
+    cbz  w10, 2f
+    add  x9, x9, #1
+    cmp  x9, #63
+    b.lo 1b
+    strb wzr, [x2, x9]
+2:  ret
+
+// long _hue_split(const char *id, const char **raw) -> which bridge (0-3) a device id is
+//   from, and *raw the bridge's own id (leaf)
+.globl _hue_split
+_hue_split:
+    ldrb w9, [x0]
+    sub  w9, w9, #'2'
+    cmp  w9, #2
+    b.hi 1f
+    ldrb w10, [x0, #1]
+    cmp  w10, #':'
+    b.ne 1f
+    add  x10, x0, #2
+    str  x10, [x1]
+    add  x0, x9, #1
+    ret
+1:  str  x0, [x1]
+    mov  x0, #0
+    ret
 
 // long _hue_addr_ok(const char *s) -> 1 if it can be a bridge's address in a URL: 1-63 of
 //   letters, digits, '.', '-' (an IPv4 address or a name like Philips-hue.local), not
@@ -254,7 +312,7 @@ Lhc_has:
     ret
 
 // ---------------------------------------------------------------------------
-// self-tests 188-190, called from test.s
+// self-tests 188-191, called from test.s
 
 .macro HC_STR lbl                         // x20 &= (string at x22 == \lbl)
     mov  x0, x22
@@ -279,7 +337,7 @@ Lhc_same:
 
 .globl _hue_core_selftest
 _hue_core_selftest:
-    ENTER 256                             // [96] out (256)
+    ENTER 288                             // [96] out (256)  [360] bridge  [368] raw
     mov  x19, #0
     add  x22, sp, #96
 
@@ -288,6 +346,7 @@ _hue_core_selftest:
     ADRL x0, Lht_in1
     mov  x1, x22
     mov  x2, #256
+    add  x3, sp, #360
     bl   _hue_serials
     cmp  x0, #2
     cset x9, eq
@@ -296,6 +355,7 @@ _hue_core_selftest:
     ADRL x0, Lht_in2
     mov  x1, x22
     mov  x2, #256
+    add  x3, sp, #360
     bl   _hue_serials
     cmp  x0, #0
     cset x9, eq
@@ -304,6 +364,7 @@ _hue_core_selftest:
     ADRL x0, Lht_in3                      // 7 characters
     mov  x1, x22
     mov  x2, #256
+    add  x3, sp, #360
     bl   _hue_serials
     cmp  x0, #-1
     cset x9, eq
@@ -311,6 +372,7 @@ _hue_core_selftest:
     ADRL x0, Lht_in4                      // a quote: never into the JSON
     mov  x1, x22
     mov  x2, #256
+    add  x3, sp, #360
     bl   _hue_serials
     cmp  x0, #-1
     cset x9, eq
@@ -326,6 +388,7 @@ _hue_core_selftest:
     ADRL x0, Lht_in10
     mov  x1, x22
     mov  x2, #256
+    add  x3, sp, #360
     bl   _hue_serials
     cmp  x0, #10
     cset x9, eq
@@ -333,6 +396,7 @@ _hue_core_selftest:
     ADRL x0, Lht_in11
     mov  x1, x22
     mov  x2, #256
+    add  x3, sp, #360
     bl   _hue_serials
     cmp  x0, #-2
     cset x9, eq
@@ -340,6 +404,7 @@ _hue_core_selftest:
     ADRL x0, Lht_in1
     mov  x1, x22
     mov  x2, #40
+    mov  x3, #0
     bl   _hue_serials
     cmp  x0, #-3
     cset x9, eq
@@ -379,15 +444,79 @@ _hue_core_selftest:
     bl   _t_report
     add  x19, x19, x0
 
+    // 191. a serial for bridge 2; device ids per bridge, and back
+    mov  x20, #1
+    ADRL x0, Lht_in_b2
+    mov  x1, x22
+    mov  x2, #256
+    add  x3, sp, #360
+    bl   _hue_serials
+    cmp  x0, #1
+    cset x9, eq
+    and  x20, x20, x9
+    ldr  x9, [sp, #360]
+    cmp  x9, #2
+    cset x9, eq
+    and  x20, x20, x9
+    ADRL x0, Lht_in_b9                    // no bridge 9
+    mov  x1, x22
+    mov  x2, #256
+    add  x3, sp, #360
+    bl   _hue_serials
+    cmp  x0, #-1
+    cset x9, eq
+    and  x20, x20, x9
+    mov  x0, #0
+    ADRL x1, Lht_id3
+    mov  x2, x22
+    bl   _hue_devid
+    HC_STR Lht_id3
+    mov  x0, x22
+    add  x1, sp, #368
+    bl   _hue_split
+    cmp  x0, #0
+    cset x9, eq
+    and  x20, x20, x9
+    mov  x0, #1
+    ADRL x1, Lht_id3
+    mov  x2, x22
+    bl   _hue_devid
+    HC_STR Lht_id2_3
+    mov  x0, x22
+    add  x1, sp, #368
+    bl   _hue_split
+    cmp  x0, #1
+    cset x9, eq
+    and  x20, x20, x9
+    ldr  x0, [sp, #368]
+    ADRL x1, Lht_id3
+    bl   Lhc_same
+    and  x20, x20, x0
+    mov  x0, #3
+    ADRL x1, Lht_id12
+    mov  x2, x22
+    bl   _hue_devid
+    HC_STR Lht_id4_12
+    mov  x0, x22
+    add  x1, sp, #368
+    bl   _hue_split
+    cmp  x0, #3
+    cset x9, eq
+    and  x20, x20, x9
+    mov  w1, w20
+    ADRL x0, Ln_hc191
+    bl   _t_report
+    add  x19, x19, x0
+
     mov  x0, x19
-    LEAVE 256
+    LEAVE 288
 
 // ---------------------------------------------------------------------------
 .section __DATA,__const
 .p2align 3
 Lhs_skip:
     .quad Lhs_w1, Lhs_w2, Lhs_w3, Lhs_w4, Lhs_w5, Lhs_w6, Lhs_w7, Lhs_w8, Lhs_w9, Lhs_w10
-    .quad Lhs_w11, Lhs_w12, Lhs_w13, Lhs_w14, Lhs_w15, 0
+    .quad Lhs_w11, Lhs_w12, Lhs_w13, Lhs_w14, Lhs_w15, Lhs_w16, Lhs_w17, Lhs_w18, Lhs_w19, Lhs_w20, Lhs_w21, 0
 Lht_bad_addrs:
     .quad Lht_b1, Lht_b2, Lht_b3, Lht_b4, Lht_b5, 0
 
@@ -410,6 +539,12 @@ Lhs_w12:        .asciz "by"
 Lhs_w13:        .asciz "with"
 Lhs_w14:        .asciz "the"
 Lhs_w15:        .asciz "no"
+Lhs_w16:        .asciz "on"
+Lhs_w17:        .asciz "to"
+Lhs_w18:        .asciz "bridge"
+Lhs_w19:        .asciz "hue"
+Lhs_w20:        .asciz "any"
+Lhs_w21:        .asciz "new"
 Lht_in1:        .asciz "light by serial 1a2b3c, and #FFEE00"
 Lht_out1:       .asciz "{\"deviceid\":[\"1A2B3C\",\"FFEE00\"]}"
 Lht_in2:        .asciz " lights "
@@ -431,4 +566,11 @@ Lht_ssdp_v2:    .asciz "HTTP/1.1 200 OK\r\nSERVER: Hue/1.0 UPnP/1.0 IpBridge/1.6
 Lht_ssdp_tv:    .asciz "HTTP/1.1 200 OK\r\nSERVER: Roku/9.4.0 UPnP/1.0 Roku/9.4.0\r\nST: roku:ecp\r\n\r\n"
 Ln_hc188:       .asciz "188 hue: serials read from what's typed, fillers skipped, bad words refused"
 Ln_hc189:       .asciz "189 hue: at most ten serials; a small buffer refused"
+Lht_in_b2:      .asciz "1a2b3c on bridge 2"
+Lht_in_b9:      .asciz "1a2b3c 9"
+Lht_id3:        .asciz "3"
+Lht_id12:       .asciz "12"
+Lht_id2_3:      .asciz "2:3"
+Lht_id4_12:     .asciz "4:12"
+Ln_hc191:       .asciz "191 hue: which bridge a serial is for; device ids per bridge, and back"
 Ln_hc190:       .asciz "190 hue: bridge addresses checked; a Hue bridge's SSDP answer, v1 and v2"

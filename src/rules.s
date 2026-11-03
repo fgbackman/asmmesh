@@ -159,6 +159,10 @@ Lsimple:
     .quad Lw_hue_add,        1, _h_hue_add, 0
     .quad Lw_hue_search,     1, _h_hue_add, 0
     .quad Lw_hue_find,       1, _h_hue_add, 0
+    .quad Lw_hue_bridges,    0, _h_hue_bridges, 0
+    .quad Lw_list_hue_br,    0, _h_hue_bridges, 0
+    .quad Lw_hue_forget,     1, _h_hue_forget, 0
+    .quad Lw_hue_remove,     1, _h_hue_forget, 0
     .quad Lw_hue_bridge,     1, _h_hue_bridge, 0
     .quad Lw_settings,       2, _h_services, 0
     .quad Lw_service_list,   2, _h_services, 0
@@ -2902,6 +2906,10 @@ Lw_hue_add:      .asciz "add hue"
 Lw_hue_search:   .asciz "search hue"
 Lw_hue_find:     .asciz "find new hue"
 Lw_hue_bridge:   .asciz "hue bridge"
+Lw_hue_bridges:  .asciz "hue bridges"
+Lw_list_hue_br:  .asciz "list hue bridges"
+Lw_hue_forget:   .asciz "forget hue bridge"
+Lw_hue_remove:   .asciz "remove hue bridge"
 Lw_trust2:       .asciz "these trackers are mine"
 Lw_trust3:       .asciz "this tracker is mine"
 Lw_weather:      .asciz "weather"

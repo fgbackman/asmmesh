@@ -157,6 +157,7 @@ Lmethods:
     .quad Ls_m_talk,        _voice_toggle,      Ls_ty_v1
     .quad Ls_m_connectST,   _st_connect_dialog, Ls_ty_v1
     .quad Ls_m_pairHue,     _hue_pair,          Ls_ty_v1
+    .quad Ls_m_addHue,      _hue_add_dialog,    Ls_ty_v1
     .quad Ls_m_meshPass,    _crypto_dialog,     Ls_ty_v1
     .quad Ls_m_fmShow,      _fm_show,           Ls_ty_v1
     .quad Ls_m_fmApply,     _fm_apply,          Ls_ty_v1
@@ -1307,6 +1308,11 @@ _build_menus:
     ADRL x3, Ls_empty
     bl   _add_item
     mov  x0, x21
+    ADRL x1, Ls_addhue_item
+    ADRL x2, Ls_m_addHue
+    ADRL x3, Ls_empty
+    bl   _add_item
+    mov  x0, x21
     ADRL x1, Ls_connectst_item
     ADRL x2, Ls_m_connectST
     ADRL x3, Ls_empty
@@ -1753,6 +1759,7 @@ Ls_p_speech:           .asciz "SFSpeechRecognitionTaskDelegate"
 Ls_m_talk:             .asciz "talk:"
 Ls_m_connectST:        .asciz "connectSmartThings:"
 Ls_m_pairHue:          .asciz "pairHue:"
+Ls_m_addHue:           .asciz "addHueLights:"
 Ls_m_meshPass:         .asciz "meshPassphrase:"
 Ls_m_fmShow:           .asciz "fmShow:"
 Ls_m_fmApply:          .asciz "fmApply:"
@@ -1792,6 +1799,7 @@ Ls_ty_vB:              .asciz "v@:@B"
 Ls_talk_title:         .asciz "\360\237\216\244 Talk"
 Ls_talk_item:          .asciz "Talk"
 Ls_pairhue_item:       .asciz "Pair Hue Bridge"
+Ls_addhue_item:        .asciz "Add Hue Lights\342\200\246"
 Ls_connectst_item:     .asciz "Connect SmartThings\342\200\246"
 Ls_key_t:              .asciz "t"
 

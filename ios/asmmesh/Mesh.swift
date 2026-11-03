@@ -346,6 +346,19 @@ final class Mesh: ObservableObject {
         coreLater { text.withCString { am_send($0) } }   // a command may ask something
     }
 
+    // MARK: Hue bridges (hue.s)
+
+    struct HueBridge: Identifiable, Hashable { let id: Int; let name: String; let host: String; let paired: Bool }
+
+    /// The bridges known, numbered as Home's "hue bridges" numbers them (1-4)
+    func hueBridges() -> [HueBridge] {
+        (0..<4).compactMap { b in
+            let host = String(cString: am_hue_host(b))
+            guard !host.isEmpty else { return nil }
+            return HueBridge(id: b + 1, name: String(cString: am_hue_name(b)), host: host, paired: am_hue_paired(b) != 0)
+        }
+    }
+
     // MARK: what you typed, and suggestions (term_hist.s)
 
     struct Suggestion: Hashable { let word: String; let more: Bool }
