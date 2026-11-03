@@ -83,8 +83,8 @@ The rules are in `tools/ninefold/make_words.py`, the sources and licences in
   and plain sexual vocabulary (PORN, ORGASM). If a family game should leave those out too,
   that's a second, stricter setting: a taste decision, to be made as one.
 - **Measured against people's choices**: `benchmark.py` runs the lists on 595 puzzles whose
-  answers were chosen by hand. 96.9% of our answers are words those editors listed; of
-  their words, we accept 85.6% once plurals and contractions (excluded by rule) are set
+  answers were chosen by hand. 97.0% of our answers are words those editors listed; of
+  their words, we accept 85.7% once plurals and contractions (excluded by rule) are set
   aside. Most of the rest are rarer words below our cut-offs (THROE, EWER, TIRO).
 - **200 sample puzzles** with every word: `samples-200.md`, checked by
   `tools/ninefold/check_samples.py` (separate code): 7,957 words, 0 problems. It catches

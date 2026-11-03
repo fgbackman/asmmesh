@@ -7,8 +7,8 @@
 #   answers.txt   the words a round counts, reveals and says you missed
 #   extra.txt     real words that are rarer, or spelled the American way: they score, but
 #                 are never shown as missed
-#   family.txt    words the family filter hides (a game setting, on by default): only words
-#                 on the lists below exactly as written there, never guessed variants
+#   family.txt    words the family filter hides (a game setting, on by default): see TASTE
+#   family-candidates.txt  the words judge_family.py looks up (fetch_wiktionary.py reads it)
 #   REPORT.txt    every word left out, and why (not in git: ~3 MB)
 #
 # A REAL WORD (4 to 9 letters a-z) is in all of:
@@ -99,11 +99,13 @@ def main(enable_path, scowl_dir, ldnoobw_path, out_dir):
             judged[cols[0]] = cols[1]
     # a listed word is hidden unless Wiktionary's labels say it isn't offensive; a word
     # not judged yet stays hidden until it is (fetch_wiktionary.py, judge_family.py)
-    family = sorted(w for w in set(answers) | set(extra) if w in listed and judged.get(w, 'hide') == 'hide')
+    candidates = sorted(w for w in set(answers) | set(extra) if w in listed)
+    family = [w for w in candidates if judged.get(w, 'hide') == 'hide']
 
     os.makedirs(out_dir, exist_ok=True)
     for fname, rows in (('answers.txt', answers), ('extra.txt', extra),
-                        ('family.txt', family), ('REPORT.txt', report)):
+                        ('family.txt', family), ('family-candidates.txt', candidates),
+                        ('REPORT.txt', report)):
         with open(os.path.join(out_dir, fname), 'w') as f:
             f.write('\n'.join(rows) + '\n')
     print('answers %d, extra %d, hidden by the family filter %d, left out %d'

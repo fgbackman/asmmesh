@@ -1,5 +1,5 @@
 # fetch_wiktionary.py: downloads the raw Wiktionary page (wikitext) of every word the family
-# filter hides (words/family.txt), so its labels (vulgar, offensive, derogatory, slur) can be
+# filter might hide (words/family-candidates.txt, written by make_words.py), so its labels (vulgar, offensive, derogatory, slur) can be
 # read. Only fetches and saves; judge_family.py reads the labels and decides.
 # Run it anywhere with internet (it uses nothing but Python 3's standard library):
 #   python3 tools/ninefold/fetch_wiktionary.py
@@ -7,7 +7,7 @@
 import json, os, sys, time, urllib.parse, urllib.request
 
 here = os.path.dirname(os.path.abspath(__file__))
-words = [w.strip() for w in open(os.path.join(here, 'words', 'family.txt')) if w.strip()]
+words = [w.strip() for w in open(os.path.join(here, 'words', 'family-candidates.txt')) if w.strip()]
 out, failed = {}, []
 for i, w in enumerate(words, 1):
     url = 'https://en.wiktionary.org/w/index.php?action=raw&title=' + urllib.parse.quote(w)
