@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ninefold mockups</title>
+<!-- Ninefold: an invite-only word game over asmmesh's mesh. These are mockups, not the
+     game: open with #invite, #play, #mac or #results (tools render each to a PNG).
+     The puzzle shown is real: generated from the ENABLE word list (public domain),
+     "moonlight" with G in the centre, 42 words. -->
+<style>
+:root{
+  --bg:#121315; --card:#222427; --hi:#2e2f33; --dim:#9e9e9e; --fg:#f2f2f2;
+  --orange:#ff9e0a; --blue:#0a85ff; --green:#30d158; --purple:#bf59f2; --yellow:#ffd60a; --red:#ff453a;
+  --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  --sans:-apple-system,"SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:#0a0a0b;color:var(--fg);font:15px/1.35 var(--sans)}
+.screen{display:none}
+.screen.on{display:block}
+/* ---- phone frame ---- */
+.phone{width:390px;height:844px;background:var(--bg);border-radius:48px;overflow:hidden;position:relative;
+  box-shadow:0 0 0 10px #1d1d1f,0 0 0 11px #3a3a3c;margin:24px}
+.status{height:47px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 30px 6px;font-weight:600;font-size:15px}
+.island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:120px;height:34px;background:#000;border-radius:20px}
+.nav{display:flex;align-items:center;gap:10px;padding:8px 18px 4px}
+.nav h1{font-size:22px;margin:0;flex:1}
+.pill{font-size:12px;padding:4px 9px;border-radius:999px;background:var(--hi);color:var(--dim)}
+.pill.lock{color:var(--orange)}
+.players{display:flex;gap:8px;padding:10px 16px 6px}
+.pl{flex:1;background:var(--card);border-radius:14px;padding:8px 10px;min-width:0}
+.pl .n{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl .s{font:600 20px var(--mono)}
+.pl .w{font-size:11px;color:var(--dim)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+.timer{display:flex;align-items:center;gap:10px;padding:6px 18px}
+.bar{flex:1;height:6px;background:var(--hi);border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--orange),var(--yellow));width:62%}
+.grid{display:grid;grid-template-columns:repeat(3,80px);gap:9px;justify-content:center;padding:10px 0 4px}
+.t{height:80px;border-radius:18px;background:var(--card);display:flex;align-items:center;justify-content:center;
+  font:700 42px var(--sans);letter-spacing:.5px;position:relative}
+.t.c{background:var(--orange);color:#1a1205}
+.t.used{background:var(--hi);color:#6b6b6b}
+.t sub{position:absolute;right:10px;bottom:8px;font:600 11px var(--mono);color:var(--dim)}
+.entry{text-align:center;font:700 30px var(--mono);letter-spacing:6px;height:44px;margin-top:6px}
+.entry .cur{display:inline-block;width:3px;height:30px;background:var(--orange);vertical-align:-4px;margin-left:2px}
+.hint{text-align:center;color:var(--dim);font-size:12px;height:16px}
+.btns{display:flex;gap:10px;justify-content:center;padding:10px 16px}
+.btn{background:var(--card);border-radius:14px;padding:11px 16px;font-weight:600;font-size:14px}
+.btn.go{background:var(--orange);color:#1a1205;flex:1;text-align:center}
+.found{margin:6px 16px;background:var(--card);border-radius:16px;padding:10px 12px}
+.found h3{margin:0 0 6px;font-size:12px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:600 13px var(--mono);padding:5px 9px;border-radius:9px;background:var(--hi)}
+.chip.first{box-shadow:inset 0 0 0 1.5px var(--orange)}
+.feed{margin:6px 16px;font-size:12.5px;color:var(--dim)}
+.feed div{padding:3px 0}
+.feed b{color:var(--fg);font-weight:600}
+.tabbar{position:absolute;bottom:0;left:0;right:0;height:84px;background:#18191b;border-top:1px solid #2a2b2e;
+  display:flex;justify-content:space-around;padding-top:9px;font-size:10px;color:var(--dim)}
+.tabbar div{text-align:center}
+.tabbar .ic{font-size:21px;display:block;margin-bottom:2px}
+.tabbar .on{color:var(--orange)}
+/* ---- invite ---- */
+.room{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:16px;margin:8px 16px;padding:12px}
+.badge{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:19px}
+.room .t1{font-weight:600}
+.room .t2{font-size:12px;color:var(--dim)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#1c1d20;border-radius:28px 28px 0 0;padding:22px 20px 40px;
+  box-shadow:0 -10px 40px rgba(0,0,0,.6)}
+.sheet .grab{width:38px;height:5px;background:#48484a;border-radius:3px;margin:-8px auto 16px}
+.mini{display:grid;grid-template-columns:repeat(3,40px);gap:5px;margin:14px auto;justify-content:center}
+.mini div{height:40px;border-radius:9px;background:var(--hi)}
+.mini .c{background:var(--orange)}
+.sheet h2{margin:0;text-align:center;font-size:21px}
+.sheet p{text-align:center;color:var(--dim);margin:8px 6px}
+.facts{background:var(--card);border-radius:14px;padding:10px 12px;margin:12px 0;font-size:13px}
+.facts div{display:flex;justify-content:space-between;padding:4px 0}
+.facts span:last-child{color:var(--dim)}
+.dimmed{opacity:.35}
+/* ---- mac window ---- */
+.mac{width:1180px;height:720px;margin:24px;background:#1e1f22;border-radius:12px;overflow:hidden;
+  box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 0 1px #3a3a3c}
+.mbar{height:38px;background:#2a2b2e;display:flex;align-items:center;padding:0 14px;gap:8px;font-size:13px;color:var(--dim)}
+.mbar i{width:12px;height:12px;border-radius:50%;display:inline-block}
+.mbody{display:flex;height:682px}
+.side{width:220px;background:#191a1c;padding:12px 8px;border-right:1px solid #2c2d30}
+.side .r{padding:7px 10px;border-radius:8px;font-size:13.5px;display:flex;gap:8px;align-items:center}
+.side .r.on{background:#2f3034}
+.side .h{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;margin:12px 10px 4px}
+.main{flex:1;display:flex;flex-direction:column}
+.mhead{padding:12px 18px;border-bottom:1px solid #2c2d30;font-size:14px}
+.mhead small{color:var(--dim)}
+.mcols{flex:1;display:flex}
+.board{width:430px;padding:16px 10px;border-right:1px solid #2c2d30}
+.board .grid{grid-template-columns:repeat(3,104px);gap:12px}
+.board .t{height:104px;font-size:48px}
+.chat{flex:1;padding:14px 18px;font:13px/1.55 var(--mono);color:#d8d8d8}
+.chat .ts{color:#6e6e73;margin-right:8px}
+.chat .sys{color:var(--dim)}
+.chat .me{color:var(--orange)}
+.input{margin:0 18px 14px;background:#141517;border:1px solid #333438;border-radius:9px;padding:9px 12px;font:14px var(--mono);color:var(--dim)}
+.input b{color:var(--orange);margin-right:8px}
+.score{padding:0 16px}
+.score table{width:100%;border-collapse:collapse;font-size:13px}
+.score td{padding:5px 4px;border-bottom:1px solid #2c2d30}
+.score td:last-child{text-align:right;font:600 14px var(--mono)}
+/* ---- results ---- */
+.res{margin:4px 16px;background:var(--card);border-radius:16px;padding:12px}
+.res .row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #2c2d30}
+.res .row:last-child{border:0}
+.res .medal{font-size:22px;width:28px;text-align:center}
+.res .nm{flex:1;font-weight:600}
+.res .pts{font:700 20px var(--mono)}
+.legend{display:flex;gap:12px;margin:8px 18px;font-size:12px;color:var(--dim)}
+.verify{margin:8px 16px;font-size:12px;color:var(--green)}
+.nine{margin:8px 16px;background:linear-gradient(135deg,#3a2600,#2a1c00);border:1px solid #5a3d00;border-radius:16px;padding:12px;text-align:center}
+.nine .w{font:800 26px var(--mono);letter-spacing:5px;color:var(--orange)}
+.nine .by{font-size:12px;color:var(--dim)}
+</style>
+</head>
+<body>
+
+<!-- 1. the invitation, on the iPhone -->
+<section class="screen" id="invite">
+<div class="phone">
+  <div class="island"></div>
+  <div class="status"><span>9:41</span><span>▂▄▆ 100%</span></div>
+  <div class="nav"><h1>Rooms</h1></div>
+  <div class="dimmed">
+    <div class="room"><div class="badge" style="background:#0a85ff33">🌐</div><div><div class="t1">Main</div><div class="t2">Everyone on the mesh</div></div></div>
+    <div class="room"><div class="badge" style="background:#ff9e0a33">🏠</div><div><div class="t1">Home</div><div class="t2">Lights, locks and scenes</div></div></div>
+    <div class="room"><div class="badge" style="background:#bf59f233">🔒</div><div><div class="t1">Campsite</div><div class="t2">Invite-only · 3 people</div></div></div>
+  </div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2>Fred invites you to Ninefold</h2>
+    <div class="mini"><div></div><div></div><div></div><div></div><div class="c"></div><div></div><div></div><div></div><div></div></div>
+    <p>Nine letters, one in the middle every word needs. Four minutes. Words stay hidden until the end.</p>
+    <div class="facts">
+      <div><span>Players</span><span>Fred, Anna, Sam + you</span></div>
+      <div><span>Fred</span><span>2 hops away · fingerprint 7c2e</span></div>
+      <div><span>Round</span><span>4 min · starts when all are in</span></div>
+      <div><span>Privacy</span><span>sealed with this game's key</span></div>
+    </div>
+    <div class="btns" style="padding:4px 0">
+      <div class="btn" style="flex:1;text-align:center">Not now</div>
+      <div class="btn go">Join game</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- 2. playing, on the iPhone -->
+<section class="screen" id="play">
+<div class="phone">
+  <div class="island"></div>
+  <div class="status"><span>9:44</span><span>▂▄▆ 100%</span></div>
+  <div class="nav"><span style="color:var(--orange);font-size:20px">‹</span><h1>Ninefold</h1><span class="pill lock">🔒 4 players</span></div>
+  <div class="players">
+    <div class="pl"><div class="n"><span class="dot" style="background:var(--orange)"></span>You</div><div class="s">23</div><div class="w">10 words</div></div>
+    <div class="pl"><div class="n"><span class="dot" style="background:var(--blue)"></span>Anna</div><div class="s">?</div><div class="w">9 words</div></div>
+    <div class="pl"><div class="n"><span class="dot" style="background:var(--green)"></span>Fred</div><div class="s">?</div><div class="w">12 words</div></div>
+    <div class="pl"><div class="n"><span class="dot" style="background:var(--purple)"></span>Sam</div><div class="s">?</div><div class="w">6 words</div></div>
+  </div>
+  <div class="timer"><span style="font:600 14px var(--mono)">2:31</span><div class="bar"><i></i></div></div>
+  <div class="grid">
+    <div class="t">O</div><div class="t">L</div><div class="t">M</div>
+    <div class="t used">T</div><div class="t c">G</div><div class="t used">H</div>
+    <div class="t used">I</div><div class="t used">N</div><div class="t">O</div>
+  </div>
+  <div class="entry">THING<span class="cur"></span></div>
+  <div class="hint">5 letters · 2 points · not taken by anyone yet</div>
+  <div class="btns"><div class="btn">⌫</div><div class="btn">⤾ Shuffle</div><div class="btn go">Enter</div></div>
+  <div class="found">
+    <h3>Your words · 10</h3>
+    <div class="chips">
+      <span class="chip first">LOOMING</span><span class="chip">LIGHT</span><span class="chip first">TIGLON</span><span class="chip">NIGHT</span><span class="chip">GLOOM</span><span class="chip">IGLOO</span><span class="chip first">INGOT</span><span class="chip">LONG</span><span class="chip">GOON</span><span class="chip">LOGO</span>
+    </div>
+  </div>
+  <div class="feed">
+    <div><span class="dot" style="background:var(--green)"></span><b>Fred</b> found a 7-letter word · 0:04 ago</div>
+    <div><span class="dot" style="background:var(--orange)"></span><b>You</b> were first to INGOT (+1)</div>
+  </div>
+  <div class="tabbar"><div class="on"><span class="ic">💬</span>Rooms</div><div><span class="ic">👥</span>People</div><div><span class="ic">📡</span>Nearby</div><div><span class="ic">⚙︎</span>Settings</div></div>
+</div>
+</section>
+
+<!-- 3. the same game on the Mac, inside asmmesh -->
+<section class="screen" id="mac">
+<div class="mac">
+  <div class="mbar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><span style="margin-left:12px">asmmesh — Fred</span></div>
+  <div class="mbody">
+    <div class="side">
+      <div class="h">Rooms</div>
+      <div class="r">🌐 Main</div><div class="r">🏠 Home</div><div class="r">🔒 Campsite</div>
+      <div class="r on">🧩 Ninefold · 2:31</div>
+      <div class="h">People</div>
+      <div class="r"><span class="dot" style="background:var(--blue)"></span>Anna · nearby</div>
+      <div class="r"><span class="dot" style="background:var(--purple)"></span>Sam · 3 hops</div>
+      <div class="r"><span class="dot" style="background:var(--orange)"></span>Mia (iPhone) · 2 hops</div>
+    </div>
+    <div class="main">
+      <div class="mhead"><b>🧩 Ninefold</b> &nbsp;<small>invite-only game · sealed with its own key · words hidden until the end · round 2 of 3</small></div>
+      <div class="mcols">
+        <div class="board">
+          <div class="grid">
+            <div class="t used">O</div><div class="t used">L</div><div class="t used">M</div>
+            <div class="t used">T</div><div class="t c">G</div><div class="t">H</div>
+            <div class="t used">I</div><div class="t used">N</div><div class="t">O</div>
+          </div>
+          <div class="entry" style="margin-top:12px">MOLTING<span class="cur"></span></div>
+          <div class="hint">7 letters · 4 points · Tab shuffles · Esc clears</div>
+          <div class="score" style="margin-top:16px">
+            <table>
+              <tr><td><span class="dot" style="background:var(--green)"></span>Fred (you)</td><td>12 words</td><td>27</td></tr>
+              <tr><td><span class="dot" style="background:var(--orange)"></span>Mia</td><td>11 words</td><td>?</td></tr>
+              <tr><td><span class="dot" style="background:var(--blue)"></span>Anna</td><td>9 words</td><td>?</td></tr>
+              <tr><td><span class="dot" style="background:var(--purple)"></span>Sam</td><td>6 words</td><td>?</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="chat">
+          <div><span class="ts">09:41:02</span><span class="sys">· Fred started Ninefold with Anna, Sam and Mia. Seed 3f9a…: everyone builds the same grid.</span></div>
+          <div><span class="ts">09:41:05</span><span class="sys">· All four in (Sam through 3 hops). Go!</span></div>
+          <div><span class="ts">09:41:19</span><span class="me">you: GLOOM ✓ (first)</span></div>
+          <div><span class="ts">09:41:24</span><span class="sys">· Anna found a 5-letter word</span></div>
+          <div><span class="ts">09:41:40</span><span class="me">you: TOOLING ✓ (first, +1)</span></div>
+          <div><span class="ts">09:41:52</span><span class="sys">· Mia found a 7-letter word</span></div>
+          <div><span class="ts">09:42:10</span><span class="me">you: THONG ✓</span></div>
+          <div><span class="ts">09:42:11</span><span class="sys">· Sam found a 4-letter word</span></div>
+          <div><span class="ts">09:42:30</span>anna: there's a 9 in here somewhere 👀</div>
+          <div><span class="ts">09:42:41</span><span class="me">you: GLOMN ✗ not a word</span></div>
+          <div><span class="ts">09:42:58</span><span class="sys">· Mia found a 6-letter word</span></div>
+        </div>
+      </div>
+      <div class="input"><b>❯</b>molting</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- 4. the end of a round: every word revealed and checked -->
+<section class="screen" id="results">
+<div class="phone">
+  <div class="island"></div>
+  <div class="status"><span>9:45</span><span>▂▄▆ 100%</span></div>
+  <div class="nav"><span style="color:var(--orange);font-size:20px">‹</span><h1>Round 2 · results</h1></div>
+  <div class="nine"><div class="w">MOONLIGHT</div><div class="by">the nine-letter word · found by Fred at 3:12 · +10</div></div>
+  <div class="res">
+    <div class="row"><div class="medal">🥇</div><div class="nm">Fred</div><div style="color:var(--dim);font-size:12px">13 words · 4 first · 2 only his</div><div class="pts">41</div></div>
+    <div class="row"><div class="medal">🥈</div><div class="nm">You</div><div style="color:var(--dim);font-size:12px">14 words · 5 first · 3 only yours</div><div class="pts">36</div></div>
+    <div class="row"><div class="medal">🥉</div><div class="nm">Mia</div><div style="color:var(--dim);font-size:12px">12 words · 2 first</div><div class="pts">27</div></div>
+    <div class="row"><div class="medal"> </div><div class="nm">Anna</div><div style="color:var(--dim);font-size:12px">10 words</div><div class="pts">19</div></div>
+    <div class="row"><div class="medal"> </div><div class="nm">Sam</div><div style="color:var(--dim);font-size:12px">7 words</div><div class="pts">12</div></div>
+  </div>
+  <div class="verify">✓ every word checked against the hash its finder sent when they found it</div>
+  <div class="found">
+    <h3>42 words in all · the 30 longest</h3>
+    <div class="chips">
+      <span class="chip first">TOOLING</span><span class="chip">HOOTING</span><span class="chip">LOOTING</span><span class="chip">MOLTING</span><span class="chip first">LOOMING</span><span class="chip" style="opacity:.4">MOOTING</span><span class="chip" style="opacity:.4">THOLING</span><span class="chip">HOLING</span><span class="chip">HOMING</span><span class="chip first">TIGLON</span><span class="chip" style="opacity:.4">LOGION</span><span class="chip">MOOING</span><span class="chip">GLOOM</span><span class="chip">IGLOO</span><span class="chip first">INGOT</span><span class="chip">LIGHT</span><span class="chip">LINGO</span><span class="chip">MIGHT</span><span class="chip">NIGHT</span><span class="chip">THING</span><span class="chip">THONG</span><span class="chip" style="opacity:.4">TIGON</span><span class="chip">GLINT</span><span class="chip">LONG</span><span class="chip">LOGO</span><span class="chip">GOON</span><span class="chip">GILT</span><span class="chip">NIGH</span><span class="chip" style="opacity:.4">GLIM</span><span class="chip">TONG</span>
+    </div>
+  </div>
+  <div class="legend"><span>orange ring: you found it first</span><span>faded: nobody found it</span></div>
+  <div class="btns"><div class="btn">Leave</div><div class="btn go">Next round (3 of 3)</div></div>
+</div>
+</section>
+
+<script>
+  // which screen: the part after # (invite, play, mac, results); all of them stacked otherwise
+  const pick = location.hash.slice(1);
+  document.querySelectorAll('.screen').forEach(s => {
+    if (!pick || s.id === pick) s.classList.add('on');
+  });
+</script>
+</body>
+</html>
