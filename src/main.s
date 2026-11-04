@@ -81,6 +81,7 @@ Lc_rc_b:     .double 0.80
 // frames: x, y, w, h
 Lf_roomslbl: .double 16.0, 610.0, 150.0, 16.0
 Lf_addroom:  .double 206.0, 604.0, 36.0, 28.0
+Lf_ninefold: .double 166.0, 604.0, 36.0, 28.0   // the game button, left of +
 Lf_rooms:    .double 6.0, 306.0, 240.0, 294.0
 Lf_peoplelbl: .double 16.0, 284.0, 196.0, 16.0
 Lf_people:   .double 6.0, 128.0, 240.0, 152.0
@@ -368,6 +369,9 @@ _build_ui:
     movk x1, #0xF5, lsl #16
     mov  x2, #1
     bl   _pill
+
+    mov  x0, x21                      // ▦ Play Ninefold, as on the iPhone's Rooms list
+    bl   Lmk_nf_button
 
     mov  x0, #8
     mov  x1, #0                       // no header
@@ -1561,6 +1565,45 @@ _symbol_image:
     MSG2 Ls_imageWithSymbol
     LEAVE 0
 
+// Lmk_nf_button(id content) — the amber ▦ button left of +: Mesh › Play Ninefold…
+Lmk_nf_button:
+    ENTER 0
+    mov  x21, x0
+    ADRL x0, Ls_empty
+    ADRL x1, Ls_m_ninefold
+    mov  x2, #8
+    mov  x3, x21
+    ADRL x8, Lf_ninefold
+    ldp  d0, d1, [x8]
+    ldp  d2, d3, [x8, #16]
+    bl   _mk_button
+    mov  x19, x0
+    mov  x1, #0xB82E                  // amber, like +
+    movk x1, #0xF5, lsl #16
+    mov  x2, #1
+    bl   _pill
+    ADRL x0, Ls_grid_symbol
+    bl   _symbol_image
+    cbz  x0, 1f                       // before macOS 11: a text grid instead
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_setImage
+    CLS  Ls_NSColor
+    MSG0 Ls_blackColor
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_setContentTintColor
+    b    2f
+1:  ADRL x0, Ls_grid_text
+    bl   _nsstr
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_setTitle
+2:  mov  x0, x19
+    ADRL x1, Ls_ninefold_tip
+    bl   _tooltip
+    LEAVE 0
+
 // void _tooltip(id view, const char *utf8)
 _tooltip:
     ENTER 0
@@ -1845,6 +1888,10 @@ Ls_title:              .asciz "asmmesh"
 Ls_rooms_lbl:          .asciz "ROOMS"
 Ls_people_lbl:         .asciz "PEOPLE ON THE MESH"
 Ls_plus:               .asciz "+"
+Ls_grid_symbol:        .asciz "square.grid.3x3.fill"
+Ls_grid_text:          .asciz "\342\226\246"
+Ls_ninefold_tip:       .asciz "Play Ninefold"
+Ls_setContentTintColor: .asciz "setContentTintColor:"
 Ls_invite_title:       .asciz "Invite to Chat"
 Ls_scanner_title:      .asciz "Mesh Scanner"
 Ls_send_title:         .asciz "Send"
