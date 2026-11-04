@@ -77,6 +77,8 @@ _g_warned_clash:  .quad 0
 .zerofill __DATA,__bss,_g_fwd,256,4
 .globl _g_txt
 .zerofill __DATA,__bss,_g_txt,256,4
+.zerofill __DATA,__bss,_g_deleted,(DEL_N * 16),4   // rooms we deleted: id, when (a day)
+.zerofill __DATA,__bss,_g_delpkt,256,4
 .globl _g_nickbuf
 .zerofill __DATA,__bss,_g_nickbuf,32,4
 .zerofill __DATA,__bss,_g_roombuf,32,4
@@ -92,6 +94,7 @@ _g_warned_clash:  .quad 0
 .zerofill __DATA,__bss,_g_fpbuf,48,4
 .globl _g_last_refused
 _g_last_refused:  .quad 0
+_g_del_last:      .quad 0            // _roomdel_again: when it last said so
 
 // ---------------------------------------------------------------------------
 .text
@@ -810,22 +813,93 @@ Lsi2_nokey:                           // we haven't had their hello yet
     mov  x0, #-1
     LEAVE 0
 
-// long _mesh_send_roomdel(long room) -> peers written, -1 not sent (no identity yet)
+// long _mesh_send_roomdel(long room) -> peers written, -1 not sent (no identity yet). The
+//   room is remembered for a day: whoever missed this hears it again (_roomdel_again)
 .globl _mesh_send_roomdel
 _mesh_send_roomdel:
+    ENTER 0
+    ADRL x8, _g_rooms
+    add  x8, x8, x0, lsl #ROOM_SHIFT
+    ldr  x19, [x8, #R_ID]
+    mov  x0, #0
+    bl   _time
+    mov  x20, x0
+    ADRL x8, _g_deleted               // into the list: its place, else the oldest
+    mov  x9, #0
+    mov  x10, #0
+    mov  x11, #-1
+1:  cmp  x9, #DEL_N
+    b.hs 3f
+    add  x12, x8, x9, lsl #4
+    ldp  x13, x14, [x12]
+    cmp  x13, x19
+    b.eq 2f
+    cmp  x14, x11
+    b.hs 11f
+    mov  x10, x9
+    mov  x11, x14
+11: add  x9, x9, #1
+    b    1b
+2:  mov  x10, x9
+3:  add  x12, x8, x10, lsl #4
+    stp  x19, x20, [x12]
+    mov  x0, x19
+    bl   Lsd_send
+    LEAVE 0
+
+// void _roomdel_again(uint64 room) — say again that rooms we deleted in the last day are
+//   gone: room 0 all of them (someone came back: their hello), else that one if we deleted
+//   it (a message in it reached us). Once a minute at most.
+.globl _roomdel_again
+_roomdel_again:
+    ENTER 0
+    mov  x19, x0
+    mov  x0, #0
+    bl   _time
+    mov  x20, x0
+    ADRL x8, _g_del_last
+    ldr  x9, [x8]
+    sub  x9, x20, x9
+    cmp  x9, #60
+    b.lo 9f
+    mov  x21, #0
+    mov  x22, #0                      // sent any
+1:  cmp  x21, #DEL_N
+    b.hs 8f
+    ADRL x8, _g_deleted
+    add  x12, x8, x21, lsl #4
+    add  x21, x21, #1
+    ldp  x13, x14, [x12]
+    cbz  x13, 1b
+    sub  x9, x20, x14                 // more than a day ago: let it go
+    MOVI x10, 86400
+    cmp  x9, x10
+    b.hi 1b
+    cbz  x19, 2f
+    cmp  x13, x19
+    b.ne 1b
+2:  mov  x0, x13
+    bl   Lsd_send
+    mov  x22, #1
+    b    1b
+8:  cbz  x22, 9f
+    ADRL x8, _g_del_last
+    str  x20, [x8]
+9:  LEAVE 0
+
+// long Lsd_send(uint64 room id) -> peers written, -1 not sent: the ROOMDEL packet, in its
+//   own buffer (this can run while a received packet is being handled)
+Lsd_send:
     ENTER 0
     mov  x19, x0
     ADRL x8, _g_id_ready
     ldr  x9, [x8]
     cbz  x9, Lsd_fail
-    ADRL x0, _g_pkt
+    ADRL x0, _g_delpkt
     mov  w1, #T_ROOMDEL
     bl   _pkt_begin
-    ADRL x21, _g_pkt
-    ADRL x8, _g_rooms
-    add  x8, x8, x19, lsl #ROOM_SHIFT
-    ldr  x9, [x8, #R_ID]
-    str  x9, [x21, #12]
+    ADRL x21, _g_delpkt
+    str  x19, [x21, #12]
     ADRL x8, _g_node_id
     ldr  x9, [x8]
     str  x9, [x21, #20]
@@ -1255,7 +1329,7 @@ Lrx_msg_locked:
 Lrx_msg_rkey:
     ldr  x0, [x19, #12]
     bl   _room_find
-    tbnz x0, #63, Lrx_relay           // not a room we are in: just pass it on
+    tbnz x0, #63, Lrx_msg_gone        // not a room we are in: just pass it on
     bl   _room_key
     cbz  x0, Lrx_relay
     add  x1, x19, x23
@@ -1271,6 +1345,10 @@ Lrx_msg_rkey:
     mov  x2, #240
     bl   _strlcpy
     b    Lrx_msg_text
+Lrx_msg_gone:                         // one we deleted? they missed that: say it again
+    ldr  x0, [x19, #12]
+    bl   _roomdel_again
+    b    Lrx_relay
 Lrx_game:                             // a Ninefold packet in a room we're in
     tbnz x0, #63, Lrx_relay           //   (didn't open: not for us to read)
     mov  x4, x0
@@ -1365,6 +1443,8 @@ Lrx_hello:
     bl   _ui_lists_changed
     ldr  x0, [x19, #12]               // anything it sent before we knew its key
     bl   _pending_replay
+    mov  x0, #0                       // back on the mesh: rooms we deleted while it was away
+    bl   _roomdel_again
     b    Lrx_relay
 
     // ---- INVITE ----
