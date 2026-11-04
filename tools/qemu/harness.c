@@ -35,6 +35,11 @@ extern long bc_peer_selftest(void) F(bc_peer_selftest) __attribute__((weak));
 extern long term_selftest(void) F(term_selftest) __attribute__((weak));
 extern long hue_core_selftest(void) F(hue_core_selftest) __attribute__((weak));
 extern long bc_noise_selftest(void) F(bc_noise_selftest) __attribute__((weak));
+extern long nf_core_selftest(void) F(nf_core_selftest) __attribute__((weak));
+extern long nf_puzzle(unsigned long, void *) F(nf_puzzle);
+extern long nf_find(const void *, const void *, long) F(nf_find);
+extern void nf_commit(const void *, unsigned long, long, long, void *) F(nf_commit);
+extern void nf_hash(void *) F(nf_hash);
 extern long bc_decode(const void *, long, void *, void *, long) F(bc_decode);
 extern long bc_sign_data(const void *, void *, long) F(bc_sign_data);
 extern long bc_verify(const void *, const void *, void *, long) F(bc_verify);
@@ -111,7 +116,7 @@ static long unhex(const char *s, unsigned char *p) {
 int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IONBF, 0);   /* a crash shows right after the last test that ran */
     if (argc > 1 && !strcmp(argv[1], "selftest")) {
-        long f = bc_selftest() + bc_link_selftest() + bc_packet_selftest() + bc_peer_selftest() + term_selftest() + hue_core_selftest() + bc_noise_selftest();
+        long f = bc_selftest() + bc_link_selftest() + bc_packet_selftest() + bc_peer_selftest() + term_selftest() + hue_core_selftest() + bc_noise_selftest() + nf_core_selftest();
         printf("%ld failed\n", f);
         return f != 0;
     }
@@ -267,6 +272,22 @@ int main(int argc, char **argv) {
         else if (!strcmp(cmd, "clean")) { bc_text_clean(out, A[0], N[0]); hex(out, N[0]); }
         else if (!strcmp(cmd, "split")) printf("%ld", bc_msg_split(A[0], N[0], A[1][0]));
         else if (!strcmp(cmd, "relayok")) { static unsigned char rl[16]; printf("%ld", bc_relay_ok(rl, be(A[0], 8))); }
+        else if (!strcmp(cmd, "nfpuz")) {            /* seed -> word centre tiles n answers tries: indexes */
+            static unsigned char p[560];
+            if (nf_puzzle(be(A[0], 8), p)) { printf("none"); goto done; }
+            printf("%.9s %c %.9s %ld %ld %ld:", p + 10, p[9], p, *(long *)(p + 24), *(long *)(p + 32), *(long *)(p + 40));
+            for (long i = 0; i < *(long *)(p + 24); i++) printf(" %d", ((unsigned short *)(p + 48))[i]);
+        }
+        else if (!strcmp(cmd, "nffind")) {           /* seed text -> index flags (the puzzle from nfpuz) */
+            static unsigned char p[560];
+            nf_puzzle(be(A[0], 8), p);
+            register long x0 __asm__("x0") = (long)p, x1 __asm__("x1") = (long)A[1], x2 __asm__("x2") = N[1];
+            __asm__ volatile("bl _nf_find" : "+r"(x0), "+r"(x1), "+r"(x2) :
+                             : "x3", "x9", "x10", "x11", "x12", "x13", "x14", "x30", "cc", "memory");
+            printf("%ld %ld", x0, x1);
+        }
+        else if (!strcmp(cmd, "nfcommit")) { nf_commit(A[0], be(A[1], 8), A[2][0], A[3][0], out); hex(out, 16); }
+        else if (!strcmp(cmd, "nfhash")) { nf_hash(out); hex(out, 8); }
         else if (!strcmp(cmd, "expire")) printf("%ld", bc_peer_expire(bt, be(A[0], 8)));
         else printf("?");
         done:

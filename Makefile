@@ -16,7 +16,7 @@ SRCS    := $(SRCDIR)/main.s $(SRCDIR)/ui.s $(SRCDIR)/scanner.s $(SRCDIR)/util.s 
            $(SRCDIR)/fm.s $(SRCDIR)/fm_dsp.s $(SRCDIR)/fm_audio.s $(SRCDIR)/fm_io.s $(SRCDIR)/fm_pack.s \
            $(SRCDIR)/fm_util.s $(SRCDIR)/fm_fec.s $(SRCDIR)/fm_html.s $(SRCDIR)/web.s $(SRCDIR)/spinui.s $(SRCDIR)/alerts.s $(SRCDIR)/files.s \
            $(SRCDIR)/sens_decode.s $(SRCDIR)/sensors.s $(SRCDIR)/handoff.s $(SRCDIR)/cards.s $(SRCDIR)/limits.s $(SRCDIR)/guard.s $(SRCDIR)/files_mac.s $(SRCDIR)/scan_core.s $(SRCDIR)/listed.s $(SRCDIR)/seek.s \
-           $(SRCDIR)/bc_crypto.s $(SRCDIR)/bc_link.s $(SRCDIR)/bc_ble.s $(SRCDIR)/bc_packet.s $(SRCDIR)/bc_zlib.s $(SRCDIR)/bc_peer.s $(SRCDIR)/bc_noise.s $(SRCDIR)/term_core.s $(SRCDIR)/term_hist.s $(SRCDIR)/hue_core.s $(SRCDIR)/term.s
+           $(SRCDIR)/bc_crypto.s $(SRCDIR)/bc_link.s $(SRCDIR)/bc_ble.s $(SRCDIR)/bc_packet.s $(SRCDIR)/bc_zlib.s $(SRCDIR)/bc_peer.s $(SRCDIR)/bc_noise.s $(SRCDIR)/term_core.s $(SRCDIR)/term_hist.s $(SRCDIR)/hue_core.s $(SRCDIR)/term.s $(SRCDIR)/nf_core.s
 OBJS    := $(SRCS:.s=.o)
 FRAMEWORKS := -framework Cocoa -framework CoreBluetooth -framework Security -framework Speech -framework AVFoundation \
               -framework IOBluetooth -framework AudioToolbox -framework CoreAudio -framework CoreFoundation -framework CoreLocation -framework CoreImage -framework IOKit -lz
@@ -32,8 +32,10 @@ all: $(APP)
 asmmesh: $(OBJS)
 	$(CC) $(ARCH) -o $@ $(OBJS) $(FRAMEWORKS)
 
-$(SRCDIR)/%.o: $(SRCDIR)/%.s $(SRCDIR)/macros.inc $(SRCDIR)/fm_defs.inc $(SRCDIR)/fm_fec_tables.inc $(SRCDIR)/sens_bthome.inc $(SRCDIR)/bc_defs.inc
+$(SRCDIR)/%.o: $(SRCDIR)/%.s $(SRCDIR)/macros.inc $(SRCDIR)/fm_defs.inc $(SRCDIR)/fm_fec_tables.inc $(SRCDIR)/sens_bthome.inc $(SRCDIR)/bc_defs.inc $(SRCDIR)/nf_defs.inc
 	$(CC) $(ARCH) -I $(SRCDIR) -c $< -o $@
+
+$(SRCDIR)/nf_core.o: $(SRCDIR)/nf_words.bin
 
 $(APP): asmmesh Info.plist icon/AppIcon.icns
 	rm -rf $(APP)
