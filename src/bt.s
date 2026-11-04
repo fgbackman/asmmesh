@@ -220,8 +220,12 @@ _bt_done:
     ADRL x0, Ls_bt_ok
     cbz  x2, Lbdn_say
     ADRL x0, Ls_bt_fail
+    bl   _scan_say                    // not connected: pairing is System Settings' to do
+    bl   _bt_settings
+    b    Lbdn_said
 Lbdn_say:
     bl   _scan_say
+Lbdn_said:
     mov  x0, x19
     MSG0 Ls_release
     mov  x0, x21
@@ -272,7 +276,7 @@ Ls_connected:         .asciz "connected"
 Ls_not_connected:     .asciz "paired, not connected"
 Ls_connecting:        .asciz "\302\267 Asking %s to connect\342\200\246"
 Ls_bt_ok:             .asciz "\302\267 %s is connected."
-Ls_bt_fail:           .asciz "\302\267 %s didn't connect (error 0x%lx). Make sure it's switched on and nearby, and not connected to another device."
+Ls_bt_fail:           .asciz "\302\267 %s didn't connect (error 0x%lx). Opening System Settings \342\200\272 Bluetooth: connect it there, or pair it again (switch it on, hold its pairing button). A speaker connected to another device has to let go of it first."
 Lc_misc:              .asciz "Bluetooth"
 Lc_computer:          .asciz "Bluetooth computer"
 Lc_phone:             .asciz "Bluetooth phone"

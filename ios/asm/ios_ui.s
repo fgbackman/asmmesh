@@ -1285,6 +1285,10 @@ _t_report:
     ret
 
 // IOKit (battery levels on the Mac) is not open to iPhone apps
+.globl _popen                         // nor running another program (system_profiler)
+_popen:
+    mov  x0, #0
+    ret
 .globl _IOPSCopyPowerSourcesInfo
 _IOPSCopyPowerSourcesInfo:
 .globl _IOPSCopyPowerSourcesList

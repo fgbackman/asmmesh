@@ -1783,6 +1783,8 @@ Lbw_bt_next:
     add  x22, x22, #1
     b    Lbw_bt_loop
 Lbw_send:
+    mov  x0, x19                      // and what System Information knows: speakers and
+    bl   Lbw_profiler                 //   headphones that tell macOS their battery
     mov  x1, x19
     LDGOT x0, __dispatch_main_q
     ADRL x2, _bat_show
@@ -1826,6 +1828,181 @@ _sn_bt_pct:
     LEAVE 0
 Lbp_none:
     mov  x0, #-1
+    LEAVE 0
+
+// Lbw_profiler(ctx) — background: connected Bluetooth devices' batteries as macOS reports
+//   them (system_profiler SPBluetoothDataType -json: "device_connected", each one's
+//   device_batteryLevelMain, or the lower of Left and Right). Listed once by name.
+Lbw_profiler:
+    ENTER 48                              // [96] FILE *  [104] a name
+    mov  x19, x0
+    ADRL x0, Ls_sp_cmd
+    ADRL x1, Ls_sp_mode
+    bl   _popen
+    cbz  x0, 9f
+    str  x0, [sp, #96]
+    mov  x0, #0x40000                     // 256 KB: the report is a few KB
+    bl   _malloc
+    mov  x20, x0
+    mov  x21, #0
+    cbz  x20, 3f
+1:  mov  x2, #0x40000
+    sub  x2, x2, x21
+    cbz  x2, 2f
+    add  x0, x20, x21
+    mov  x1, #1
+    ldr  x3, [sp, #96]
+    bl   _fread
+    cbz  x0, 2f
+    add  x21, x21, x0
+    b    1b
+2:  CLS  Ls_NSData
+    mov  x2, x20
+    mov  x3, x21
+    MSG2 Ls_dataWithBytes
+    mov  x22, x0
+    mov  x0, x20
+    bl   _free
+    cbz  x22, 3f
+    CLS  Ls_NSJSONSerialization
+    mov  x2, x22
+    mov  x3, #0
+    mov  x4, #0
+    MSG3 Ls_JSONObjectWithData
+    ADRL x1, Ls_sp_top                    // ["SPBluetoothDataType"][0]["device_connected"]
+    bl   Lbw_get
+    mov  x1, #0
+    bl   Lbw_at
+    ADRL x1, Ls_sp_connected
+    bl   Lbw_get
+    cbz  x0, 3f
+    mov  x23, x0
+    MSG0 Ls_count
+    mov  x24, x0
+    mov  x22, #0
+4:  cmp  x22, x24
+    b.hs 3f
+    mov  x0, x23
+    mov  x1, x22
+    add  x22, x22, #1
+    bl   Lbw_at                           // {"Name": {...}}
+    cbz  x0, 4b
+    mov  x20, x0
+    MSG0 Ls_allKeys
+    mov  x1, #0
+    bl   Lbw_at
+    cbz  x0, 4b
+    mov  x21, x0                          // the name (an NSString)
+    MSG0 Ls_UTF8String
+    cbz  x0, 4b
+    mov  x1, x0
+    add  x0, sp, #104
+    mov  x2, #40
+    bl   _strlcpy
+    mov  x0, x20
+    mov  x2, x21
+    MSG1 Ls_objectForKey
+    mov  x20, x0                          // its properties
+    ADRL x1, Ls_sp_main
+    bl   Lbw_pct
+    tbz  x0, #63, 5f
+    mov  x0, x20                          // earbuds: the lower of the two
+    ADRL x1, Ls_sp_left
+    bl   Lbw_pct
+    mov  x21, x0
+    mov  x0, x20
+    ADRL x1, Ls_sp_right
+    bl   Lbw_pct
+    tbnz x21, #63, 5f
+    tbnz x0, #63, 41f
+    cmp  x0, x21
+    b.lt 5f
+41: mov  x0, x21
+5:  tbnz x0, #63, 4b
+    mov  x2, x0
+    mov  x0, x19
+    add  x1, sp, #104
+    mov  x3, #0
+    bl   _bat_line
+    b    4b
+3:  ldr  x0, [sp, #96]
+    bl   _pclose
+9:  LEAVE 48
+
+// id Lbw_get(id dict, const char *key) -> dict[key], or 0 (also when it isn't a dictionary)
+Lbw_get:
+    ENTER 0
+    mov  x19, x0
+    mov  x20, x1
+    cbz  x19, 8f
+    ADRL x0, Ls_objectForKey
+    bl   _sel_registerName
+    mov  x2, x0
+    mov  x0, x19
+    SELX1 Ls_respondsToSelector
+    mov  x0, x19
+    bl   _objc_msgSend
+    tst  w0, #0xff
+    b.eq 8f
+    mov  x0, x20
+    bl   _nsstr
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_objectForKey
+    LEAVE 0
+8:  mov  x0, #0
+    LEAVE 0
+
+// id Lbw_at(id array, long i) -> array[i], or 0 (also when it isn't an array, or too short)
+Lbw_at:
+    ENTER 0
+    mov  x19, x0
+    mov  x20, x1
+    cbz  x19, 8f
+    ADRL x0, Ls_objectAtIndex
+    bl   _sel_registerName
+    mov  x2, x0
+    mov  x0, x19
+    SELX1 Ls_respondsToSelector
+    mov  x0, x19
+    bl   _objc_msgSend
+    tst  w0, #0xff
+    b.eq 8f
+    mov  x0, x19
+    MSG0 Ls_count
+    cmp  x20, x0
+    b.hs 8f
+    mov  x0, x19
+    mov  x2, x20
+    MSG1 Ls_objectAtIndex
+    LEAVE 0
+8:  mov  x0, #0
+    LEAVE 0
+
+// long Lbw_pct(id props, const char *key) -> "80%" there as 80 (1-100), or -1
+Lbw_pct:
+    ENTER 0
+    bl   Lbw_get
+    cbz  x0, 8f
+    mov  x19, x0
+    ADRL x0, Ls_intValue
+    bl   _sel_registerName
+    mov  x2, x0
+    mov  x0, x19
+    SELX1 Ls_respondsToSelector
+    mov  x0, x19
+    bl   _objc_msgSend
+    tst  w0, #0xff
+    b.eq 8f
+    mov  x0, x19
+    MSG0 Ls_intValue
+    sxtw x0, w0
+    cmp  x0, #1
+    b.lt 8f
+    cmp  x0, #100
+    b.gt 8f
+    LEAVE 0
+8:  mov  x0, #-1
     LEAVE 0
 
 // void _bat_show(ctx) — main thread: the list in Home (or, quietly, pushes for low ones)
@@ -2478,6 +2655,19 @@ Ls_isConnected:    .asciz "isConnected"
 Ls_nameOrAddress:  .asciz "nameOrAddress"
 Ls_respondsToSelector: .asciz "respondsToSelector:"
 Ls_bp_single:      .asciz "batteryPercentSingle"
+Ls_sp_cmd:         .asciz "/usr/sbin/system_profiler SPBluetoothDataType -json 2>/dev/null"
+Ls_sp_mode:        .asciz "r"
+Ls_sp_top:         .asciz "SPBluetoothDataType"
+Ls_sp_connected:   .asciz "device_connected"
+Ls_sp_main:        .asciz "device_batteryLevelMain"
+Ls_sp_left:        .asciz "device_batteryLevelLeft"
+Ls_sp_right:       .asciz "device_batteryLevelRight"
+Ls_NSData:         .asciz "NSData"
+Ls_dataWithBytes:  .asciz "dataWithBytes:length:"
+Ls_NSJSONSerialization: .asciz "NSJSONSerialization"
+Ls_JSONObjectWithData: .asciz "JSONObjectWithData:options:error:"
+Ls_allKeys:        .asciz "allKeys"
+Ls_intValue:       .asciz "intValue"
 Ls_bp_left:        .asciz "batteryPercentLeft"
 Ls_bp_right:       .asciz "batteryPercentRight"
 Ls_u_fcd2:         .asciz "FCD2"

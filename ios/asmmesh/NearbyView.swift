@@ -9,6 +9,7 @@ struct NearbyView: View {
     @State private var newName = ""
     @State private var picked: ScanRow?
     @State private var showing = 0            // 0 all, 1 Bluetooth, 2 Wi-Fi & internet
+    @State private var showBatteries = false
 
     var body: some View {
         NavigationStack {
@@ -20,7 +21,7 @@ struct NearbyView: View {
                     }
                     HStack(spacing: 10) {
                         QuickButton(title: "Batteries", symbol: "battery.75percent", color: Theme.green) {
-                            mesh.home("batteries")
+                            showBatteries = true
                         }
                         QuickButton(title: "Headphones here", symbol: "airpodspro", color: Theme.blue) {
                             mesh.home("headphones here")
@@ -80,6 +81,9 @@ struct NearbyView: View {
             .navigationTitle("Nearby")
             .sheet(item: $picked) { r in
                 ScanDetail(row: r).presentationDetents([.medium, .large])
+            }
+            .sheet(isPresented: $showBatteries) {
+                BatterySheet().environmentObject(mesh).presentationDetents([.medium, .large])
             }
             .alert("Name this sensor", isPresented: Binding(get: { naming != nil }, set: { if !$0 { naming = nil } })) {
                 TextField("e.g. Bedroom", text: $newName)
@@ -228,6 +232,7 @@ private func symbol(for kind: String) -> String {
 struct ScanDetail: View {
     let row: ScanRow
     @State private var details = ""
+    @State private var pairing = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -240,15 +245,22 @@ struct ScanDetail: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     HStack(spacing: 10) {
                         Button { coreLater { am_scan_pair(row.id); reload() } } label: {
-                            Label("Connect & Pair", systemImage: "link")
+                            Label(row.bluetooth ? "Connect" : "Connect & Pair", systemImage: "link")
                         }
                         .buttonStyle(.borderedProminent)
-                        Button { coreLater { am_scan_setup(row.id); reload() } } label: {
-                            Label("Set Up", systemImage: "gearshape")
+                        if row.bluetooth {
+                            Button { pairing = true } label: { Label("Pair in Settings\u{2026}", systemImage: "gear") }
+                                .buttonStyle(.bordered)
+                        } else {
+                            Button { coreLater { am_scan_setup(row.id); reload() } } label: {
+                                Label("Set Up", systemImage: "gearshape")
+                            }
+                            .buttonStyle(.bordered)
                         }
-                        .buttonStyle(.bordered)
                     }
-                    Text("Connect & Pair reads a Bluetooth device's maker, model, firmware and battery. Set Up pairs a Hue Bridge or Nanoleaf, connects Home Assistant, opens the Home app for HomeKit and Matter devices, or opens a device's web page. What happens shows in Home.")
+                    Text(row.bluetooth
+                         ? "Connect reads what a Bluetooth device tells apps about itself: maker, model, firmware and, if it offers one, its battery. Speakers, headphones and keyboards are paired in Settings \u{203A} Bluetooth: iOS doesn\u{2019}t let apps pair them. What happens shows in Home."
+                         : "Connect & Pair reads a device's details. Set Up pairs a Hue Bridge or Nanoleaf, connects Home Assistant, opens the Home app for HomeKit and Matter devices, or opens a device's web page. What happens shows in Home.")
                         .font(.caption).foregroundStyle(Theme.dim)
                 }
                 .padding()
@@ -258,6 +270,12 @@ struct ScanDetail: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
             .onAppear { reload() }
+            .alert("Pair in Settings", isPresented: $pairing) {
+                Button("Open Settings") { openSettings() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("iOS pairs speakers, headphones and keyboards only in its own Settings, not in apps. Open Settings, go back to the main list, tap Bluetooth, and pick \u{201C}\(row.name.isEmpty ? "the device" : row.name)\u{201D} under Other Devices (put it in pairing mode first).")
+            }
         }
     }
 
@@ -265,5 +283,71 @@ struct ScanDetail: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             details = String(cString: am_scan_details(row.id))
         }
+    }
+}
+
+/// Batteries, as far as iOS lets an app see: this iPhone's, and Bluetooth sensors' (which say
+/// theirs out loud). Speakers', headphones' and keyboards' are only in iOS's Batteries widget.
+struct BatterySheet: View {
+    @EnvironmentObject var mesh: Mesh
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("This iPhone") {
+                    HStack {
+                        Label(UIDevice.current.name, systemImage: "iphone")
+                        Spacer()
+                        Text(phoneLevel()).foregroundStyle(Theme.dim)
+                    }
+                }
+                let withBattery = mesh.sensors.filter { $0.reading.contains("battery") }
+                if !withBattery.isEmpty {
+                    Section("Bluetooth sensors") {
+                        ForEach(withBattery) { s in
+                            HStack {
+                                Label(s.label, systemImage: "sensor.fill")
+                                Spacer()
+                                Text(Self.battery(in: s.reading)).foregroundStyle(Theme.dim)
+                            }
+                        }
+                    }
+                }
+                Section {
+                    Text("iOS doesn\u{2019}t let apps read the batteries of speakers, headphones, keyboards or other phones. To see them, add the Batteries widget to your Home Screen (touch and hold the Home Screen, tap Edit \u{203A} Add Widget \u{203A} Batteries). On a Mac, asmmesh\u{2019}s batteries command lists them.")
+                        .font(.footnote).foregroundStyle(Theme.dim)
+                }
+            }
+            .navigationTitle("Batteries")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+        .onAppear { UIDevice.current.isBatteryMonitoringEnabled = true }
+    }
+
+    private func phoneLevel() -> String {
+        let d = UIDevice.current
+        d.isBatteryMonitoringEnabled = true
+        guard d.batteryLevel >= 0 else { return "unknown" }
+        let pct = Int((d.batteryLevel * 100).rounded())
+        switch d.batteryState {
+        case .charging: return "\(pct)% \u{00B7} charging"
+        case .full: return "\(pct)% \u{00B7} full"
+        default: return "\(pct)%"
+        }
+    }
+
+    /// "72.4°F · 45% humidity · battery 80%" -> "80%"
+    static func battery(in reading: String) -> String {
+        guard let r = reading.range(of: "battery ") else { return "" }
+        return String(reading[r.upperBound...].prefix { $0 != " " && $0 != "\u{00B7}" })
+    }
+}
+
+/// Settings, at this app's page: as close to Settings › Bluetooth as iOS lets an app go
+func openSettings() {
+    if let url = URL(string: UIApplication.openSettingsURLString) {
+        UIApplication.shared.open(url)
     }
 }
