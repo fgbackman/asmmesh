@@ -1,5 +1,6 @@
 #!/bin/bash
 # Double-click me (or: bash "Install on iPhone.command") with your iPhone or iPad plugged in.
+# A phone it doesn't find: name it, bash "Install on iPhone.command" "iphoney (2)".
 # Builds asmmesh for iPhone and iPad with your Apple ID's signing certificate, installs it on
 # every paired one and opens it. Everything is also written to build.log next to this file.
 cd "$(dirname "$0")"
@@ -41,8 +42,11 @@ for x in d.get('result', {}).get('devices', []):
     hw = x.get('hardwareProperties', {})
     cp = x.get('connectionProperties', {})
     name = x.get('deviceProperties', {}).get('name', '?')
-    if hw.get('platform') != 'iOS' or hw.get('reality') != 'physical':
-        continue
+    plat, real = hw.get('platform') or '', hw.get('reality') or ''
+    if plat not in ('', 'iOS') or real == 'virtual':
+        continue                    # a watch, a Mac, a simulator
+    if not plat or not real:        # its details haven't come through: say so, try it anyway
+        print('  %s: not fully set up with this Mac yet (unlocked? Developer Mode on?) - trying it anyway' % name, file=sys.stderr)
     via = {'wired': 'cable', 'localNetwork': 'Wi-Fi'}.get(cp.get('transportType'), 'not connected now')
     if cp.get('pairingState') != 'paired':
         print('skipped %s (%s): not paired with this Mac (plug it in, unlock it, tap Trust)' % (name, via), file=sys.stderr)
@@ -51,6 +55,14 @@ for x in d.get('result', {}).get('devices', []):
     print(x.get('identifier') + '\t' + name + '\t' + via)
 EOF2
 )
+# phones named on the command line get it whatever the list says (devicectl takes a name):
+#   bash "Install on iPhone.command" "iphoney (2)"
+for want in "$@"; do
+  if ! printf '%s\n' "$DEVS" | cut -f2 | grep -qxF "$want"; then
+    DEVS="$DEVS${DEVS:+
+}$want	$want	named"
+  fi
+done
 echo "found: $(printf '%s\n' "$DEVS" | cut -f2 | paste -sd ',' - | sed 's/,/, /g')"
 echo "(an iPhone missing here isn't seen by this Mac at all: plug it in with a cable, unlock it, tap Trust)"
 if [ -z "$DEVS" ]; then
