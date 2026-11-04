@@ -41,6 +41,7 @@ struct RoomList: View {
     @EnvironmentObject var mesh: Mesh
     @Binding var picked: UInt64?
     let split: Bool
+    @State private var newGame = false
 
     var body: some View {
         ScrollView {
@@ -61,6 +62,9 @@ struct RoomList: View {
                     }
                     SectionTitle(text: "Your rooms")
                 }
+                if mesh.game.state != 0, let room = mesh.rooms.first(where: { $0.index == mesh.game.room }) {
+                    gameRow(room)                       // the game being played, on top
+                }
                 ForEach(mesh.rooms) { room in
                     roomRow(room)
                 }
@@ -71,9 +75,26 @@ struct RoomList: View {
         .navigationTitle("Rooms")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                Button { newGame = true } label: { Image(systemName: "square.grid.3x3.fill") }
+                    .accessibilityLabel("Play Ninefold")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
                 Button { coreLater { am_new_room() } } label: { Image(systemName: "plus.circle.fill") }
                     .keyboardShortcut("n", modifiers: .command)
             }
+        }
+        .sheet(isPresented: $newGame) {
+            NinefoldSheet().environmentObject(mesh)
+        }
+    }
+
+    @ViewBuilder private func gameRow(_ room: Room) -> some View {
+        if split {
+            Button { picked = room.id } label: { GameCard(game: mesh.game, name: room.name) }
+                .buttonStyle(.plain)
+        } else {
+            NavigationLink(value: room.id) { GameCard(game: mesh.game, name: room.name) }
+                .buttonStyle(.plain)
         }
     }
 
@@ -166,8 +187,11 @@ struct ChatView: View {
     private var room: Room? { mesh.rooms.first { $0.id == roomID } }
     private var lines: [Line] { mesh.lines[roomID] ?? [] }
 
+    private var isGame: Bool { room != nil && mesh.game.state != 0 && mesh.game.room == room!.index }
+
     var body: some View {
         VStack(spacing: 0) {
+            if isGame { GameBoard() }
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 8) {

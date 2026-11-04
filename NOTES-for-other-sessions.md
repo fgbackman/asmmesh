@@ -206,3 +206,18 @@ For where the bitchat work stands and what comes next, start with `docs/bitchat_
 - mesh.s `_mesh_send_text`: typing in a chat room -> `_bc_pm_say`. `Lbc_read`: 0x10/0x11 for us ->
   `Lbc_noise_in` (not relayed). `Lbc_keys_wipe` -> `Lbc_pm_wipe`; `_bc_tick` -> `Lbc_pm_tick`.
 - Home: `bitchat chat <name|hex>` (`_h_bitchat_chat`); iPhone `am_bc_hexid`, PeopleView "Message".
+
+## Ninefold, the word game (Nov 4, branch claude/ninefold)
+- New files: `src/nf_core.s`, `src/nf_play.s`, `src/nf_text.s` (all pure, qemu self-tests 196-204),
+  `src/nf_mesh.s` (Mac and iPhone), `src/nf_defs.inc`, `src/nf_words.bin` (made by
+  `tools/ninefold/nf.py pack` from `tools/ninefold/words/`), `ios/asmmesh/GameView.swift`.
+  In the Makefile (nf_core.o depends on nf_words.bin) and ios/make_project.py.
+- Numbers taken: MSGF_GAME 8 (room-message flag: the bytes are a game packet, always with
+  MSGF_RKEY). Game packet kinds NK_START 1, NK_CLAIM 3, NK_REVEAL 4 (nf_defs.inc).
+- mesh.s: `_mesh_send_game(room, data, len)`; `Lrx_game` -> `_nf_rx`; `_mesh_send_text` asks
+  `_nf_typed` first. Home word "ninefold" (rules.s). `_nf_tick` runs from scanner.s and
+  ios_ui.s next to `_bc_tick`. Platform hook `_nf_ui_show(status)`: ui.s (room header) and
+  ios_ui.s (`ios_nf_changed` in Bridge.swift).
+- `tools/qemu/run.sh nfdiff N` checks nf_core.s against nf.py; `run.sh nfdemo` prints a round.
+- Not tried on a Mac or iPhone yet (built and tested under qemu and clang only; Swift not
+  compiled here).

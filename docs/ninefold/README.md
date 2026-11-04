@@ -1,7 +1,10 @@
 # Ninefold — a word game for asmmesh, played by invitation across the mesh
 
-Status: **prototype (images only)**. Nothing in the app yet. The mockups are `mockups.html`
-(open with `#invite`, `#play`, `#mac` or `#results`) and the PNGs next to it.
+Status: **built, not yet tried on devices.** The rules, the puzzles and the screens' text
+are pure code tested under qemu (self-tests 196-204, and `tools/qemu/run.sh nfdiff` against
+the Python copy); the mesh, Mac and iPhone parts assemble, but haven't run on a Mac or
+iPhone yet, and the Swift wasn't compiled here. The mockups are `mockups.html` (open with
+`#invite`, `#play`, `#mac` or `#results`) and the PNGs next to it.
 
 Nine letters in a 3×3 grid. Every word must use the centre letter, and one word uses all
 nine. Ninefold is asmmesh's own game in that long-standing newspaper format. It is **not** a
@@ -43,9 +46,11 @@ in the centre, 19 answers and 7 rarer words also accepted.
 
 - The host picks a random 64-bit **seed**. The puzzle comes from the seed alone, so only the
   seed travels, and every Mac and iPhone builds the same grid.
-- From the seed:
+- From the seed (splitmix64; `src/nf_core.s`, Python copy `tools/ninefold/nf.py`):
   1. A 9-letter answer with no other 9-letter anagram among the answers.
-  2. A centre letter that leaves between 15 and 60 answers.
+  2. A centre letter that leaves between 15 and 60 answers (family-filter words never
+     count here, so the setting can't change the puzzle). A puzzle with more than 250 words
+     in all is skipped, so a word's index fits in one byte.
   3. The order of the other eight tiles.
 - The generator is pure code with self-tests (like `term_core.s` and `bc_noise.s`): the same
   seed must give the same puzzle on every build.
@@ -110,28 +115,35 @@ relaying and duplicate filter, and stay within the 240-byte packet limit:
 
 | Packet   | Sent by      | Carries                                                                                  |
 |----------|--------------|------------------------------------------------------------------------------------------|
-| `START`  | host         | seed, round, round length, start time (10 s ahead), the players' ids, the word lists' hash |
-| `READY`  | each player  | "I have built the puzzle"; the round starts when all are ready, or after 30 s            |
-| `CLAIM`  | finder       | word length, a 16-byte commitment, the time found                                        |
-| `REVEAL` | each player  | after the round: their words (one byte each: an index into the puzzle's word list), their salt |
-| `END`    | host         | round over (everyone also stops on their own clock)                                      |
+| `START`  | host         | game id, round, rounds, round length, seed, start time (10 s ahead), the word lists' hash, family filter (31 bytes) |
+| `CLAIM`  | finder       | word length, the time found, a 16-byte commitment (28 bytes)                             |
+| `REVEAL` | each player  | after the round: their salt and their words (one byte each: an index into the puzzle's word list), 80 a packet |
+
+- There is no READY or END: everyone starts and stops on their own clock, from the start
+  time in `START`. The host sends `START` again every 15 seconds while a round is waiting or
+  on, so a slow hop or a late joiner catches up (a late joiner starts where the round has
+  got to). Only a game's host can start its later rounds.
+- Claims are taken until 5 seconds after the round; their times are kept within the round.
+  Reveals are scored 12 seconds after it. The host's next round starts 15 seconds after that.
 
 ### Words stay hidden until the end: commit, then reveal
 
 A puzzle has only a few dozen words, so a plain hash would be easy to undo by trying them
 all. Each player therefore makes a secret random **salt** for each round:
 
-- When you find a word, `CLAIM` carries `SHA-256(salt ‖ round ‖ word index)`, first 16
-  bytes. Others learn the length and that you found something, nothing more.
+- When you find a word, `CLAIM` carries `SHA-256(salt ‖ your id ‖ round ‖ word index)`,
+  first 16 bytes. Your id is in it so nobody can copy your claims and, after seeing your salt
+  at the reveal, pass them off as theirs (self-test 203 tries exactly that). Others learn the length and that you found something, nothing more.
 - At the end, `REVEAL` gives your word indexes and the salt. Every device recomputes each
   commitment. A word whose commitment wasn't sent during the round, or doesn't match, scores
   nothing. So you can't add words after seeing everyone else's.
 - **First finder**: the earliest signed time on a matching claim. Clocks differ, so claims
-  within 2 s of each other share the bonus.
+  within 2 s of the earliest share the bonus. Only signed claims and reveals count, so every
+  device works out the same scores (self-test 203 checks two devices agree).
 
 ### Limits
 
-- 4 claims a second per player, 12 players a game.
+- 100 claims a player a round, 768 in all, 12 players a game.
 - Names and chat are cleaned like everywhere else in asmmesh.
 - A game room is local to its players: not listed, and gone when the game ends (its
   transcript can be kept).
@@ -139,27 +151,30 @@ all. Each player therefore makes a secret random **salt** for each round:
 ## In the app
 
 - **Mac**:
-  - Home: `ninefold with Anna Sam` starts a game and invites them.
-  - Inside the game room: the grid sits next to the room's chat. You type a word in the
-    input line and press Enter; Tab shuffles and Esc clears, as the terminal-style line
-    already does.
-  - Each word gets a line in the transcript ("you: TOOLING ✓ (first, +1)").
+  - Home: `ninefold with Anna, Sam` (options `3 rounds`, `2 minutes`, `family off`) makes the
+    game room and invites them; `ninefold` alone makes it empty (invite from the room).
+  - Inside the game room: `start` (the host), then type words and press Enter. `shuffle`
+    shows the tiles in a new order, `words` lists yours. The room's header shows the clock
+    and everyone's word counts; the grid, each answer and the results are transcript lines.
+  - A typed line that is one word of letters, during a round, is always a guess and never
+    chat; anything else is chat as usual.
 - **iPhone**:
-  - The invitation comes as a sheet with **Join game** and **Not now**.
-  - The game screen is the grid with letter tiles, the players' counts, the clock and your
-    words.
-  - A hardware keyboard works too.
+  - The invitation says it's a game: **Join Game** or **Not now**.
+  - The ▦ button on the Rooms list starts a game (people, rounds, minutes, family filter).
+  - The game room shows the board above the chat: the status, tiles to tap, Shuffle,
+    Delete, Clear, your words, the others' counts; after a round, the results and
+    **Next Round Now** (host) or **Play Again** (after the last round). A card on the Rooms
+    list leads back to the game.
 - **Not over bitchat.** bitchat stays walled off.
+- One game at a time on a device.
 
-## Plan
+## What was done, and what's left
 
-1. **Generator** (pure, qemu self-tests): seed to puzzle, word check, scoring, commitments.
-   Cross-checked against a Python copy, as the bitchat code was.
-2. **Word lists** (`tools/ninefold`) packed into the app (Mac and iPhone), with the credits
-   from `SOURCES.md`.
-3. **Mesh**: the game flag on room messages, the five packets, the reveal check, invitations
-   through the existing invite flow.
-4. **Mac UI**: the game room view (grid panel and transcript), and Home commands.
-5. **iPhone UI**: the invitation sheet, the game screen and the results screen, as in the
-   mockups.
-6. Two Macs and two iPhones, one of them several hops away: a full game of 3 rounds.
+1. Generator and rules (pure, qemu self-tests 196-204), cross-checked against `nf.py`. Done.
+2. Word lists packed into the app (`src/nf_words.bin`, 25,815 words). Done; the credits from
+   `tools/ninefold/SOURCES.md` still need adding to the app's About text.
+3. Mesh: the game flag on room messages, the packets, the reveal check, invitations through
+   the existing invite flow. Done.
+4. Mac UI: header and transcript, Home command. Done.
+5. iPhone UI: invitation wording, game board, start sheet, results. Done, not compiled here.
+6. Two Macs and two iPhones, one of them several hops away: a full game of 3 rounds. To do.

@@ -100,6 +100,19 @@ long am_sensor_info(long i, long k);        // 0 label, 1 reading, 2 age, 3 kind
 long am_near_count(void);
 long am_near_info(long i, long k);          // 0 name, 1 maker, 2 what (char *), 3 dBm, 4 age, 5 flags
 
+// Ninefold (nf_mesh.s): one game at a time, in its own invite-only room
+long am_nf_state(void);                      // 0 none, 1 lobby, 2 starting, 3 playing, 4 checking, 5 scored
+long am_nf_room(void);                       // the game room's index, or -1
+long am_nf_host(void);                       // 1 if this phone starts the rounds
+long am_nf_left(void);                       // seconds until the round starts / ends
+char *am_nf_tiles(char *buf);                // buf: 10 bytes; 9 capitals, the centre 5th
+long am_nf_status(char *buf, long cap);
+long am_nf_mine(char *buf, long cap);        // your words this round, by spaces
+long am_nf_players(char *buf, long cap);     // "name\twords\tscore\n" each, best first
+long am_nf_result(long k, char *buf, long cap);  // the round's results, line k (0 after the last)
+long am_nf_new(const long *people, long n, long rounds, long minutes, long family);
+void nf_shuffle(void);
+
 // objects the core talks to: the text field voice writes into, the Talk button
 extern void *g_field;
 extern void *g_talkbtn;

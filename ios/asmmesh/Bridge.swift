@@ -37,6 +37,12 @@ func iosStatus(_ text: UnsafePointer<CChar>?) {
     Mesh.shared.status = String(cString: text)
 }
 
+// Ninefold changed (nf_mesh.s, every second while a game is on): the game screen reads it again
+@_cdecl("ios_nf_changed")
+func iosNfChanged(_ text: UnsafePointer<CChar>?) {
+    Mesh.shared.gameChanged()
+}
+
 // Files on Wi-Fi: its address as a QR code; "airdrop": pick files, then the share sheet
 @_cdecl("ios_show_qr")
 func iosShowQR(_ text: UnsafePointer<CChar>?) {

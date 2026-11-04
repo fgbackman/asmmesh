@@ -151,6 +151,21 @@ struct Service: Identifiable, Equatable {
     var on: Bool
 }
 
+/// The Ninefold game, as the core has it (nf_mesh.s)
+struct Game: Equatable {
+    struct Player: Equatable, Hashable { let name: String; let words: Int; let score: Int }
+    var state = 0            // 0 none, 1 lobby, 2 starting, 3 playing, 4 checking, 5 scored
+    var room = -1
+    var tiles: [String] = []
+    var status = ""
+    var mine: [String] = []
+    var players: [Player] = []
+    var results: [String] = []
+    var host = false
+    var left = 0
+    var playing: Bool { state == 3 }
+}
+
 final class Mesh: ObservableObject {
     static let shared = Mesh()
 
@@ -174,6 +189,7 @@ final class Mesh: ObservableObject {
     @Published var talkTitle = "Talk"
     @Published var qrText: QRText?
     @Published var pickingFiles = false
+    @Published var game = Game()
     var talking: Bool { talkTitle.contains("Stop") }
 
     private var started = false
@@ -354,6 +370,43 @@ final class Mesh: ObservableObject {
         guard !text.isEmpty else { return }
         input = ""
         coreLater { text.withCString { am_send($0) } }   // a command may ask something
+    }
+
+    // MARK: Ninefold (nf_mesh.s)
+
+    func gameChanged() {
+        var g = Game()
+        g.state = am_nf_state()
+        g.room = am_nf_room()
+        if g.state != 0 && g.room >= 0 {
+            var buf = [CChar](repeating: 0, count: 1200)
+            _ = am_nf_tiles(&buf)
+            g.tiles = Array(String(cString: buf)).map(String.init)
+            _ = am_nf_status(&buf, 1200)
+            g.status = String(cString: buf)
+            _ = am_nf_mine(&buf, 1200)
+            g.mine = String(cString: buf).split(separator: " ").map(String.init)
+            _ = am_nf_players(&buf, 1200)
+            g.players = String(cString: buf).split(separator: "\n").map { row in
+                let f = row.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+                return Game.Player(name: f.first ?? "?", words: Int(f.count > 1 ? f[1] : "") ?? 0,
+                                   score: Int(f.count > 2 ? f[2] : "") ?? 0)
+            }
+            var k = 0
+            while am_nf_result(k, &buf, 1200) > 0 {
+                g.results.append(String(cString: buf)); k += 1
+            }
+            g.host = am_nf_host() != 0
+            g.left = am_nf_left()
+        }
+        if g != game { game = g }
+    }
+
+    /// Typed into the game room as if by keyboard: a word, "start", "shuffle"
+    func gameSay(_ text: String) {
+        guard game.room >= 0 else { return }
+        am_select_room(game.room)
+        coreLater { text.withCString { am_send($0) } }
     }
 
     // MARK: Hue bridges (hue.s)

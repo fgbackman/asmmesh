@@ -98,6 +98,16 @@ asmmesh can also talk to phones running [bitchat](https://github.com/permissionl
 
 How it works, how it was tested and what's next: `docs/bitchat_roadmap.md` and `docs/bitchat_handoff.md`.
 
+## Ninefold: a word game across the mesh, by invitation
+
+Nine letters in a 3×3 grid; make words of 4 to 9 letters that use the centre letter, each tile once. One word uses all nine. Everyone plays the same puzzle at the same time, and nobody sees anyone else's words until the round ends.
+
+- **Start a game** in Home: `ninefold with Anna, Sam` (names as People shows them, commas between). Add `3 rounds` (1-5), `2 minutes` (1-9) or `family off` as you like; the defaults are 3 rounds of 4 minutes with the family filter on. On iPhone: the ▦ button on the Rooms list.
+- That makes an invite-only room, "Ninefold" and your name, and invites them; the invitation says it's a game. When they've joined, type `start` (iPhone: **Start Game**). Each round starts 10 seconds later on everyone's own clock; the next one follows 15 seconds after the results.
+- **During a round**, any single word you type in the game room is a guess, never sent as chat: ✓ and its points, or why not. Only its length and a sealed commitment go out. `shuffle` moves the tiles, `words` lists yours. The Mac shows the clock and everyone's counts in the room's header; the iPhone shows the tiles above the chat (tap them to type).
+- **At the end** everyone's words are revealed and checked against what they claimed during the round, on every device, so all agree on the score: 1 point for 4 letters, one more per extra letter, 10 for the nine-letter word, +1 for finding it first (within 2 s), +2 if nobody else did. Then the answers nobody found.
+- The puzzles come from built-in word lists (`tools/ninefold`), the same on every device; a different build won't play with yours. How it works: `docs/ninefold/README.md`.
+
 ## Typing: history and suggestions
 
 On the Mac the input line works like a terminal's: monospaced, with a ❯ prompt.
@@ -141,6 +151,10 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
     src/parse.s    plain-English commands: actions, choosing devices, running them per backend
     src/net.s      HTTP (NSURLSession delegate), JSON accessors, Keychain
     src/hue.s      Hue Bridge (Bonjour, SSDP for v1, pairing, lights/rooms, adding by serial) and Hue Bluetooth bulbs
+    src/nf_core.s  Ninefold's rules, pure: the word table (nf_words.bin), seed to puzzle, words typed, points, commitments
+    src/nf_play.s  a Ninefold game, pure: rounds, claims, reveals checked against claims, scores
+    src/nf_text.s  Ninefold's words on screen, pure: status line, grid, answers to words typed, results
+    src/nf_mesh.s  Ninefold on the mesh: packets, the clock, Home's "ninefold", what the iPhone's game screen reads
     src/hue_core.s Hue's bytes-only parts: serials typed, bridge addresses, telling a bridge's SSDP answer
     src/st.s       SmartThings (all capabilities, scenes, status) and Apple Home via Shortcuts
     src/lan.s      Bonjour: WLED, Elgato, Shelly, Nanoleaf, Home Assistant discovery, scanner network rows
