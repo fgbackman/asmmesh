@@ -88,14 +88,9 @@ struct RoomList: View {
         }
     }
 
-    @ViewBuilder private func gameRow(_ room: Room) -> some View {
-        if split {
-            Button { picked = room.id } label: { GameCard(game: mesh.game, name: room.name) }
-                .buttonStyle(.plain)
-        } else {
-            NavigationLink(value: room.id) { GameCard(game: mesh.game, name: room.name) }
-                .buttonStyle(.plain)
-        }
+    private func gameRow(_ room: Room) -> some View {
+        Button { mesh.gameChanged(); mesh.showGame = true } label: { GameCard(game: mesh.game, name: room.name) }
+            .buttonStyle(.plain)
     }
 
     @ViewBuilder private func roomRow(_ room: Room) -> some View {
@@ -216,6 +211,11 @@ struct ChatView: View {
         .navigationTitle(room?.name ?? "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if isGame {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { mesh.showGame = true } label: { Label("Play", systemImage: "square.grid.3x3.fill") }
+                }
+            }
             if let room, room.kind == .main || room.kind == .privateRoom {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {

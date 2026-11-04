@@ -17,6 +17,7 @@
 .zerofill __DATA,__bss,_g_nf_start,32,4    // the host's START, sent again every 15 s
 .zerofill __DATA,__bss,_g_nf_view,16,4     // the tiles as shown (shuffle moves them)
 .zerofill __DATA,__bss,_g_nf_names,160,4   // who was invited, for the room's first line
+.zerofill __DATA,__bss,_g_nf_last,300,4    // the answer to the last word typed, for the windows
 _g_nf_next:     .quad 0                    // host: when the next round starts (0: not yet)
 _g_nf_warned:   .quad 0                    // the game we said "other word lists" about
 
@@ -335,6 +336,10 @@ _nf_typed:
     ADRL x5, _g_nf_buf
     mov  x6, #300
     bl   _nft_try
+    ADRL x0, _g_nf_last
+    ADRL x1, _g_nf_buf
+    mov  x2, #300
+    bl   _strlcpy
     mov  x0, x19
     ADRL x1, _g_nf_buf
     mov  x2, #1
@@ -554,6 +559,7 @@ Lhn_go:                                   // the room, the game, the invitations
     str  x9, [x22, #G_FAMILY]
     mov  x0, x20
     bl   _ui_select_room
+    bl   _nf_ui_pop                       // the game's own screen, waiting for players
     ADRL x8, _g_nf_names
     strb wzr, [x8]
     mov  x21, #0
@@ -922,7 +928,10 @@ Lnf_round_set:
     ADRL x1, Ls_nf_howto
     mov  x2, #1
     bl   _room_line
-1:  bl   Lnf_show
+1:  ADRL x8, _g_nf_last                     // a new round: no answer shown yet
+    strb wzr, [x8]
+    bl   Lnf_show
+    bl   _nf_ui_pop                       // the game comes up for every round
     ldp  x19, x20, [sp, #16]
     ldp  x29, x30, [sp], #32
     ret
@@ -963,6 +972,42 @@ Lnf_show:
     ADRL x0, _g_nf_buf
     bl   _nf_ui_show
     ldp  x29, x30, [sp], #16
+    ret
+
+// void _nf_joined(uint64 room, uint64 host) — we took an invitation to a game room (ui.s,
+//   ios_ui.s): its screen comes up now, waiting for the host, not only once a round starts
+.globl _nf_joined
+_nf_joined:
+    ENTER 0
+    mov  x19, x0
+    mov  x20, x1
+    ADRL x21, _g_nfg
+    ldr  x9, [x21, #G_STATE]              // a game being played here: that one stays
+    cmp  x9, #NFS_WAIT
+    b.lo 1f
+    cmp  x9, #NFS_DONE
+    b.lo 9f
+1:  mov  x0, x21
+    mov  x1, #0
+    mov  x2, #G_PUZ
+    bl   _memset
+    mov  x9, #NFS_LOBBY
+    str  x9, [x21, #G_STATE]
+    str  x19, [x21, #G_ROOM]
+    str  x20, [x21, #G_HOST]
+    ADRL x8, _g_node_id
+    ldr  x9, [x8]
+    str  x9, [x21, #G_ME]
+    ADRL x8, _g_nf_last
+    strb wzr, [x8]
+    bl   Lnf_show
+    bl   _nf_ui_pop
+9:  LEAVE 0
+
+// const char *am_nf_last(void) — the answer to the last word typed ("✓ TOOLING +4"), or ""
+.globl _am_nf_last
+_am_nf_last:
+    ADRL x0, _g_nf_last
     ret
 
 // ---------------------------------------------------------------------------

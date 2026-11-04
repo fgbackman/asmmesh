@@ -163,6 +163,7 @@ struct Game: Equatable {
     var results: [String] = []
     var host = false
     var left = 0
+    var last = ""            // the answer to the last word typed
     var playing: Bool { state == 3 }
 }
 
@@ -190,6 +191,7 @@ final class Mesh: ObservableObject {
     @Published var qrText: QRText?
     @Published var pickingFiles = false
     @Published var game = Game()
+    @Published var showGame = false      // the game full screen (GameScreen)
     var talking: Bool { talkTitle.contains("Stop") }
 
     private var started = false
@@ -397,9 +399,11 @@ final class Mesh: ObservableObject {
                 g.results.append(String(cString: buf)); k += 1
             }
             g.host = am_nf_host() != 0
+            if let p = am_nf_last() { g.last = String(cString: p) }
             g.left = am_nf_left()
         }
         if g != game { game = g }
+        if g.state == 0 && showGame { showGame = false }        // the game room went
     }
 
     /// Typed into the game room as if by keyboard: a word, "start", "shuffle"

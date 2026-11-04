@@ -58,6 +58,11 @@ struct GameBoard: View {
         }
         .frame(maxWidth: 260)
         .frame(maxWidth: .infinity)
+        if !g.last.isEmpty {
+            Text(g.last).font(.callout.weight(.semibold))
+                .foregroundStyle(g.last.hasPrefix("\u{2713}") ? Theme.green : Theme.dim)
+                .frame(maxWidth: .infinity)
+        }
         HStack(spacing: 10) {
             Button { coreLater { nf_shuffle() } } label: { Label("Shuffle", systemImage: "shuffle") }
             Button { if !mesh.input.isEmpty { mesh.input.removeLast() } } label: {
@@ -128,6 +133,59 @@ struct GameBoard: View {
             }
             .buttonStyle(.bordered)
         }
+    }
+}
+
+/// The game, full screen: comes up by itself (a game made or joined, every round)
+struct GameScreen: View {
+    @EnvironmentObject var mesh: Mesh
+    @FocusState private var typing: Bool
+
+    var body: some View {
+        NavigationStack {
+            ScrollView { GameBoard() }
+                .background(Theme.bg)
+                .safeAreaInset(edge: .bottom) { if mesh.game.playing { wordBar } }
+                .navigationTitle("Ninefold")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") { mesh.showGame = false }
+                    }
+                }
+                .onChange(of: mesh.game.playing, initial: true) { _, on in typing = on }
+        }
+    }
+
+    private var wordBar: some View {
+        HStack(spacing: 10) {
+            TextField("Type a word", text: $mesh.input)
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+                .focused($typing)
+                .submitLabel(.send)
+                .onSubmit { submit() }
+                .padding(.horizontal, 14).padding(.vertical, 10)
+                .background(Theme.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            Button { submit() } label: {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(width: 40, height: 40)
+                    .background(mesh.input.isEmpty ? Theme.grey : Theme.orange, in: Circle())
+            }
+            .disabled(mesh.input.isEmpty)
+        }
+        .padding()
+        .background(Theme.bg)
+    }
+
+    private func submit() {
+        let word = mesh.input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !word.isEmpty else { return }
+        mesh.input = ""
+        mesh.gameSay(word)
+        typing = true
     }
 }
 

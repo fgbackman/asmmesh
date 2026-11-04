@@ -112,6 +112,7 @@ long am_nf_players(char *buf, long cap);     // "name\twords\tscore\n" each, bes
 long am_nf_result(long k, char *buf, long cap);  // the round's results, line k (0 after the last)
 long am_nf_new(const long *people, long n, long rounds, long minutes, long family);
 void nf_shuffle(void);
+const char *am_nf_last(void);                // the answer to the last word typed, or ""
 
 // objects the core talks to: the text field voice writes into, the Talk button
 extern void *g_field;

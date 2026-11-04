@@ -43,6 +43,13 @@ func iosNfChanged(_ text: UnsafePointer<CChar>?) {
     Mesh.shared.gameChanged()
 }
 
+// Ninefold: a game was made or joined, or a round is starting: the game comes up full screen
+@_cdecl("ios_nf_pop")
+func iosNfPop() {
+    Mesh.shared.gameChanged()
+    Mesh.shared.showGame = true
+}
+
 // Files on Wi-Fi: its address as a QR code; "airdrop": pick files, then the share sheet
 @_cdecl("ios_show_qr")
 func iosShowQR(_ text: UnsafePointer<CChar>?) {

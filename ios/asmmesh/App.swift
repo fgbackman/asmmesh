@@ -77,6 +77,8 @@ struct ContentView: View {
             Text("They\u{2019}ll see an arrow and a distance to you, and you\u{2019}ll see one to them. Sharing stops by itself, or when either of you taps Stop.")
         }
         .sheet(isPresented: $finder.showing) { FindView() }
+        // Ninefold comes up by itself: a game made or joined, and every round (GameView.swift)
+        .fullScreenCover(isPresented: $mesh.showGame) { GameScreen().environmentObject(mesh) }
         .sheet(item: $mesh.qrText) { qr in
             QRSheet(text: qr.text)
                 .presentationDetents([.medium, .large])

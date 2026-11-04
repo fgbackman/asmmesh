@@ -201,7 +201,11 @@ _chat_line:
 _ui_select_room:
     ENTER 256
     mov  x19, x0
-    bl   _term_hide                   // suggestions are Home's
+    bl   _am_nf_room                  // the game's room: its window comes up too
+    cmp  x0, x19
+    b.ne 1f
+    bl   _nf_ui_pop
+1:  bl   _term_hide                   // suggestions are Home's
     ADRL x8, _g_cur_room
     str  x19, [x8]
     ADRL x8, _g_rooms
@@ -303,6 +307,7 @@ Lsr_done:
 _nf_ui_show:
     ENTER 0
     mov  x19, x0
+    bl   _nfw_update                      // the game's window (nf_win.s)
     ldrb w9, [x19]
     cbz  w9, 9f
     ADRL x8, _g_header
@@ -1547,6 +1552,15 @@ Lic_join:
     ADRL x1, Ls_joined_txt
     mov  w2, #MSGF_NOTICE
     bl   _mesh_send_msg
+    add  x0, x19, #8                  // a game's room: the game comes up, waiting for its host
+    ADRL x1, Ls_inv_nf_prefix
+    mov  x2, #9
+    bl   _strncmp
+    cbnz w0, 3f
+    ldr  x0, [x19]
+    ldr  x1, [x19, #136]
+    bl   _nf_joined
+3:
     mov  x0, x20
     mov  x1, #1
     ADRL x2, Ls_fmt_you_joined

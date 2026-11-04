@@ -160,6 +160,11 @@ Lmethods:
     .quad Ls_m_pairHue,     _hue_pair,          Ls_ty_v1
     .quad Ls_m_addHue,      _hue_add_dialog,    Ls_ty_v1
     .quad Ls_m_ninefold,    _nf_dialog,         Ls_ty_v1
+    .quad Ls_m_nfTile,      _nfw_tile,          Ls_ty_v1
+    .quad Ls_m_nfWord,      _nfw_word,          Ls_ty_v1
+    .quad Ls_m_nfStart,     _nfw_start,         Ls_ty_v1
+    .quad Ls_m_nfShuffle,   _nfw_shuffle,       Ls_ty_v1
+    .quad Ls_m_nfClear,     _nfw_clear,         Ls_ty_v1
     .quad Ls_m_meshPass,    _crypto_dialog,     Ls_ty_v1
     .quad Ls_m_fmShow,      _fm_show,           Ls_ty_v1
     .quad Ls_m_fmApply,     _fm_apply,          Ls_ty_v1
@@ -759,6 +764,7 @@ Lfo_done:
     LEAVE 16
 
 // id _dict2(id font, id color) — retained {font, foreground colour} attributes
+.globl _dict2
 _dict2:
     ENTER 32
     stp  x0, x1, [sp, #96]
@@ -1148,6 +1154,7 @@ Lac_add:
     LEAVE 16
 
 // id _mk_textview(id parent, unsigned mask, NSRect frame /*d0-d3*/)
+.globl _mk_textview
 _mk_textview:
     ENTER 32
     mov  x19, x0
@@ -1811,6 +1818,11 @@ Ls_m_connectST:        .asciz "connectSmartThings:"
 Ls_m_pairHue:          .asciz "pairHue:"
 Ls_m_addHue:           .asciz "addHueLights:"
 Ls_m_ninefold:         .asciz "playNinefold:"
+Ls_m_nfTile:           .asciz "nfTile:"
+Ls_m_nfWord:           .asciz "nfWord:"
+Ls_m_nfStart:          .asciz "nfStart:"
+Ls_m_nfShuffle:        .asciz "nfShuffle:"
+Ls_m_nfClear:          .asciz "nfClear:"
 Ls_m_meshPass:         .asciz "meshPassphrase:"
 Ls_m_fmShow:           .asciz "fmShow:"
 Ls_m_fmApply:          .asciz "fmApply:"

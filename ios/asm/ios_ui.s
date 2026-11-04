@@ -1752,6 +1752,11 @@ _combo_add:
 _nf_ui_show:
     b    _ios_nf_changed
 
+// void _nf_ui_pop(void) — the game's screen comes up (a game made or joined, every round)
+.globl _nf_ui_pop
+_nf_ui_pop:
+    b    _ios_nf_pop
+
 // void _invite_queue(uint64 room, const char *room_name, const char *from, const uint8 *key64)
 .globl _invite_queue
 _invite_queue:
@@ -1856,6 +1861,15 @@ Lic_join:
     ADRL x1, Ls_joined_txt
     mov  w2, #MSGF_NOTICE
     bl   _mesh_send_msg
+    add  x0, x19, #8                  // a game's room: the game comes up, waiting for its host
+    ADRL x1, Ls_inv_nf_prefix
+    mov  x2, #9
+    bl   _strncmp
+    cbnz w0, 3f
+    ldr  x0, [x19]
+    ldr  x1, [x19, #136]
+    bl   _nf_joined
+3:
     mov  x0, x20
     mov  x1, #1
     ADRL x2, Ls_fmt_you_joined
