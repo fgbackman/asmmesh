@@ -1447,16 +1447,22 @@ Lrx_roomdel:
     sub  x10, x9, #1                  // nor a local room
     cmp  x10, #(LOCAL_ROOMS - 2)
     b.ls Lrx_relay
-    ldr  x9, [x23, #R_OWNER]
-    cbz  x9, Lrx_relay
-    ldr  x10, [x19, #20]
-    cmp  x9, x10
-    b.ne Lrx_relay
     add  x0, x19, #29
     ldr  x1, [sp, #104]
     bl   _copy_nick
+    ldr  x9, [x23, #R_OWNER]
+    cbz  x9, Lrx_roomdel_no           // who made it isn't known here: only its maker may
+    ldr  x10, [x19, #20]
+    cmp  x9, x10
+    b.ne Lrx_roomdel_no
     mov  x0, x22
     bl   _room_deleted
+    b    Lrx_relay
+Lrx_roomdel_no:                       // refused: say so, so the room isn't a mystery
+    ADRL x0, Ls_fmt_del_refused
+    ADRL x1, _g_nickbuf
+    add  x2, x23, #R_NAME
+    bl   _chat_fmt
     b    Lrx_relay
 
     // ---- HP: headphones, let go / take them (handoff.s); signed, passed on unless ours ----
@@ -2157,6 +2163,7 @@ Lrs_done:
 
 // ---------------------------------------------------------------------------
 .section __TEXT,__cstring,cstring_literals
+Ls_fmt_del_refused: .asciz "\302\267 %s asked to delete the room \342\200\234%s\342\200\235 for everyone, but this device doesn\342\200\231t know them as the one who made it, so it stays. To be rid of it: Leave Room."
 Ls_anon:              .asciz "anon"
 Ls_localhost:         .asciz "localhost"
 Ls_main:              .asciz "Main"

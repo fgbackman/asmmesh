@@ -2007,7 +2007,7 @@ Ls_inv_info:          .asciz "It's an invite-only room. Messages hop over Blueto
 Ls_joined_txt:        .asciz "joined the room"
 Ls_left_txt:          .asciz "left the room"
 Ls_fmt_you_left:      .asciz "\302\267 You left #%s."
-Lf_room_deleted:      .asciz "\302\267 \360\237\227\221 %s deleted the room \342\200\234%s\342\200\235 \342\200\224 it\342\200\231s gone from this Mac too."
+Lf_room_deleted:      .asciz "\302\267 \360\237\227\221 %s deleted the room \342\200\234%s\342\200\235 \342\200\224 it\342\200\231s gone from this iPhone too."
 Lf_you_deleted:       .asciz "\302\267 \360\237\227\221 You deleted \342\200\234%s\342\200\235 for everyone in it."
 Ls_del_msg:           .asciz "Delete \342\200\234%s\342\200\235 for everyone?"
 Ls_del_info:          .asciz "It disappears from every Mac in it, with its messages. A Mac that\342\200\231s away gets the news when it comes back. This can\342\200\231t be undone."
