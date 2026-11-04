@@ -116,6 +116,12 @@ Nine letters in a 3×3 grid; make words of 4 to 9 letters that use the centre le
 - **Secure and walled off:** every move, whoever sends it, is checked against the rules on both devices (illegal, out-of-turn and other people's moves are refused; catching up after a lost move only ever fills in the other player's moves). Game packets are sealed with the room's key. Over bitchat only text crosses the wall: the game never touches asmmesh's rooms, devices, rules or keys, and nothing from bitchat runs as a command. The rules engine is pure code, checked by perft (the count of every position a few moves deep, from standard test positions, against the published numbers: 4,865,609 at depth 5 from the start).
 - The game ends by checkmate, resignation, an agreed draw, stalemate, the fifty-move rule, threefold repetition, or when neither side can mate. One game at a time.
 
+## Block, report, and the chat filter
+
+- **Block** someone: Mesh › Block Person (with them picked in People) on the Mac, their ⋯ in People on iPhone, or `block Anna` in Home; in a private bitchat chat, type `block`. Their messages, invitations, game moves and asks to join aren't shown or taken any more (their packets are still passed on for others: that's the mesh). `unblock Anna`, `unblock all`, `blocked` lists them. Kept between launches.
+- **Report** someone: Mesh › Report Person…, ⋯ › Report… on iPhone, `report Anna`, or `report` in a private bitchat chat. Your mail app opens a report (their name, key fingerprint and what they sent here lately) addressed to the report address, and they're blocked. Set the address with `report address you@example.com` or Settings › Privacy on iPhone.
+- **The chat filter** (on unless `filter off`; Settings › Privacy on iPhone): vulgar words and slurs in what others send show as `f***`. Only words Wiktionary itself labels vulgar, offensive or a slur (the same 37 as Ninefold's family filter), whole words with -s or -es: Scunthorpe, assess and Dickens are untouched, and so are Dick and Mongol written as names.
+
 ## Typing: history and suggestions
 
 On the Mac the input line works like a terminal's: monospaced, with a ❯ prompt.
@@ -167,6 +173,8 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
     src/ch_play.s  a chess game, pure: turns, packets, catching up, how it ends, the board and moves as text
     src/ch_mesh.s  chess on the mesh and over bitchat text; Home's "chess", what the boards read
     src/ch_win.s   the Mac's chess window (src/nf_win.s: Ninefold's)
+    src/cf_core.s  the chat filter, pure (its words: cf_words.inc, made by tools/ninefold/make_chat_filter.py)
+    src/safety.s   block, report, the filter's setting, and Home's words for them
     src/hue_core.s Hue's bytes-only parts: serials typed, bridge addresses, telling a bridge's SSDP answer
     src/st.s       SmartThings (all capabilities, scenes, status) and Apple Home via Shortcuts
     src/lan.s      Bonjour: WLED, Elgato, Shelly, Nanoleaf, Home Assistant discovery, scanner network rows

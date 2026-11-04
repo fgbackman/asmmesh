@@ -1,0 +1,4 @@
+# Short words for the chat filter (make_chat_filter.py) that family.txt can't hold (it has
+# 4-9 letters). Add one only if Wiktionary labels its main sense vulgar, offensive,
+# derogatory or a slur, as judge_family.py does for the rest. (Not "fag": first, a
+# cigarette. Not "cum": first, "with", as in summa cum laude.)

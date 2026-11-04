@@ -234,3 +234,13 @@ For where the bitchat work stands and what comes next, start with `docs/bitchat_
 - `tools/qemu/run.sh chperft` (deep perft), `run.sh chmesh` (ch_mesh.s with stand-ins for the
   app, tests 214-216: both transports).
 - Not tried on a Mac or iPhone yet.
+
+## Block, report, chat filter (Nov 4, branch claude/ninefold)
+- New files: `src/cf_core.s` (pure, self-test 217; words in `src/cf_words.inc` from
+  `tools/ninefold/make_chat_filter.py`), `src/safety.s` (Mac and iPhone).
+- mesh.s: blocked senders' MSG (text and game), INVITE, JOINREQ, SEEK aren't shown or taken
+  (still relayed); `_chat_clean` + `_rec_note` on every message shown. bc_ble.s: the same for
+  bitchat public and private messages. Typing block / unblock / report in a private bitchat
+  chat (`_sf_bc_typed`, before chess). Defaults keys "blocked", "chatFilter", "reportTo".
+- Home words: block, unblock, blocked, report, report address, filter, filter on/off.
+  Mac: Mesh › Block Person, Report Person…. iPhone: People ⋯ menu; Settings › Privacy.

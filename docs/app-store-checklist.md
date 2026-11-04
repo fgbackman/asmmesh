@@ -61,7 +61,7 @@ must still make sense alone: see 4.
 
 | Guideline                         | asmmesh                                                                                                                                        | State  |
 |-----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|--------|
-| 1.2 User-generated content        | Chat apps must have: a way to report a message or person, a way to block someone, a filter for objectionable content, and a published contact. asmmesh has none of the first three | ⬜ ⚠️ (biggest blocker) |
+| 1.2 User-generated content        | Chat apps must have: a way to report a message or person, a way to block someone, a filter for objectionable content, and a published contact. Block, report (an email to the report address) and a filter are in (safety.s, cf_core.s); still to do: set the report address to one you watch, answer reports within 24 hours, publish a contact | ✅ built, ⬜ the address and the contact |
 | 1.2 / 5.1.1 Anonymous chat        | Chat with people nearby without accounts gets extra attention: blocking and reporting must be easy to find                                     | ⬜ ⚠️ |
 | 2.1 App completeness              | No placeholders, no "not tried yet", no crashes; a reviewer alone must find something that works (Home, sensors, Hue, the scanner)            | ⬜     |
 | 2.3 Accurate metadata             | The description must not promise what iOS stops (pairing speakers, their batteries, relaying with the screen off)                             | ⬜     |

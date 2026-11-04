@@ -127,6 +127,15 @@ const char *am_ch_opponent(void);
 long am_ch_move(long from, long to);         // 1 if played
 void am_ch_say(const char *word);            // "resign", "draw"
 
+// block, report, the chat filter (safety.s)
+long am_blk_node(long node);                 // 1 if that person is blocked
+void am_blk_set_node(long node, long on);
+void am_report_node(long node);              // an email about them (to the report address), and blocked
+long am_filter(void);                        // 1 if the chat filter is on
+void am_filter_set(long on);
+const char *am_report_to(void);              // where reports go, or ""
+void am_report_to_set(const char *address);
+
 // objects the core talks to: the text field voice writes into, the Talk button
 extern void *g_field;
 extern void *g_talkbtn;

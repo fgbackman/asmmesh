@@ -100,6 +100,7 @@ struct Person: Identifiable, Equatable {
     let hops: Int
     let rssi: Int
     let age: Int
+    var blocked = false
     var whereText: String {
         if age > 120 { return "away" }
         if hops <= 1 { return rssi != 0 ? "nearby · \(rssi) dBm" : "nearby" }
@@ -288,7 +289,7 @@ final class Mesh: ObservableObject {
             am_node_fp(i, &buf)
             p.append(Person(id: i, name: cstr(am_node_nick(i)), fingerprint: String(cString: buf),
                             hops: am_node_info(i, 0), rssi: am_node_info(i, 1),
-                            age: am_node_info(i, 2)))
+                            age: am_node_info(i, 2), blocked: am_blk_node(i) != 0))
         }
         if p != people { people = p }
         var b: [BitchatPerson] = []

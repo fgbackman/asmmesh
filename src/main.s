@@ -170,6 +170,8 @@ Lmethods:
     .quad Ls_m_chResign,    _chw_resign,        Ls_ty_v1
     .quad Ls_m_chDraw,      _chw_draw,          Ls_ty_v1
     .quad Ls_m_playChess,   _ch_dialog,         Ls_ty_v1
+    .quad Ls_m_blockPerson, _ui_block_person,   Ls_ty_v1
+    .quad Ls_m_reportPerson, _ui_report_person, Ls_ty_v1
     .quad Ls_m_meshPass,    _crypto_dialog,     Ls_ty_v1
     .quad Ls_m_fmShow,      _fm_show,           Ls_ty_v1
     .quad Ls_m_fmApply,     _fm_apply,          Ls_ty_v1
@@ -1308,6 +1310,16 @@ _build_menus:
     ADRL x3, Ls_key_8
     bl   _add_item
     mov  x0, x21
+    ADRL x1, Ls_block_item
+    ADRL x2, Ls_m_blockPerson
+    ADRL x3, Ls_empty
+    bl   _add_item
+    mov  x0, x21
+    ADRL x1, Ls_report_item
+    ADRL x2, Ls_m_reportPerson
+    ADRL x3, Ls_empty
+    bl   _add_item
+    mov  x0, x21
     ADRL x1, Ls_leave_item
     ADRL x2, Ls_m_leave
     ADRL x3, Ls_empty
@@ -1878,6 +1890,10 @@ Ls_m_chSquare:         .asciz "chSquare:"
 Ls_m_chResign:         .asciz "chResign:"
 Ls_m_chDraw:           .asciz "chDraw:"
 Ls_m_playChess:        .asciz "playChess:"
+Ls_m_blockPerson:      .asciz "blockPerson:"
+Ls_m_reportPerson:     .asciz "reportPerson:"
+Ls_block_item:         .asciz "Block Person"
+Ls_report_item:        .asciz "Report Person\342\200\246"
 Ls_chess_item:         .asciz "Play Chess\342\200\246"
 Ls_key_8:              .asciz "8"
 Ls_chess_symbol:       .asciz "checkerboard.rectangle"

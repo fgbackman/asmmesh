@@ -6,6 +6,7 @@ struct PeopleView: View {
     @EnvironmentObject var mesh: Mesh
     @State private var renaming = false
     @State private var newName = ""
+    @State private var reporting: Person?
 
     var body: some View {
         NavigationStack {
@@ -46,6 +47,21 @@ struct PeopleView: View {
                                     .frame(width: 38, height: 38)
                                     .background(Theme.cardHi, in: Circle())
                             }
+                            Menu {                       // block, report (safety.s)
+                                Button { coreLater { am_blk_set_node(p.id, p.blocked ? 0 : 1); mesh.listsChanged() } } label: {
+                                    Label(p.blocked ? "Unblock" : "Block", systemImage: p.blocked ? "hand.raised.slash" : "hand.raised.fill")
+                                }
+                                Button(role: .destructive) { reporting = p } label: {
+                                    Label("Report\u{2026}", systemImage: "exclamationmark.bubble")
+                                }
+                            } label: {
+                                Image(systemName: p.blocked ? "hand.raised.fill" : "ellipsis")
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundStyle(p.blocked ? Theme.red : Color.accentColor)
+                                    .frame(width: 38, height: 38)
+                                    .background(Theme.cardHi, in: Circle())
+                            }
+                            .accessibilityLabel(p.blocked ? "Blocked: unblock or report" : "Block or report")
                             Button {
                                 mesh.invited.insert(p.fingerprint)
                                 coreLater {              // it may ask something
@@ -85,6 +101,17 @@ struct PeopleView: View {
             }
             .background(Theme.bg)
             .navigationTitle("People")
+            .confirmationDialog(reporting.map { "Report \($0.name)?" } ?? "",
+                                isPresented: Binding(get: { reporting != nil }, set: { if !$0 { reporting = nil } }),
+                                titleVisibility: .visible, presenting: reporting) { p in
+                Button("Report and Block", role: .destructive) {
+                    coreLater { am_report_node(p.id); mesh.listsChanged() }
+                }
+            } message: { _ in
+                Text(String(cString: am_report_to()).isEmpty
+                     ? "They\u{2019}ll be blocked. To send reports as well, set a report address in Settings \u{203A} Privacy."
+                     : "Your mail app opens with a report (their name, key and what they sent here lately) to send, and they\u{2019}re blocked.")
+            }
             .alert("Your name on the mesh", isPresented: $renaming) {
                 TextField("Name", text: $newName)
                     .textInputAutocapitalization(.words)

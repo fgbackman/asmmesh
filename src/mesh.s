@@ -637,7 +637,12 @@ Lst_bitchat:
     bl   _bc_say
     LEAVE 0
 Lst_bcpm:
-    mov  x0, x19                      // chess in this chat? a move or "chess" (ch_mesh.s)
+    mov  x0, x19                      // block / unblock / report this person (safety.s)
+    mov  x1, x20
+    bl   _sf_bc_typed
+    cbz  x0, 3f
+    LEAVE 0
+3:  mov  x0, x19                      // chess in this chat? a move or "chess" (ch_mesh.s)
     mov  x1, x20
     bl   _chm_typed
     cbz  x0, 1f
@@ -1304,6 +1309,9 @@ Lrx_msg:
     ADRL x1, _g_nickbuf
     ldr  x2, [sp, #96]
     bl   _node_touch_announce
+    ldr  x0, [x19, #20]               // blocked: passed on, never shown or played (safety.s)
+    bl   _blk_has
+    cbnz x0, Lrx_relay
     ldr  x9, [sp, #104]
     add  x23, x9, #30                 // text offset
     sub  x24, x20, x23
@@ -1381,6 +1389,12 @@ Lrx_msg_plain:                        // unencrypted: only fine in Main with no 
 Lrx_msg_text:
     ADRL x0, _g_txt
     bl   _sanitize
+    ADRL x0, _g_txt                   // the chat filter, then kept for a report (safety.s)
+    bl   _chat_clean
+    ldr  x0, [x19, #20]
+    ldr  x1, [x19, #12]
+    ADRL x2, _g_txt
+    bl   _rec_note
     ldr  x0, [x19, #12]
     sub  x9, x0, #1                   // nobody else's words land in a local room
     cmp  x9, #(LOCAL_ROOMS - 2)       //   (Home, Web, News, bitchat)
@@ -1515,6 +1529,9 @@ Linv_sized:
     bl   _memcmp
     cbz  w0, Lrx_new                  // the key we have: nothing new
 Linv_queue:
+    ldr  x0, [x19, #20]               // from someone blocked: not even asked
+    bl   _blk_has
+    cbnz x0, Lrx_new
     ADRL x8, _g_invites_for_me
     ldr  x9, [x8]
     add  x9, x9, #1
@@ -1590,6 +1607,9 @@ Lrx_roomad:
     bl   _roomad_rx
     b    Lrx_relay
 Lrx_joinreq:
+    ldr  x0, [x19, #20]               // blocked: passed on, not taken
+    bl   _blk_has
+    cbnz x0, Lrx_relay
     add  x0, x19, #29
     ldr  x1, [sp, #104]
     bl   _copy_nick
@@ -1606,6 +1626,9 @@ Lrx_joinreq:
 
     // ---- SEEK: finding someone (seek.s), sealed for one person ----
 Lrx_seek:
+    ldr  x0, [x19, #20]               // blocked: passed on, not taken
+    bl   _blk_has
+    cbnz x0, Lrx_relay
     add  x0, x19, #29
     ldr  x1, [sp, #104]
     bl   _copy_nick

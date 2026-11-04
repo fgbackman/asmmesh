@@ -156,6 +156,14 @@ Lsimple:
     .quad Lw_ninefold,       1, _h_ninefold, 0
     .quad Lw_chess,          0, _h_chess, 0
     .quad Lw_chess,          1, _h_chess, 0
+    .quad Lw_block,          1, _h_safety, 1
+    .quad Lw_unblock,        1, _h_safety, 2
+    .quad Lw_blocked,        0, _h_safety, 3
+    .quad Lw_report_addr,    1, _h_safety, 8
+    .quad Lw_report,         1, _h_safety, 4
+    .quad Lw_filter_on,      0, _h_safety, 5
+    .quad Lw_filter_off,     0, _h_safety, 6
+    .quad Lw_filter,         0, _h_safety, 7
     .quad Lw_hist,           0, _h_term_history, 3
     .quad Lw_hist_on,        0, _h_term_history, 1
     .quad Lw_hist_off,       0, _h_term_history, 0
@@ -2873,6 +2881,14 @@ Lw_bc_name:      .asciz "bitchat name"
 Lw_bc_chat:      .asciz "bitchat chat"
 Lw_ninefold:     .asciz "ninefold"
 Lw_chess:        .asciz "chess"
+Lw_block:        .asciz "block"
+Lw_unblock:      .asciz "unblock"
+Lw_blocked:      .asciz "blocked"
+Lw_report_addr:  .asciz "report address"
+Lw_report:       .asciz "report"
+Lw_filter_on:    .asciz "filter on"
+Lw_filter_off:   .asciz "filter off"
+Lw_filter:       .asciz "filter"
 Lw_hist:         .asciz "history"
 Lw_hist_on:      .asciz "history on"
 Lw_hist_off:     .asciz "history off"

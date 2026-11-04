@@ -6,6 +6,10 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var mesh: Mesh
     @State private var showSpin = UserDefaults.standard.bool(forKey: "spin")   // "-spin YES"
+    @State private var filterOn = am_filter() != 0
+    @State private var reportTo = String(cString: am_report_to())
+    @State private var editingReportTo = false
+    @State private var newReportTo = ""
 
     // Mac-only switches: FM radio (a transmitter on the headphone jack, an RTL-SDR
     // stick) and the web gateway (it fetches pages with curl).
@@ -79,6 +83,28 @@ struct SettingsView: View {
                     SectionTitle(text: "Privacy")
                     ConnectRow(title: "Mesh passphrase", subtitle: "Encrypts rooms and commands between devices that share it", symbol: "key.fill", color: Theme.yellow) { coreLater { am_mesh_pass() } }
                         .background(Theme.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    Card(padding: 14) {                  // the chat filter (safety.s)
+                        HStack(spacing: 14) {
+                            IconBadge(symbol: "text.badge.xmark", color: Theme.purple)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Chat filter").font(.headline)
+                                Text("Vulgar words and slurs in what others send show as f***").font(.caption).foregroundStyle(Theme.dim)
+                            }
+                            Spacer()
+                            Toggle("", isOn: Binding(get: { filterOn }, set: { on in filterOn = on; am_filter_set(on ? 1 : 0) }))
+                                .labelsHidden()
+                        }
+                    }
+                    ConnectRow(title: "Report address", subtitle: reportTo.isEmpty ? "Where reports about someone are sent (not set)" : "Reports go to \(reportTo)",
+                               symbol: "exclamationmark.bubble.fill", color: Theme.red) {
+                        newReportTo = reportTo
+                        editingReportTo = true
+                    }
+                    .background(Theme.card, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    Text("Block or report someone from their \u{22EF} in People. In a private bitchat chat, type block or report.")
+                        .font(.caption).foregroundStyle(Theme.dim)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 4)
 
                     SectionTitle(text: "Services")
                     ForEach(mesh.services.filter { !macOnly.contains($0.id) }) { s in
@@ -105,6 +131,22 @@ struct SettingsView: View {
             }
             .background(Theme.bg)
             .navigationTitle("Settings")
+            .alert("Report address", isPresented: $editingReportTo) {
+                TextField("you@example.com", text: $newReportTo)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.emailAddress)
+                    .autocorrectionDisabled()
+                Button("Save") {
+                    let a = newReportTo.trimmingCharacters(in: .whitespaces)
+                    if a.isEmpty || a.contains("@") {
+                        a.withCString { am_report_to_set($0) }
+                        reportTo = a
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Reports about someone open your mail app addressed here, with their name, key and what they sent lately.")
+            }
             .onAppear { mesh.loadServices() }
         }
     }

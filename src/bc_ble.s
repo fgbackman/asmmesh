@@ -845,6 +845,9 @@ Lbc_message:
     tbnz x0, #63, 8f
     ADRL x8, _g_bc_peers
     add  x19, x8, x0, lsl #BT_SHIFT       // x19: who said it
+    ldr  x0, [x19, #BT_ID]                // blocked (safety.s): taken, not shown
+    bl   _blk_has
+    cbnz x0, 7f
     mov  x0, #BITCHAT_ID
     bl   _room_find
     tbnz x0, #63, 7f                      // (taken, but there's no room to show it in)
@@ -866,6 +869,12 @@ Lbc_message:
     mov  x2, x21
     bl   _bc_text_clean
     strb wzr, [x22, x21]
+    mov  x0, x22                          // the chat filter; kept for a report
+    bl   _chat_clean
+    ldr  x0, [x19, #BT_ID]
+    mov  x1, #BITCHAT_ID
+    mov  x2, x22
+    bl   _rec_note
     mov  x0, x19
     bl   _bc_person_clash
     ADRL x2, Lf_bc_said
@@ -3428,6 +3437,9 @@ Lbc_pm_took:
     ADRL x8, _g_bc_rxids
     add  x10, x8, x9, lsl #4
     stp  x19, x21, [x10]
+    mov  x0, x19                          // blocked (safety.s): taken and acked, not shown
+    bl   _blk_has
+    cbnz x0, 9f
     mov  x0, x19                          // their chat
     mov  x1, #1
     bl   Lbc_chat_for
@@ -3444,6 +3456,12 @@ Lbc_pm_took:
     bl   _bc_text_clean
     add  x9, sp, #160
     strb wzr, [x9, x21]
+    add  x0, sp, #160                     // the chat filter; kept for a report
+    bl   _chat_clean
+    mov  x0, x19
+    mov  x1, #0
+    add  x2, sp, #160
+    bl   _rec_note
     mov  x0, x19
     add  x1, sp, #848
     bl   Lbc_who

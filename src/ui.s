@@ -305,6 +305,60 @@ Lsr_table:
 Lsr_done:
     LEAVE 256
 
+// - blockPerson:(id)sender — Mesh › Block Person: the one picked in People (again: unblock)
+.globl _ui_block_person
+_ui_block_person:
+    ENTER 0
+    bl   Lui_people_pick
+    tbnz x0, #63, 9f
+    mov  x19, x0
+    bl   _am_blk_node
+    eor  x20, x0, #1                      // the other way
+    mov  x0, x19
+    mov  x1, x20
+    bl   _am_blk_set_node
+    ADRL x8, _g_nodes
+    add  x1, x8, x19, lsl #NODE_SHIFT
+    add  x1, x1, #N_NICK
+    ADRL x0, Ls_ui_unblocked
+    cbz  x20, 1f
+    ADRL x0, Ls_ui_blocked
+1:  bl   _home_say
+    bl   _ui_lists_changed
+9:  LEAVE 0
+
+// - reportPerson:(id)sender — Mesh › Report Person…: an email about them, and blocked
+.globl _ui_report_person
+_ui_report_person:
+    ENTER 0
+    bl   Lui_people_pick
+    tbnz x0, #63, 9f
+    bl   _am_report_node
+    bl   _ui_lists_changed
+9:  LEAVE 0
+
+// Lui_people_pick -> the person picked in People (an index), or -1 after saying to pick one
+Lui_people_pick:
+    ENTER 0
+    ADRL x8, _g_people_table
+    ldr  x0, [x8]
+    cbz  x0, 8f
+    MSG0 Ls_selectedRow
+    tbnz x0, #63, 8f
+    ADRL x8, _g_node_count
+    ldr  x9, [x8]
+    cmp  x0, x9
+    b.hs 8f
+    LEAVE 0
+8:  ADRL x0, Ls_ui_pick
+    ADRL x1, Ls_ui_pick_info
+    ADRL x2, Ls_ok
+    mov  x3, #0
+    mov  x4, #0
+    bl   _alert_run
+    mov  x0, #-1
+    LEAVE 0
+
 // void _nf_ui_show(const char *status) — Ninefold's clock and counts in the game room's
 //   header, while that room is open (nf_mesh.s, every second)
 .globl _nf_ui_show
@@ -1727,6 +1781,10 @@ Ls_name_msg:          .asciz "Your name on the mesh"
 Ls_name_info:         .asciz "Pick one or type your own, up to 23 characters. Everyone sees it next to your messages and in their People list."
 Ls_inv_msg:           .asciz "%s invites you to #%s"
 Ls_inv_nf_prefix:     .asciz "Ninefold "
+Ls_ui_blocked:        .asciz "\302\267 \360\237\232\253 Blocked %s: you won\342\200\231t see their messages, invitations or game moves (Block Person again to undo)."
+Ls_ui_unblocked:      .asciz "\302\267 Unblocked %s."
+Ls_ui_pick:           .asciz "Pick someone in People first"
+Ls_ui_pick_info:      .asciz "Click a person in the People list, then choose Block Person or Report Person again. For a bitchat person, type block or report in your private chat with them."
 Ls_inv_ch_prefix:     .asciz "Chess "
 Ls_inv_ch_msg:        .asciz "%s invites you to play chess"
 Ls_inv_ch_info:       .asciz "A game of chess over the mesh: every move is checked on both devices, and only the two of you see the game."
