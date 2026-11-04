@@ -82,6 +82,7 @@ Lc_rc_b:     .double 0.80
 Lf_roomslbl: .double 16.0, 610.0, 150.0, 16.0
 Lf_addroom:  .double 206.0, 604.0, 36.0, 28.0
 Lf_ninefold: .double 166.0, 604.0, 36.0, 28.0   // the game button, left of +
+Lf_chessbtn: .double 126.0, 604.0, 36.0, 28.0   // chess, left of that
 Lf_rooms:    .double 6.0, 306.0, 240.0, 294.0
 Lf_peoplelbl: .double 16.0, 284.0, 196.0, 16.0
 Lf_people:   .double 6.0, 128.0, 240.0, 152.0
@@ -165,6 +166,10 @@ Lmethods:
     .quad Ls_m_nfStart,     _nfw_start,         Ls_ty_v1
     .quad Ls_m_nfShuffle,   _nfw_shuffle,       Ls_ty_v1
     .quad Ls_m_nfClear,     _nfw_clear,         Ls_ty_v1
+    .quad Ls_m_chSquare,    _chw_square,        Ls_ty_v1
+    .quad Ls_m_chResign,    _chw_resign,        Ls_ty_v1
+    .quad Ls_m_chDraw,      _chw_draw,          Ls_ty_v1
+    .quad Ls_m_playChess,   _ch_dialog,         Ls_ty_v1
     .quad Ls_m_meshPass,    _crypto_dialog,     Ls_ty_v1
     .quad Ls_m_fmShow,      _fm_show,           Ls_ty_v1
     .quad Ls_m_fmApply,     _fm_apply,          Ls_ty_v1
@@ -377,6 +382,8 @@ _build_ui:
 
     mov  x0, x21                      // ▦ Play Ninefold, as on the iPhone's Rooms list
     bl   Lmk_nf_button
+    mov  x0, x21                      // and chess, left of it
+    bl   Lmk_ch_button
 
     mov  x0, #8
     mov  x1, #0                       // no header
@@ -1296,6 +1303,11 @@ _build_menus:
     ADRL x3, Ls_key_9
     bl   _add_item
     mov  x0, x21
+    ADRL x1, Ls_chess_item
+    ADRL x2, Ls_m_playChess
+    ADRL x3, Ls_key_8
+    bl   _add_item
+    mov  x0, x21
     ADRL x1, Ls_leave_item
     ADRL x2, Ls_m_leave
     ADRL x3, Ls_empty
@@ -1611,6 +1623,45 @@ Lmk_nf_button:
     bl   _tooltip
     LEAVE 0
 
+// Lmk_ch_button(id content) — the amber chess button left of ▦: Mesh › Play Chess…
+Lmk_ch_button:
+    ENTER 0
+    mov  x21, x0
+    ADRL x0, Ls_empty
+    ADRL x1, Ls_m_playChess
+    mov  x2, #8
+    mov  x3, x21
+    ADRL x8, Lf_chessbtn
+    ldp  d0, d1, [x8]
+    ldp  d2, d3, [x8, #16]
+    bl   _mk_button
+    mov  x19, x0
+    mov  x1, #0xB82E
+    movk x1, #0xF5, lsl #16
+    mov  x2, #1
+    bl   _pill
+    ADRL x0, Ls_chess_symbol
+    bl   _symbol_image
+    cbz  x0, 1f
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_setImage
+    CLS  Ls_NSColor
+    MSG0 Ls_blackColor
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_setContentTintColor
+    b    2f
+1:  ADRL x0, Ls_chess_text
+    bl   _nsstr
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_setTitle
+2:  mov  x0, x19
+    ADRL x1, Ls_chess_tip
+    bl   _tooltip
+    LEAVE 0
+
 // void _tooltip(id view, const char *utf8)
 _tooltip:
     ENTER 0
@@ -1823,6 +1874,15 @@ Ls_m_nfWord:           .asciz "nfWord:"
 Ls_m_nfStart:          .asciz "nfStart:"
 Ls_m_nfShuffle:        .asciz "nfShuffle:"
 Ls_m_nfClear:          .asciz "nfClear:"
+Ls_m_chSquare:         .asciz "chSquare:"
+Ls_m_chResign:         .asciz "chResign:"
+Ls_m_chDraw:           .asciz "chDraw:"
+Ls_m_playChess:        .asciz "playChess:"
+Ls_chess_item:         .asciz "Play Chess\342\200\246"
+Ls_key_8:              .asciz "8"
+Ls_chess_symbol:       .asciz "checkerboard.rectangle"
+Ls_chess_text:         .asciz "\342\231\236"
+Ls_chess_tip:          .asciz "Play Chess"
 Ls_m_meshPass:         .asciz "meshPassphrase:"
 Ls_m_fmShow:           .asciz "fmShow:"
 Ls_m_fmApply:          .asciz "fmApply:"

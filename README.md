@@ -108,6 +108,14 @@ Nine letters in a 3×3 grid; make words of 4 to 9 letters that use the centre le
 - **At the end** everyone's words are revealed and checked against what they claimed during the round, on every device, so all agree on the score: 1 point for 4 letters, one more per extra letter, 10 for the nine-letter word, +1 for finding it first (within 2 s), +2 if nobody else did. Then the answers nobody found.
 - The puzzles come from built-in word lists (`tools/ninefold`), the same on every device; a different build won't play with yours. How it works: `docs/ninefold/README.md`.
 
+## Chess, across the mesh or with a bitchat person
+
+- **With someone on asmmesh:** the chess button next to ▦ above Rooms, **Mesh › Play Chess…** (⌘8), or in Home `chess with Anna` (add `black` to play black). That makes an invite-only room, "Chess" and your name, and invites them; the invitation pops up and says it's chess. On iPhone: the chessboard button on Rooms.
+- **With someone on bitchat:** in your private bitchat chat with them, type `chess` (or `chess black`). bitchat has no chess of its own, so moves go as text: they see "♟ 12. Nf3 · your move" and reply by typing a move (`e5`, `Nf6`, `O-O`, or `resign`, `draw`). Another asmmesh on the other end reads those lines too, so two asmmesh users can play over bitchat.
+- **The board** pops up in its own window (Mac) or full screen (iPhone) when a game starts and with every move: click or tap a piece of yours, its moves light up, click one to play it. Or type moves in the game's room or chat: `e4`, `Nf3`, `exd5`, `O-O`, `e7e8q`, `e2e4`; `resign`, `draw` (offer, or accept theirs), `board`, `moves`. Only a line that is a single word counts as a move; anything else is chat.
+- **Secure and walled off:** every move, whoever sends it, is checked against the rules on both devices (illegal, out-of-turn and other people's moves are refused; catching up after a lost move only ever fills in the other player's moves). Game packets are sealed with the room's key. Over bitchat only text crosses the wall: the game never touches asmmesh's rooms, devices, rules or keys, and nothing from bitchat runs as a command. The rules engine is pure code, checked by perft (the count of every position a few moves deep, from standard test positions, against the published numbers: 4,865,609 at depth 5 from the start).
+- The game ends by checkmate, resignation, an agreed draw, stalemate, the fifty-move rule, threefold repetition, or when neither side can mate. One game at a time.
+
 ## Typing: history and suggestions
 
 On the Mac the input line works like a terminal's: monospaced, with a ❯ prompt.
@@ -155,6 +163,10 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
     src/nf_play.s  a Ninefold game, pure: rounds, claims, reveals checked against claims, scores
     src/nf_text.s  Ninefold's words on screen, pure: status line, grid, answers to words typed, results
     src/nf_mesh.s  Ninefold on the mesh: packets, the clock, Home's "ninefold", what the iPhone's game screen reads
+    src/ch_core.s  chess's rules, pure: legal moves, check and mate, SAN read and written, perft
+    src/ch_play.s  a chess game, pure: turns, packets, catching up, how it ends, the board and moves as text
+    src/ch_mesh.s  chess on the mesh and over bitchat text; Home's "chess", what the boards read
+    src/ch_win.s   the Mac's chess window (src/nf_win.s: Ninefold's)
     src/hue_core.s Hue's bytes-only parts: serials typed, bridge addresses, telling a bridge's SSDP answer
     src/st.s       SmartThings (all capabilities, scenes, status) and Apple Home via Shortcuts
     src/lan.s      Bonjour: WLED, Elgato, Shelly, Nanoleaf, Home Assistant discovery, scanner network rows

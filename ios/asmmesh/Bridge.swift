@@ -50,6 +50,18 @@ func iosNfPop() {
     Mesh.shared.showGame = true
 }
 
+// chess (ch_mesh.s): the game changed / a game was set up or a move came: the board comes up
+@_cdecl("ios_ch_changed")
+func iosChChanged() {
+    Mesh.shared.chessChanged()
+}
+
+@_cdecl("ios_ch_pop")
+func iosChPop() {
+    Mesh.shared.chessChanged()
+    Mesh.shared.showChess = true
+}
+
 // Files on Wi-Fi: its address as a QR code; "airdrop": pick files, then the share sheet
 @_cdecl("ios_show_qr")
 func iosShowQR(_ text: UnsafePointer<CChar>?) {

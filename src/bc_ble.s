@@ -3458,6 +3458,11 @@ Lbc_pm_took:
     ADRL x1, _g_bc_line
     mov  w2, #0
     bl   _room_line
+    mov  x0, x22                          // a chess game in this chat? their move (ch_mesh.s);
+    mov  x1, x19                          //   only the text goes: nothing else crosses
+    add  x2, sp, #160
+    mov  x3, x21
+    bl   _chm_bc_text
 9:  LEAVE 864
 
 // const char *Lbc_who(uint64 peer, char *buf /*16*/) -> "Anna (1a2b)" (their name as
@@ -3767,6 +3772,20 @@ Lbc_ob_delivered:
     mov  w2, #1
     bl   _room_line
 9:  LEAVE 64
+
+// uint64 _bc_pm_peer(uint64 room id) -> the bitchat peer that private room is with, or 0
+//   (ch_mesh.s: who a chess game there is against) (leaf)
+.globl _bc_pm_peer
+_bc_pm_peer:
+    sub  x9, x0, #BCPM_FIRST
+    cmp  x9, #(PM_CHATS - 1)
+    b.hi 1f
+    ADRL x8, _g_bc_chats
+    add  x8, x8, x9, lsl #4
+    ldr  x0, [x8]
+    ret
+1:  mov  x0, #0
+    ret
 
 // void _bc_pm_say(uint64 room id, const char *text) — typed into a private room (mesh.s):
 //   in pieces of BT_PM_MAX bytes, each into the outbox and sealed for that person alone

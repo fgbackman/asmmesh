@@ -153,6 +153,7 @@ _am_tick:
     bl   _near_tick
     bl   _bc_tick                     // bitchat: announce, forget people gone quiet
     bl   _nf_tick                     // Ninefold: the clock, rounds, reveals
+    bl   _chm_tick                    // chess: moves sent again until answered
     bl   _ios_alert_open              // a rule may ask something: not on top of another prompt
     cbnz x0, Lat_hello
     mov  x0, x20
@@ -1752,6 +1753,14 @@ _combo_add:
 _nf_ui_show:
     b    _ios_nf_changed
 
+// void _ch_ui_show(void), _ch_ui_pop(void) — chess (ch_mesh.s): redraw, bring the board up
+.globl _ch_ui_show
+_ch_ui_show:
+    b    _ios_ch_changed
+.globl _ch_ui_pop
+_ch_ui_pop:
+    b    _ios_ch_pop
+
 // void _nf_ui_pop(void) — the game's screen comes up (a game made or joined, every round)
 .globl _nf_ui_pop
 _nf_ui_pop:
@@ -1821,15 +1830,24 @@ _invite_cb:
     ADRL x1, Ls_inv_nf_prefix
     mov  x2, #9
     bl   _strncmp
+    ADRL x2, Ls_inv_nf_msg
+    ADRL x3, Ls_inv_nf_info
+    cbz  w0, 4f
+    add  x0, x19, #8                  // a chess room
+    ADRL x1, Ls_inv_ch_prefix
+    mov  x2, #6
+    bl   _strncmp
     cbnz w0, 1f
+    ADRL x2, Ls_inv_ch_msg
+    ADRL x3, Ls_inv_ch_info
+4:  str  x3, [sp, #24]                // (the varargs area: snprintf reads [sp] only)
     add  x9, x19, #40
     str  x9, [sp]
     add  x0, sp, #96
     mov  x1, #160
-    ADRL x2, Ls_inv_nf_msg
     bl   _snprintf
     add  x0, sp, #96
-    ADRL x1, Ls_inv_nf_info
+    ldr  x1, [sp, #24]
     ADRL x2, Ls_inv_nf_join
     b    2f
 1:  add  x0, sp, #96
@@ -2014,6 +2032,9 @@ Ls_name_msg:          .asciz "Your name on the mesh"
 Ls_name_info:         .asciz "Pick one or type your own, up to 23 characters. Everyone sees it next to your messages and in their People list."
 Ls_inv_msg:           .asciz "%s invites you to #%s"
 Ls_inv_nf_prefix:     .asciz "Ninefold "
+Ls_inv_ch_prefix:     .asciz "Chess "
+Ls_inv_ch_msg:        .asciz "%s invites you to play chess"
+Ls_inv_ch_info:       .asciz "A game of chess over the mesh: every move is checked on both devices, and only the two of you see the game."
 Ls_inv_nf_msg:        .asciz "%s invites you to play Ninefold"
 Ls_inv_nf_info:       .asciz "A word game over the mesh: nine letters, a few minutes a round. Everyone\342\200\231s words stay hidden until the round ends, and only the players see the game."
 Ls_inv_nf_join:       .asciz "Join Game"

@@ -151,6 +151,18 @@ struct Service: Identifiable, Equatable {
     var on: Bool
 }
 
+/// The chess game, as the core has it (ch_mesh.s)
+struct Chess: Equatable {
+    var state = 0            // 0 none, 2 playing, 3 over
+    var room = -1
+    var black = false        // we play black: the board turned round
+    var pieces = [Int](repeating: 0, count: 128)
+    var last = -1
+    var status = ""
+    var moves = ""
+    var opponent = ""
+}
+
 /// The Ninefold game, as the core has it (nf_mesh.s)
 struct Game: Equatable {
     struct Player: Equatable, Hashable { let name: String; let words: Int; let score: Int }
@@ -192,6 +204,8 @@ final class Mesh: ObservableObject {
     @Published var pickingFiles = false
     @Published var game = Game()
     @Published var showGame = false      // the game full screen (GameScreen)
+    @Published var chess = Chess()
+    @Published var showChess = false     // the board full screen (ChessScreen)
     var talking: Bool { talkTitle.contains("Stop") }
 
     private var started = false
@@ -404,6 +418,25 @@ final class Mesh: ObservableObject {
         }
         if g != game { game = g }
         if g.state == 0 && showGame { showGame = false }        // the game room went
+    }
+
+    func chessChanged() {
+        var c = Chess()
+        c.state = am_ch_state()
+        c.room = am_ch_room()
+        if c.state != 0 {
+            c.black = am_ch_me() != 0
+            for sq in 0..<128 where sq & 0x88 == 0 { c.pieces[sq] = am_ch_piece(sq) }
+            c.last = am_ch_last()
+            var buf = [CChar](repeating: 0, count: 2048)
+            _ = am_ch_status(&buf, 600)
+            c.status = String(cString: buf)
+            _ = am_ch_moves(&buf, 2048)
+            c.moves = String(cString: buf)
+            if let p = am_ch_opponent() { c.opponent = String(cString: p) }
+        }
+        if c != chess { chess = c }
+        if c.state == 0 && showChess { showChess = false }
     }
 
     /// Typed into the game room as if by keyboard: a word, "start", "shuffle"

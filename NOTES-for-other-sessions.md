@@ -221,3 +221,16 @@ For where the bitchat work stands and what comes next, start with `docs/bitchat_
 - `tools/qemu/run.sh nfdiff N` checks nf_core.s against nf.py; `run.sh nfdemo` prints a round.
 - Not tried on a Mac or iPhone yet (built and tested under qemu and clang only; Swift not
   compiled here).
+
+## Chess (Nov 4, branch claude/ninefold)
+- New files: `src/ch_core.s`, `src/ch_play.s` (pure; qemu self-tests 205-213), `src/ch_mesh.s`
+  (Mac and iPhone), `src/ch_win.s` (Mac), `src/ch_defs.inc`, `ios/asmmesh/ChessView.swift`.
+- Game packets share MSGF_GAME with Ninefold: byte 0 'C' is chess (`_chm_rx`), 'N' Ninefold.
+  Kinds CK_NEW 1, CK_MOVE 2, CK_RESIGN 3, CK_ASK 4, CK_HIST 5, CK_DRAW 6 (ch_defs.inc).
+- bc_ble.s: `Lbc_pm_took` hands each private message's text to `_chm_bc_text` after showing it;
+  `_bc_pm_peer(room id)`. mesh.s `_mesh_send_text` asks `_chm_typed` in game rooms and in
+  bitchat chats. Home word "chess". `_chm_tick` next to `_nf_tick`. Hooks `_ch_ui_show`,
+  `_ch_ui_pop` (ch_win.s on the Mac; ios_ui.s -> `ios_ch_changed` / `ios_ch_pop`).
+- `tools/qemu/run.sh chperft` (deep perft), `run.sh chmesh` (ch_mesh.s with stand-ins for the
+  app, tests 214-216: both transports).
+- Not tried on a Mac or iPhone yet.

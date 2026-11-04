@@ -11,9 +11,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 CORE = """mesh ident crypto util ble near home parse rules net hue st cloud lan udp weather
 extras find sens_decode sensors spin spinui alerts voice services handoff bt limits guard web fm_html fm_pack fm_util fm_io files scan_core listed seek
-bc_crypto bc_link bc_ble bc_packet bc_zlib bc_peer bc_noise term_core term_hist hue_core nf_core nf_play nf_text nf_mesh ch_core ch_play""".split()
+bc_crypto bc_link bc_ble bc_packet bc_zlib bc_peer bc_noise term_core term_hist hue_core nf_core nf_play nf_text nf_mesh ch_core ch_play ch_mesh""".split()
 SWIFT = ["App.swift", "Bridge.swift", "Mesh.swift", "RoomsView.swift", "PeopleView.swift",
-         "NearbyView.swift", "SettingsView.swift", "SpinView.swift", "FindView.swift", "HueView.swift", "GameView.swift"]
+         "NearbyView.swift", "SettingsView.swift", "SpinView.swift", "FindView.swift", "HueView.swift", "GameView.swift", "ChessView.swift"]
 FRAMEWORKS = ["CoreBluetooth", "Security", "CoreLocation", "Speech", "AVFoundation", "NearbyInteraction"]
 BUNDLE_ID = "com.fbackman.asmmesh.ios"
 

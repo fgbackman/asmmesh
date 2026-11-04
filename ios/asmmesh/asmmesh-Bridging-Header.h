@@ -114,6 +114,19 @@ long am_nf_new(const long *people, long n, long rounds, long minutes, long famil
 void nf_shuffle(void);
 const char *am_nf_last(void);                // the answer to the last word typed, or ""
 
+// chess (ch_mesh.s): one game at a time, over asmmesh or a bitchat private chat
+long am_ch_state(void);                      // 0 none, 2 playing, 3 over
+long am_ch_room(void);                       // the game's room (or chat) index, or -1
+long am_ch_me(void);                         // 0 we're white, 8 black
+long am_ch_piece(long square);               // 0x88 square: 0 empty, 1-6 white, 9-14 black
+long am_ch_last(void);                       // from | to << 8, or -1
+long am_ch_targets(long square, uint8_t *out);  // out: 32; where the piece there may go now
+long am_ch_status(char *buf, long cap);
+long am_ch_moves(char *buf, long cap);
+const char *am_ch_opponent(void);
+long am_ch_move(long from, long to);         // 1 if played
+void am_ch_say(const char *word);            // "resign", "draw"
+
 // objects the core talks to: the text field voice writes into, the Talk button
 extern void *g_field;
 extern void *g_talkbtn;

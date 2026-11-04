@@ -205,7 +205,11 @@ _ui_select_room:
     cmp  x0, x19
     b.ne 1f
     bl   _nf_ui_pop
-1:  bl   _term_hide                   // suggestions are Home's
+1:  bl   _am_ch_room                  // the chess game's room or chat: the board
+    cmp  x0, x19
+    b.ne 2f
+    bl   _ch_ui_pop
+2:  bl   _term_hide                   // suggestions are Home's
     ADRL x8, _g_cur_room
     str  x19, [x8]
     ADRL x8, _g_rooms
@@ -1509,18 +1513,27 @@ _invite_cb:
     ADRL x1, Ls_inv_nf_prefix
     mov  x2, #9
     bl   _strncmp
+    ADRL x2, Ls_inv_nf_msg
+    ADRL x3, Ls_inv_nf_info
+    cbz  w0, 4f
+    add  x0, x19, #8                  // a chess room
+    ADRL x1, Ls_inv_ch_prefix
+    mov  x2, #6
+    bl   _strncmp
     cbnz w0, 1f
+    ADRL x2, Ls_inv_ch_msg
+    ADRL x3, Ls_inv_ch_info
+4:  str  x3, [sp, #24]                // (the varargs area: snprintf reads [sp] only)
     add  x9, x19, #40
     str  x9, [sp]
     add  x0, sp, #96
     mov  x1, #160
-    ADRL x2, Ls_inv_nf_msg
     bl   _snprintf
     ADRL x8, _g_alert_float           // a game won't wait: in front of everything
     mov  x9, #1
     str  x9, [x8]
     add  x0, sp, #96
-    ADRL x1, Ls_inv_nf_info
+    ldr  x1, [sp, #24]
     ADRL x2, Ls_inv_nf_join
     b    2f
 1:  add  x0, sp, #96
@@ -1714,6 +1727,9 @@ Ls_name_msg:          .asciz "Your name on the mesh"
 Ls_name_info:         .asciz "Pick one or type your own, up to 23 characters. Everyone sees it next to your messages and in their People list."
 Ls_inv_msg:           .asciz "%s invites you to #%s"
 Ls_inv_nf_prefix:     .asciz "Ninefold "
+Ls_inv_ch_prefix:     .asciz "Chess "
+Ls_inv_ch_msg:        .asciz "%s invites you to play chess"
+Ls_inv_ch_info:       .asciz "A game of chess over the mesh: every move is checked on both devices, and only the two of you see the game."
 Ls_setLevel:          .asciz "setLevel:"
 Ls_requestUserAttention: .asciz "requestUserAttention:"
 Ls_inv_nf_msg:        .asciz "%s invites you to play Ninefold"

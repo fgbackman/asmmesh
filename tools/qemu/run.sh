@@ -2,6 +2,7 @@
 # run.sh — build the pure bitchat files (src/bc_crypto.s, bc_link.s, bc_packet.s, bc_peer.s) for Linux on
 # ARM64 and run them under qemu-aarch64.
 #   tools/qemu/run.sh            the self-tests (the same ones `asmmesh --selftest` runs)
+#   tools/qemu/run.sh chmesh     chess's glue (ch_mesh.s) with stand-ins for the app: both transports
 #   tools/qemu/run.sh chperft    chess perft, deeper than the self-tests, against published counts
 #   tools/qemu/run.sh nfdiff [N] N random seeds: Ninefold's puzzles against tools/ninefold/nf.py
 #   tools/qemu/run.sh diff [N]   N random cases each, checked against Python's `cryptography`,
@@ -26,6 +27,14 @@ aarch64-linux-gnu-gcc -O1 -static -I "$here" -I "$src" -o "$out/harness" "$here/
 case "$1" in
     diff) python3 "$here/diff.py" "$out/harness" "${2:-200}" ;;
     chperft) qemu-aarch64 "$out/harness" chperft ;;
+    chmesh)                    # chess's glue with stand-ins for the app
+        sed -e 's/^\.include "macros\.inc"/.include "elf.inc"\n.include "chmesh.inc"/' \
+            -e 's/^\.section __TEXT,__cstring,cstring_literals/.section .rodata/' \
+            -e 's/^\.zerofill __DATA,__bss,\([_a-z]*\),\([A-Z_0-9]*\),4.*/.comm \1,\2,16/' \
+            -e 's/bl   _memcpy$/bl   memcpy/' -e 's/bl   _snprintf$/bl   Lsnprintf_apple/' \
+            "$src/ch_mesh.s" > "$out/ch_mesh.s"
+        printf '.text\nLsnprintf_apple:\n    ldr x3, [sp]\n    ldr x4, [sp, #8]\n    ldr x5, [sp, #16]\n    b snprintf\n' >> "$out/ch_mesh.s"
+        aarch64-linux-gnu-gcc -O1 -static -I "$here" -I "$src" -o "$out/chmesh" "$here/chmesh.c" "$out/bc_crypto.s" "$out/ch_core.s" "$out/ch_play.s" "$out/ch_mesh.s" && qemu-aarch64 "$out/chmesh" ;;
     nfdemo) qemu-aarch64 "$out/harness" nfdemo ;;
     nfdiff) python3 "$here/nfdiff.py" "$out/harness" "${2:-200}" ;;
     *)    qemu-aarch64 "$out/harness" selftest ;;

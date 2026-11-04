@@ -634,7 +634,14 @@ Lst_bitchat:
     bl   _bc_say
     LEAVE 0
 Lst_bcpm:
-    mov  x0, x9                       // sealed for that person alone, never a command
+    mov  x0, x19                      // chess in this chat? a move or "chess" (ch_mesh.s)
+    mov  x1, x20
+    bl   _chm_typed
+    cbz  x0, 1f
+    LEAVE 0
+1:  ADRL x8, _g_rooms                 // sealed for that person alone, never a command
+    add  x8, x8, x19, lsl #ROOM_SHIFT
+    ldr  x0, [x8, #R_ID]
     mov  x1, x20
     bl   _bc_pm_say
     LEAVE 0
@@ -644,7 +651,12 @@ Lst_mesh:
     bl   _nf_typed
     cbz  x0, 1f
     LEAVE 0
-1:  mov  x0, x20                      // a device command typed here? run it in Home
+1:  mov  x0, x19                      // a chess move in its room (ch_mesh.s)
+    mov  x1, x20
+    bl   _chm_typed
+    cbz  x0, 2f
+    LEAVE 0
+2:  mov  x0, x20                      // a device command typed here? run it in Home
     bl   _chat_route
     cbz  x0, Lst_chat
     LEAVE 0
@@ -1266,7 +1278,13 @@ Lrx_game:                             // a Ninefold packet in a room we're in
     ldr  x1, [x19, #20]
     ADRL x2, _g_nickbuf
     ADRL x3, _g_txt
-    bl   _nf_rx
+    ADRL x8, _g_txt                   // 'C': chess (ch_mesh.s); else Ninefold (nf_mesh.s)
+    ldrb w9, [x8]
+    cmp  w9, #'C'
+    b.ne 1f
+    bl   _chm_rx
+    b    Lrx_relay
+1:  bl   _nf_rx
     b    Lrx_relay
 Lrx_msg_plain:                        // unencrypted: only fine in Main with no passphrase
     ldr  x9, [x19, #12]

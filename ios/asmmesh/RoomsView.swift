@@ -42,6 +42,7 @@ struct RoomList: View {
     @Binding var picked: UInt64?
     let split: Bool
     @State private var newGame = false
+    @State private var newChess = false
 
     var body: some View {
         ScrollView {
@@ -65,6 +66,23 @@ struct RoomList: View {
                 if mesh.game.state != 0, let room = mesh.rooms.first(where: { $0.index == mesh.game.room }) {
                     gameRow(room)                       // the game being played, on top
                 }
+                if mesh.chess.state != 0 {
+                    Button { mesh.chessChanged(); mesh.showChess = true } label: {
+                        Card(padding: 12) {
+                            HStack(spacing: 12) {
+                                IconBadge(symbol: "checkerboard.rectangle", color: Theme.orange)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(mesh.chess.opponent.isEmpty ? "Chess" : "Chess with \(mesh.chess.opponent)")
+                                        .font(.headline).lineLimit(1)
+                                    Text(mesh.chess.status).font(.caption).foregroundStyle(Theme.dim).lineLimit(2)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.footnote).foregroundStyle(Theme.dim)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
                 ForEach(mesh.rooms) { room in
                     roomRow(room)
                 }
@@ -74,6 +92,10 @@ struct RoomList: View {
         .background(Theme.bg)
         .navigationTitle("Rooms")
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { newChess = true } label: { Image(systemName: "checkerboard.rectangle") }
+                    .accessibilityLabel("Play Chess")
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { newGame = true } label: { Image(systemName: "square.grid.3x3.fill") }
                     .accessibilityLabel("Play Ninefold")
@@ -85,6 +107,9 @@ struct RoomList: View {
         }
         .sheet(isPresented: $newGame) {
             NinefoldSheet().environmentObject(mesh)
+        }
+        .sheet(isPresented: $newChess) {
+            ChessSheet().environmentObject(mesh)
         }
     }
 

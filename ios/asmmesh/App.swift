@@ -79,6 +79,8 @@ struct ContentView: View {
         .sheet(isPresented: $finder.showing) { FindView() }
         // Ninefold comes up by itself: a game made or joined, and every round (GameView.swift)
         .fullScreenCover(isPresented: $mesh.showGame) { GameScreen().environmentObject(mesh) }
+        // chess too (ChessView.swift)
+        .fullScreenCover(isPresented: $mesh.showChess) { ChessScreen().environmentObject(mesh) }
         .sheet(item: $mesh.qrText) { qr in
             QRSheet(text: qr.text)
                 .presentationDetents([.medium, .large])
