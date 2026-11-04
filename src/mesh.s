@@ -530,6 +530,72 @@ Lsm_fail:
     mov  x0, #0
     LEAVE 0
 
+// long _mesh_send_game(long room, const uint8 *data, long len) -> peers written, -1 not sent
+//   a Ninefold packet (nf_mesh.s): a room message flagged MSGF_GAME, its bytes sealed with the
+//   room's own key as they are (not text), so only the room's members can read them
+.globl _mesh_send_game
+_mesh_send_game:
+    ENTER 0
+    mov  x19, x0
+    mov  x20, x1
+    mov  x21, x2
+    ADRL x8, _g_id_ready              // nothing goes out unsigned
+    ldr  x9, [x8]
+    cbz  x9, Lsg_fail
+    cbz  x19, Lsg_fail                // never in Main
+    ADRL x0, _g_pkt
+    mov  w1, #T_MSG
+    bl   _pkt_begin
+    ADRL x22, _g_pkt
+    ADRL x8, _g_rooms
+    add  x8, x8, x19, lsl #ROOM_SHIFT
+    ldr  x9, [x8, #R_ID]
+    str  x9, [x22, #12]
+    ADRL x8, _g_node_id
+    ldr  x9, [x8]
+    str  x9, [x22, #20]
+    mov  w9, #(MSGF_GAME | MSGF_RKEY)
+    strb w9, [x22, #28]
+    add  x0, x22, #29
+    bl   _put_nick
+    mov  x23, x0
+    sub  x9, x23, x22                 // room left, after the tag
+    mov  x10, #(PKT_MAX - TRAILER - 8)
+    sub  x10, x10, x9
+    cmp  x21, x10
+    b.hi Lsg_fail
+    mov  x0, x23
+    mov  x1, x20
+    mov  x2, x21
+    bl   _memcpy
+    mov  x0, x19
+    bl   _room_key
+    cbnz x0, 1f
+    mov  x0, x19
+    bl   _room_key_new
+    mov  x0, x19
+    bl   _room_key
+1:  mov  x1, x23
+    mov  x2, x21
+    add  x3, x22, #4
+    bl   _seal_key
+    add  x23, x23, x0
+    sub  x1, x23, x22
+    mov  x0, x22
+    bl   _pkt_finish
+    cbz  x0, Lsg_fail
+    mov  x23, x0
+    mov  x0, x22
+    mov  x1, x23
+    bl   _store_put
+    mov  x0, x22
+    mov  x1, x23
+    bl   _ble_broadcast
+    LEAVE 0
+Lsg_fail:
+    mov  x0, #-1
+    LEAVE 0
+
 // void _mesh_send_text(const char *text) — typed message into the current room
 .globl _mesh_send_text
 _mesh_send_text:
@@ -573,7 +639,12 @@ Lst_bcpm:
     bl   _bc_pm_say
     LEAVE 0
 Lst_mesh:
-    mov  x0, x20                      // a device command typed here? run it in Home
+    mov  x0, x19                      // a word for the game in its room (nf_mesh.s)
+    mov  x1, x20
+    bl   _nf_typed
+    cbz  x0, 1f
+    LEAVE 0
+1:  mov  x0, x20                      // a device command typed here? run it in Home
     bl   _chat_route
     cbz  x0, Lst_chat
     LEAVE 0
@@ -1152,6 +1223,7 @@ Lrx_msg:
     sub  x24, x20, x23
     ldrb w9, [x19, #28]
     tbnz w9, #2, Lrx_msg_rkey         // MSGF_RKEY: the room's own key
+    tbnz w9, #3, Lrx_relay            // a game packet not under a room's key: never read
     tbz  w9, #1, Lrx_msg_plain        // MSGF_ENC
     add  x0, x19, x23
     mov  x1, x24
@@ -1179,12 +1251,23 @@ Lrx_msg_rkey:
     add  x3, x19, #4
     ADRL x4, _g_txt
     bl   _open_key
+    ldrb w9, [x19, #28]
+    tbnz w9, #3, Lrx_game             // MSGF_GAME: Ninefold's, not text (nf_mesh.s)
     tbz  x0, #63, Lrx_msg_text
     ADRL x0, _g_txt
     ADRL x1, Ls_locked_room
     mov  x2, #240
     bl   _strlcpy
     b    Lrx_msg_text
+Lrx_game:                             // a Ninefold packet in a room we're in
+    tbnz x0, #63, Lrx_relay           //   (didn't open: not for us to read)
+    mov  x4, x0
+    ldr  x0, [x19, #12]
+    ldr  x1, [x19, #20]
+    ADRL x2, _g_nickbuf
+    ADRL x3, _g_txt
+    bl   _nf_rx
+    b    Lrx_relay
 Lrx_msg_plain:                        // unencrypted: only fine in Main with no passphrase
     ldr  x9, [x19, #12]
     cbnz x9, Lrx_msg_refuse

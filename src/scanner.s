@@ -174,6 +174,7 @@ Ltk_second:
     mov  x0, x20
     bl   _rules_tick                  // schedules, rules, sharing what we hear
     bl   _bc_tick                     // bitchat: announce, forget people gone quiet
+    bl   _nf_tick                     // Ninefold: the clock, rounds, reveals
 Ltk_hello:
     mov  x9, #150
     udiv x10, x19, x9

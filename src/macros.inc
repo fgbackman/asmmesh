@@ -139,6 +139,7 @@
 .set T_SEEN,        6        // which Bluetooth devices a Mac hears, for "where is my ..."
 .set MSGF_ENC,      2        // MSG flags bit: text is encrypted with the mesh passphrase
 .set MSGF_RKEY,     4        // MSG flags bit: text is encrypted with the room's own key
+.set MSGF_GAME,     8        // MSG flags bit: a Ninefold packet (nf_mesh.s), not text; always with MSGF_RKEY
 .set TRAILER,       68       // v3: every packet ends with time(4) + signature(64)
 .set PUBLEN,        65       // an uncompressed P-256 public key
 .set HOME_ID,       1        // the local-only Home room; never sent on the mesh

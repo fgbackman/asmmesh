@@ -292,6 +292,29 @@ Lsr_table:
 Lsr_done:
     LEAVE 256
 
+// void _nf_ui_show(const char *status) — Ninefold's clock and counts in the game room's
+//   header, while that room is open (nf_mesh.s, every second)
+.globl _nf_ui_show
+_nf_ui_show:
+    ENTER 0
+    mov  x19, x0
+    ldrb w9, [x19]
+    cbz  w9, 9f
+    ADRL x8, _g_header
+    ldr  x20, [x8]
+    cbz  x20, 9f
+    bl   _am_nf_room
+    ADRL x8, _g_cur_room
+    ldr  x9, [x8]
+    cmp  x0, x9
+    b.ne 9f
+    mov  x0, x19
+    bl   _nsstr
+    mov  x2, x0
+    mov  x0, x20
+    MSG1 Ls_setStringValue
+9:  LEAVE 0
+
 // void _ui_rooms_changed(void)
 .globl _ui_rooms_changed
 _ui_rooms_changed:
@@ -1458,10 +1481,25 @@ _invite_cb:
     mov  x1, #160
     ADRL x2, Ls_inv_msg
     bl   _snprintf
+    add  x0, x19, #8                  // a Ninefold game's room: say so
+    ADRL x1, Ls_inv_nf_prefix
+    mov  x2, #9
+    bl   _strncmp
+    cbnz w0, 1f
+    add  x9, x19, #40
+    str  x9, [sp]
     add  x0, sp, #96
+    mov  x1, #160
+    ADRL x2, Ls_inv_nf_msg
+    bl   _snprintf
+    add  x0, sp, #96
+    ADRL x1, Ls_inv_nf_info
+    ADRL x2, Ls_inv_nf_join
+    b    2f
+1:  add  x0, sp, #96
     ADRL x1, Ls_inv_info
     ADRL x2, Ls_join
-    mov  x3, #0
+2:  mov  x3, #0
     ADRL x4, Ls_notnow
     bl   _alert_run
     cbz  x0, Lic_free
@@ -1639,6 +1677,10 @@ Ls_pick_info:         .asciz "Click a name under People on the Mesh, then Invite
 Ls_name_msg:          .asciz "Your name on the mesh"
 Ls_name_info:         .asciz "Pick one or type your own, up to 23 characters. Everyone sees it next to your messages and in their People list."
 Ls_inv_msg:           .asciz "%s invites you to #%s"
+Ls_inv_nf_prefix:     .asciz "Ninefold "
+Ls_inv_nf_msg:        .asciz "%s invites you to play Ninefold"
+Ls_inv_nf_info:       .asciz "A word game over the mesh: nine letters, a few minutes a round. Everyone\342\200\231s words stay hidden until the round ends, and only the players see the game."
+Ls_inv_nf_join:       .asciz "Join Game"
 Ls_inv_info:          .asciz "It's an invite-only room. Messages hop over Bluetooth through nearby Macs; only members see them."
 Ls_joined_txt:        .asciz "joined the room"
 Ls_left_txt:          .asciz "left the room"
