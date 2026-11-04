@@ -1278,6 +1278,78 @@ _nf_play_selftest:
     bl   _t_report
     add  x19, x19, x0
 
+    // 204. the words on screen (nf_text.s): the status line, the results, a refusal
+    mov  x20, #1
+    ldr  x0, [sp, #96]
+    NFK2 x1, (T0 + 142)
+    add  x2, sp, #240
+    mov  x3, #200
+    bl   _nft_status
+    add  x0, sp, #240
+    ADRL x1, Lpt_status
+    bl   Lpt_prefix
+    and  x20, x20, x0
+    ldr  x0, [sp, #96]
+    mov  x1, #0
+    add  x2, sp, #240
+    mov  x3, #200
+    bl   _nft_result
+    add  x0, sp, #240
+    ADRL x1, Lpt_res0
+    bl   Lpt_prefix
+    and  x20, x20, x0
+    ldr  x0, [sp, #96]
+    mov  x1, #1
+    add  x2, sp, #240
+    mov  x3, #200
+    bl   _nft_result
+    add  x0, sp, #240
+    ADRL x1, Lpt_res1
+    bl   Lpt_prefix
+    and  x20, x20, x0
+    ldr  x0, [sp, #96]                    // Bea's line on Ann's device: second, 11 points
+    mov  x1, #2
+    add  x2, sp, #240
+    mov  x3, #200
+    bl   _nft_result
+    add  x0, sp, #240
+    ADRL x1, Lpt_res2
+    bl   Lpt_prefix
+    and  x20, x20, x0
+    ldr  x0, [sp, #96]                    // past the last line: nothing
+    mov  x1, #9
+    add  x2, sp, #240
+    mov  x3, #200
+    bl   _nft_result
+    cmp  x0, #0
+    NFOK eq
+    ldr  x0, [sp, #96]
+    mov  x1, #NF_LENGTH
+    mov  x2, #0
+    ADRL x3, Lpt_zzzz
+    mov  x4, #2
+    add  x5, sp, #240
+    mov  x6, #200
+    bl   _nft_try
+    add  x0, sp, #240
+    ADRL x1, Lpt_length
+    bl   Lpt_prefix
+    and  x20, x20, x0
+    ldr  x0, [sp, #96]                    // a tiny buffer: cut, still terminated
+    mov  x1, #0
+    add  x2, sp, #240
+    mov  x3, #8
+    bl   _nft_result
+    cmp  x0, #7
+    NFOK eq
+    ldrb w9, [sp, #247]
+    cmp  w9, #0
+    NFOK eq
+    mov  w1, w20
+    ADRL x0, Ln_nf204
+    bl   _t_report
+    add  x19, x19, x0
+
 Lpt_free:
     ldr  x0, [sp, #96]
     bl   _free
@@ -1291,6 +1363,18 @@ Lpt_nomem:
     bl   _t_report
     add  x19, x19, x0
     b    Lpt_free
+
+// Lpt_prefix(s, prefix) -> 1 if s starts with prefix (leaf)
+Lpt_prefix:
+    ldrb w10, [x1], #1
+    cbz  w10, 1f
+    ldrb w9, [x0], #1
+    cmp  w9, w10
+    b.eq Lpt_prefix
+    mov  x0, #0
+    ret
+1:  mov  x0, #1
+    ret
 
 // Lpt_score(g, id) -> that player's game score, or -1
 Lpt_score:
@@ -1311,6 +1395,12 @@ Lpt_ann:        .asciz "Ann"
 Lpt_bea:        .asciz "Bea"
 Lpt_cat:        .asciz "Cat"
 Lpt_zzzz:       .asciz "zzzz"
+Lpt_status:     .asciz "Round 1 of 2 \302\267 scored \302\267 you "
+Lpt_res0:       .asciz "Round 1 of 2: the nine-letter word was "
+Lpt_res1:       .asciz "1. you "
+Lpt_res2:       .asciz "2. Bea 11 (+11): "
+Lpt_length:     .asciz "\342\234\227 Words have 4 to 9 letters"
+Ln_nf204:       .asciz "204 ninefold screens: status, results, refusals, short buffers"
 Ln_nf200:       .asciz "200 ninefold game: START taken once, other lists refused, the round starts on time"
 Ln_nf201:       .asciz "201 ninefold game: two devices, one puzzle; a claim crosses; found already; junk"
 Ln_nf202:       .asciz "202 ninefold game: the round ends; reveals checked on both devices"

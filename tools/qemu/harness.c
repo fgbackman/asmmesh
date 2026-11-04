@@ -41,6 +41,73 @@ extern long nf_puzzle(unsigned long, void *) F(nf_puzzle);
 extern long nf_find(const void *, const void *, long) F(nf_find);
 extern void nf_commit(const void *, unsigned long, long, long, void *) F(nf_commit);
 extern void nf_hash(void *) F(nf_hash);
+extern long nfp_pkt_start(void *, long, long, long, long, unsigned long, long, long) F(nfp_pkt_start);
+extern long nfp_start_in(void *, long, long, const void *, long) F(nfp_start_in);
+extern long nfp_player(void *, long, const char *, long) F(nfp_player);
+extern long nfp_claim_in(void *, long, const char *, long, const void *, long, long) F(nfp_claim_in);
+extern long nfp_pkt_reveal(void *, long, void *) F(nfp_pkt_reveal);
+extern long nfp_reveal_in(void *, long, const void *, long) F(nfp_reveal_in);
+extern long nfp_tick(void *, long) F(nfp_tick);
+extern long nft_status(const void *, long, char *, long) F(nft_status);
+extern long nft_board(const void *, const char *, long, char *, long) F(nft_board);
+extern long nft_try(const void *, long, long, const char *, long, char *, long) F(nft_try);
+extern long nft_result(const void *, long, char *, long) F(nft_result);
+extern long nft_mine(const void *, char *, long) F(nft_mine);
+extern long nft_players(const void *, char *, long) F(nft_players);
+extern const char *nf_word(const void *, long) F(nf_word);
+
+/* _nfp_try answers in x0 and x1 */
+static long nfp_try2(void *g, const char *t, long n, long now, void *out, long *pts) {
+    register long x0 __asm__("x0") = (long)g, x1 __asm__("x1") = (long)t, x2 __asm__("x2") = n,
+        x3 __asm__("x3") = now, x4 __asm__("x4") = (long)out;
+    __asm__ volatile("bl _nfp_try" : "+r"(x0), "+r"(x1), "+r"(x2), "+r"(x3), "+r"(x4) :
+                     : "x5", "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17",
+                       "x18", "x30", "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v16", "v17", "v18",
+                       "v19", "v20", "v21", "v22", "v23", "v24", "v25", "v26", "v27", "v28", "v29", "v30",
+                       "v31", "cc", "memory");
+    *pts = x1;
+    return x0;
+}
+
+/* nfdemo: Ann (host) and Bea play one round of two; prints every line the screens show */
+static void nf_demo(void) {
+    enum { GS = 21664, T = 1000000 };
+    unsigned char *a = calloc(1, GS), *b = calloc(1, GS), st[32], cl[32], rv[120];
+    char buf[1200], view[10];
+    long pts, n, r;
+    nfp_pkt_start(st, 0x1234, 1, 2, 120, 0x0123456789abcdefUL, T + 10, 0);
+    nfp_start_in(a, 0xA1, 0xA1, st, 31);
+    nfp_start_in(b, 0xB2, 0xA1, st, 31);
+    nfp_player(a, 0xB2, "Bea", 3);
+    nfp_player(b, 0xA1, "Ann", 3);
+    nft_status(a, T, buf, sizeof buf); printf("status (Ann, waiting): %s\n", buf);
+    memcpy(view, a + 144, 9); view[9] = 0;
+    for (r = 0; r < 3; r++) { nft_board(a, view, r, buf, sizeof buf); printf("board: |%s|\n", buf); }
+    nfp_tick(a, T + 10); nfp_tick(b, T + 10);
+    const char *tries[] = { (char *)a + 154, "zzzz", "abc", "coolness", "loco", "LOCO", "colonics" };
+    for (int i = 0; i < 7; i++) {
+        long k = nfp_try2(a, tries[i], strlen(tries[i]) > 9 && i == 0 ? 9 : strlen(tries[i]), T + 20 + i, cl, &pts);
+        nft_try(a, k, pts, tries[i], strlen(tries[i]), buf, sizeof buf); printf("try %-10s -> %s\n", tries[i], buf);
+        if (k >= 0) nfp_claim_in(b, 0xA1, "Ann", 3, cl, 28, T + 21 + i);
+    }
+    const char *bt[] = { "coil", "loco", "silo" };
+    for (int i = 0; i < 3; i++) {
+        long k = nfp_try2(b, bt[i], 4, T + 22 + i, cl, &pts);
+        if (k >= 0) nfp_claim_in(a, 0xB2, "Bea", 3, cl, 28, T + 23 + i);
+    }
+    nft_status(a, T + 75, buf, sizeof buf); printf("status (Ann, playing): %s\n", buf);
+    nft_mine(a, buf, sizeof buf); printf("Ann's words: %s\n", buf);
+    nfp_tick(a, T + 130); nfp_tick(b, T + 130);
+    nft_status(a, T + 131, buf, sizeof buf); printf("status (Ann, over): %s\n", buf);
+    n = nfp_pkt_reveal(a, 0, rv); nfp_reveal_in(a, 0xA1, rv, n); nfp_reveal_in(b, 0xA1, rv, n);
+    n = nfp_pkt_reveal(b, 0, rv); nfp_reveal_in(a, 0xB2, rv, n); nfp_reveal_in(b, 0xB2, rv, n);
+    nfp_tick(a, T + 142); nfp_tick(b, T + 142);
+    nft_status(a, T + 142, buf, sizeof buf); printf("status (Ann, scored): %s\n", buf);
+    for (long k = 0; nft_result(a, k, buf, sizeof buf); k++) printf("result %ld (Ann): %s\n", k, buf);
+    for (long k = 0; nft_result(b, k, buf, sizeof buf); k++) printf("result %ld (Bea): %s\n", k, buf);
+    nft_players(b, buf, sizeof buf); printf("players (Bea):\n%s", buf);
+    free(a); free(b);
+}
 extern long bc_decode(const void *, long, void *, void *, long) F(bc_decode);
 extern long bc_sign_data(const void *, void *, long) F(bc_sign_data);
 extern long bc_verify(const void *, const void *, void *, long) F(bc_verify);
@@ -121,6 +188,7 @@ int main(int argc, char **argv) {
         printf("%ld failed\n", f);
         return f != 0;
     }
+    if (argc > 1 && !strcmp(argv[1], "nfdemo")) { nf_demo(); return 0; }
     static char line[300000];
     unsigned char ctx[208];
     static unsigned char ib[528], fa[8 * 8520], fout[16384], pay[8192], dd[8 + 1000 * 32], bt[32 * 256], pn[32 + 128 * 56];
