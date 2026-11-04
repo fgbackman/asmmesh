@@ -151,7 +151,7 @@ all. Each player therefore makes a secret random **salt** for each round:
 ## In the app
 
 - **Mac**:
-  - Home: `ninefold with Anna, Sam` (options `3 rounds`, `2 minutes`, `family off`) makes the
+  - **Mesh › Play Ninefold…** (⌘9) asks who to invite. Or in Home: `ninefold with Anna, Sam` (options `3 rounds`, `2 minutes`, `family off`) makes the
     game room and invites them; `ninefold` alone makes it empty (invite from the room).
   - Inside the game room: `start` (the host), then type words and press Enter. `shuffle`
     shows the tiles in a new order, `words` lists yours. The room's header shows the clock

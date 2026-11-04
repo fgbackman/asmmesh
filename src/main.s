@@ -158,6 +158,7 @@ Lmethods:
     .quad Ls_m_connectST,   _st_connect_dialog, Ls_ty_v1
     .quad Ls_m_pairHue,     _hue_pair,          Ls_ty_v1
     .quad Ls_m_addHue,      _hue_add_dialog,    Ls_ty_v1
+    .quad Ls_m_ninefold,    _nf_dialog,         Ls_ty_v1
     .quad Ls_m_meshPass,    _crypto_dialog,     Ls_ty_v1
     .quad Ls_m_fmShow,      _fm_show,           Ls_ty_v1
     .quad Ls_m_fmApply,     _fm_apply,          Ls_ty_v1
@@ -1279,6 +1280,11 @@ _build_menus:
     ADRL x3, Ls_key_i
     bl   _add_item
     mov  x0, x21
+    ADRL x1, Ls_ninefold_item
+    ADRL x2, Ls_m_ninefold
+    ADRL x3, Ls_key_9
+    bl   _add_item
+    mov  x0, x21
     ADRL x1, Ls_leave_item
     ADRL x2, Ls_m_leave
     ADRL x3, Ls_empty
@@ -1761,6 +1767,7 @@ Ls_m_talk:             .asciz "talk:"
 Ls_m_connectST:        .asciz "connectSmartThings:"
 Ls_m_pairHue:          .asciz "pairHue:"
 Ls_m_addHue:           .asciz "addHueLights:"
+Ls_m_ninefold:         .asciz "playNinefold:"
 Ls_m_meshPass:         .asciz "meshPassphrase:"
 Ls_m_fmShow:           .asciz "fmShow:"
 Ls_m_fmApply:          .asciz "fmApply:"
@@ -1810,6 +1817,8 @@ Ls_edit:               .asciz "Edit"
 Ls_mesh_menu:          .asciz "Mesh"
 Ls_name_item:          .asciz "Change Name\342\200\246"
 Ls_newroom_item:       .asciz "New Room\342\200\246"
+Ls_ninefold_item:      .asciz "Play Ninefold\342\200\246"
+Ls_key_9:              .asciz "9"
 Ls_leave_item:         .asciz "Leave Room"
 Ls_quit_title:         .asciz "Quit asmmesh"
 Ls_show_title:         .asciz "Show asmmesh"

@@ -783,6 +783,48 @@ Lhn_trim:
     b    4b
 5:  ret
 
+// void _nf_dialog(id sender) — Mesh › Play Ninefold…: who to invite (everyone on the mesh
+//   now, filled in), then what "ninefold with ..." does
+.globl _nf_dialog
+_nf_dialog:
+    ENTER 288                             // [96] the names (192)
+    strb wzr, [sp, #96]
+    mov  x19, #0
+1:  ADRL x8, _g_node_count
+    ldr  x9, [x8]
+    cmp  x19, x9
+    b.hs 3f
+    ADRL x8, _g_nodes
+    add  x20, x8, x19, lsl #NODE_SHIFT
+    add  x19, x19, #1
+    ldrb w9, [x20, #N_NICK]
+    cbz  w9, 1b
+    ldrb w9, [sp, #96]
+    cbz  w9, 2f
+    add  x0, sp, #96
+    ADRL x1, Ls_comma
+    mov  x2, #192
+    bl   _strlcat
+2:  add  x0, sp, #96
+    add  x1, x20, #N_NICK
+    mov  x2, #192
+    bl   _strlcat
+    b    1b
+3:  ADRL x0, Ls_nf_dlg_title
+    ADRL x1, Ls_nf_dlg_info
+    ADRL x2, Ls_nf_dlg_ph
+    add  x3, sp, #96
+    mov  x4, #0
+    add  x5, sp, #96
+    mov  x6, #192
+    bl   _ask_text
+    cbz  x0, 9f                           // cancelled
+    mov  x0, #0
+    add  x1, sp, #96
+    add  x2, sp, #96
+    bl   _h_ninefold
+9:  LEAVE 288
+
 // ---------------------------------------------------------------------------
 // Rounds
 
@@ -1106,6 +1148,9 @@ Ls_nf_w_start:  .asciz "start"
 Ls_nf_w_shuffle: .asciz "shuffle"
 Ls_nf_w_words:  .asciz "words"
 Ls_nf_room:     .asciz "Ninefold %s"
+Ls_nf_dlg_title: .asciz "Play Ninefold"
+Ls_nf_dlg_info: .asciz "A word game with people on the mesh: nine letters, words of 4 to 9 letters using the centre one, nobody sees your words until the round ends. Who to invite, with commas between names (everyone on the mesh now is filled in). You can add \342\200\2343 rounds\342\200\235, \342\200\2342 minutes\342\200\235 or \342\200\234family off\342\200\235."
+Ls_nf_dlg_ph:   .asciz "Anna, Sam"
 Ls_nf_newopts:  .asciz "%ld rounds, %ld minutes, family %s"
 Ls_nf_opts:     .asciz "%ld rounds of %ld minutes, family filter %s"
 Ls_nf_lobby:    .asciz "\302\267 \360\237\247\251 Ninefold: %s invited (%s). When they\342\200\231ve joined, type start."
