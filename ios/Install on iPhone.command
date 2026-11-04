@@ -43,13 +43,16 @@ for x in d.get('result', {}).get('devices', []):
     name = x.get('deviceProperties', {}).get('name', '?')
     if hw.get('platform') != 'iOS' or hw.get('reality') != 'physical':
         continue
+    via = {'wired': 'cable', 'localNetwork': 'Wi-Fi'}.get(cp.get('transportType'), 'not connected now')
     if cp.get('pairingState') != 'paired':
-        print('skipped %s: not paired with this Mac (plug it in, unlock it, tap Trust)' % name, file=sys.stderr)
+        print('skipped %s (%s): not paired with this Mac (plug it in, unlock it, tap Trust)' % (name, via), file=sys.stderr)
         continue
-    print(x.get('identifier') + '\t' + name)
+    print('  %s: paired, %s' % (name, via), file=sys.stderr)
+    print(x.get('identifier') + '\t' + name + '\t' + via)
 EOF2
 )
 echo "found: $(printf '%s\n' "$DEVS" | cut -f2 | paste -sd ',' - | sed 's/,/, /g')"
+echo "(an iPhone missing here isn't seen by this Mac at all: plug it in with a cable, unlock it, tap Trust)"
 if [ -z "$DEVS" ]; then
   echo "Built, but no iPhone or iPad found. Plug it in with a cable, unlock it, tap Trust, and run me again."
   echo "(First time: on the device, Settings > Privacy & Security > Developer Mode > On, then restart it.)"
@@ -58,11 +61,27 @@ fi
 failed=0
 # The list comes in on fd 3: devicectl reads stdin, and on stdin it would eat the rest of
 # the list, so only the first device got the app.
-while IFS="$(printf '\t')" read -r DEV NAME <&3; do
-  echo "== $NAME =="
-  xcrun devicectl device install app --device "$DEV" "$APP" </dev/null 2>&1 | grep -E "App installed|ERROR|locked" | head -3
-  if ! xcrun devicectl device info apps --device "$DEV" --bundle-id com.fbackman.asmmesh.ios </dev/null 2>/dev/null | grep -q asmmesh; then
-    echo "Not installed on $NAME - unlock it; the first time, turn on Developer Mode (Settings > Privacy & Security)."
+while IFS="$(printf '\t')" read -r DEV NAME VIA <&3; do
+  echo "== $NAME ($VIA) =="
+  ok=0
+  for try in 1 2 3; do              # a locked or sleeping phone: time to unlock it, then again
+    out=$(xcrun devicectl device install app --device "$DEV" "$APP" </dev/null 2>&1)
+    echo "$out" | grep -E "App installed|ERROR|locked" | head -3
+    if xcrun devicectl device info apps --device "$DEV" --bundle-id com.fbackman.asmmesh.ios </dev/null 2>/dev/null | grep -q asmmesh; then
+      ok=1; break
+    fi
+    [ $try -eq 3 ] && break
+    if echo "$out" | grep -q "4016"; then
+      echo "  $NAME can't take it right now: unlock it and keep its screen on$( [ "$VIA" = "Wi-Fi" ] && echo ', or plug it in with a cable (over Wi-Fi a sleeping phone can'"'"'t)')."
+    else
+      echo "  Unlock $NAME and keep its screen on."
+    fi
+    echo "  Trying again in 15 s ($try of 3)..."
+    sleep 15
+  done
+  if [ $ok -eq 0 ]; then
+    echo "Not installed on $NAME - unlock it and keep the screen on; plug it in with a cable if it's on Wi-Fi;"
+    echo "  the first time, turn on Developer Mode (Settings > Privacy & Security > Developer Mode)."
     failed=1
     continue
   fi
