@@ -38,6 +38,7 @@ extern long bc_noise_selftest(void) F(bc_noise_selftest) __attribute__((weak));
 extern long nf_core_selftest(void) F(nf_core_selftest) __attribute__((weak));
 extern long nf_play_selftest(void) F(nf_play_selftest) __attribute__((weak));
 extern long ch_core_selftest(void) F(ch_core_selftest) __attribute__((weak));
+extern long ch_play_selftest(void) F(ch_play_selftest) __attribute__((weak));
 extern long ch_fen_in(void *, const char *) F(ch_fen_in);
 extern unsigned long ch_perft(const void *, long) F(ch_perft);
 
@@ -211,7 +212,7 @@ static long unhex(const char *s, unsigned char *p) {
 int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IONBF, 0);   /* a crash shows right after the last test that ran */
     if (argc > 1 && !strcmp(argv[1], "selftest")) {
-        long f = bc_selftest() + bc_link_selftest() + bc_packet_selftest() + bc_peer_selftest() + term_selftest() + hue_core_selftest() + bc_noise_selftest() + nf_core_selftest() + nf_play_selftest() + ch_core_selftest();
+        long f = bc_selftest() + bc_link_selftest() + bc_packet_selftest() + bc_peer_selftest() + term_selftest() + hue_core_selftest() + bc_noise_selftest() + nf_core_selftest() + nf_play_selftest() + ch_core_selftest() + ch_play_selftest();
         printf("%ld failed\n", f);
         return f != 0;
     }

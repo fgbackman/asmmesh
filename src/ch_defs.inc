@@ -30,3 +30,51 @@
 .set CHP_ILLEGAL,   -1       // reads as a move, but it isn't legal here
 .set CHP_AMBIGUOUS, -2       // more than one legal move fits
 .set CHP_UNREADABLE, -3      // not a move at all
+
+// A game (ch_play.s): one at a time on a device
+.set CGS_NONE,      0
+.set CGS_PLAY,      2
+.set CGS_OVER,      3
+.set CGV_MESH,      1        // in an invite-only asmmesh room
+.set CGV_BITCHAT,   2        // in a bitchat private chat: moves as text
+.set CGR_WHITE,     1        // results
+.set CGR_BLACK,     2
+.set CGR_DRAW,      3
+.set CGE_MATE,      1        // how it ended
+.set CGE_RESIGN,    2
+.set CGE_STALE,     3
+.set CGE_FIFTY,     4
+.set CGE_MATERIAL,  5
+.set CGE_REPEAT,    6
+.set CGE_AGREED,    7
+.set CGE_LONG,      8        // 400 moves
+.set CG_STATE,      0
+.set CG_VIA,        8
+.set CG_ROOM,       16
+.set CG_GID,        24
+.set CG_ME,         32       // our colour: 0 white, 8 black
+.set CG_OPP,        40       // the other player's id (asmmesh node, or bitchat peer)
+.set CG_PLY,        48       // moves played (half-moves)
+.set CG_RESULT,     56
+.set CG_REASON,     64
+.set CG_DRAW,       72       // 1 we offered a draw, 2 they did
+.set CG_AUX,        80       // the glue's: when we last sent again
+.set CG_ME_ID,      88
+.set CG_POS,        96       // the position now (CP_SIZE)
+.set CG_HIST,       232      // u64[CG_MAXPLY + 1]: each position's hash, for repetitions
+.set CG_MOVES,      3440     // u32[CG_MAXPLY]: the moves
+.set CG_MAXPLY,     400
+.set CG_SIZE,       5040
+
+// game packets: room messages flagged MSGF_GAME, byte 0 'C', 1 kind
+.set CK_NEW,        1        // +2 game u32 +6 white id u64 +14 black id u64 (22)
+.set CK_MOVE,       2        // +2 game +6 ply u16 (after it) +8 move u32 +12 hash after u64 (20)
+.set CK_RESIGN,     3        // +2 game (6)
+.set CK_ASK,        4        // +2 game +6 how many moves we have u16 (8): send the rest
+.set CK_HIST,       5        // +2 game +6 first u16 +8 n +9 moves u32[n <= 24]
+.set CK_DRAW,       6        // +2 game +6 ply u16 (8): an offer, or yes to theirs
+.set CK_HIST_MAX,   24
+
+// _cg_try
+.set CGT_NOTPLAYING, -11
+.set CGT_NOTYOURS,  -10
