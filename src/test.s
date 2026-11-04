@@ -1306,6 +1306,8 @@ _selftest:
     add  x19, x19, x0
     bl   _nf_core_selftest            // Ninefold: words, puzzles, claims (nf_core.s)
     add  x19, x19, x0
+    bl   _nf_play_selftest            // Ninefold: a round on two devices (nf_play.s)
+    add  x19, x19, x0
     bl   _t_hard                      // fuzzing, flood limits, full tables (last: it fills them)
     add  x19, x19, x0
 
