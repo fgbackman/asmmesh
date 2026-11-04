@@ -154,6 +154,7 @@ _am_tick:
     bl   _bc_tick                     // bitchat: announce, forget people gone quiet
     bl   _nf_tick                     // Ninefold: the clock, rounds, reveals
     bl   _chm_tick                    // chess: moves sent again until answered
+    bl   _dbl_tick                    // the developer's blocklist, fetched daily
     bl   _ios_alert_open              // a rule may ask something: not on top of another prompt
     cbnz x0, Lat_hello
     mov  x0, x20

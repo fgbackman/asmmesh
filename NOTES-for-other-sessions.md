@@ -244,3 +244,11 @@ For where the bitchat work stands and what comes next, start with `docs/bitchat_
   chat (`_sf_bc_typed`, before chess). Defaults keys "blocked", "chatFilter", "reportTo".
 - Home words: block, unblock, blocked, report, report address, filter, filter on/off.
   Mac: Mesh › Block Person, Report Person…. iPhone: People ⋯ menu; Settings › Privacy.
+
+## The developer blocklist (Nov 4, branch claude/ninefold)
+- `src/dbl_core.s` (pure, self-test 218): `_dbl_verify` (Ed25519 with the key in
+  `src/dbl_key.inc`; all zeros = off), `_dbl_has`. `src/dbl_list.bin` is the list shipped
+  (may be empty). safety.s: `_blk_has` also checks it; `_dbl_tick` fetches the URL in
+  dbl_key.inc daily (tag 'd' -> `_dbl_response`, net.s); newest good list kept in defaults
+  "devBlocklist". Tool: `tools/blocklist/blocklist.py`; the private key lives in
+  ~/.asmmesh-blocklist, never in the repository. Instructions: docs/blocklist.md.

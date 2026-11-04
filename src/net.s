@@ -288,9 +288,14 @@ Lnd2_dispatch:
     b.eq Lnd2_extra
     cmp  w9, #'a'
     b.eq Lnd2_alerts
+    cmp  w9, #'d'                     // the developer's blocklist (safety.s)
+    b.eq Lnd2_dbl
     cmp  w9, #'u'
     b.ne Lnd2_release
     bl   _udp_response
+    b    Lnd2_release
+Lnd2_dbl:
+    bl   _dbl_response
     b    Lnd2_release
 Lnd2_weather:
     bl   _weather_response

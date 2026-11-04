@@ -120,6 +120,7 @@ Nine letters in a 3×3 grid; make words of 4 to 9 letters that use the centre le
 
 - **Block** someone: Mesh › Block Person (with them picked in People) on the Mac, their ⋯ in People on iPhone, or `block Anna` in Home; in a private bitchat chat, type `block`. Their messages, invitations, game moves and asks to join aren't shown or taken any more (their packets are still passed on for others: that's the mesh). `unblock Anna`, `unblock all`, `blocked` lists them. Kept between launches.
 - **Report** someone: Mesh › Report Person…, ⋯ › Report… on iPhone, `report Anna`, or `report` in a private bitchat chat. Your mail app opens a report (their name, key fingerprint and what they sent here lately) addressed to the report address, and they're blocked. Set the address with `report address you@example.com` or Settings › Privacy on iPhone.
+- **The developer blocklist:** ids you ban for everyone, signed with your key, shipped in the app and fetched daily (`docs/blocklist.md`, `tools/blocklist/blocklist.py`). Reports carry the person's id for it.
 - **The chat filter** (on unless `filter off`; Settings › Privacy on iPhone): vulgar words and slurs in what others send show as `f***`. Only words Wiktionary itself labels vulgar, offensive or a slur (the same 37 as Ninefold's family filter), whole words with -s or -es: Scunthorpe, assess and Dickens are untouched, and so are Dick and Mongol written as names.
 
 ## Typing: history and suggestions
@@ -174,7 +175,8 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
     src/ch_mesh.s  chess on the mesh and over bitchat text; Home's "chess", what the boards read
     src/ch_win.s   the Mac's chess window (src/nf_win.s: Ninefold's)
     src/cf_core.s  the chat filter, pure (its words: cf_words.inc, made by tools/ninefold/make_chat_filter.py)
-    src/safety.s   block, report, the filter's setting, and Home's words for them
+    src/safety.s   block, report, the filter's setting, the developer blocklist's loading and fetching, Home's words
+    src/dbl_core.s the developer blocklist, pure: a signed list checked, an id looked up
     src/hue_core.s Hue's bytes-only parts: serials typed, bridge addresses, telling a bridge's SSDP answer
     src/st.s       SmartThings (all capabilities, scenes, status) and Apple Home via Shortcuts
     src/lan.s      Bonjour: WLED, Elgato, Shelly, Nanoleaf, Home Assistant discovery, scanner network rows

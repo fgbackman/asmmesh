@@ -16,6 +16,7 @@
 .set REC_N,         32
 .set REC_TEXT,      184
 .set REC_SIZE,      200          // id (8), room id (8), text (184)
+.set DBL_BYTES,     (16 + 8 * 4096 + 64)
 
 .data
 .p2align 3
@@ -28,6 +29,10 @@ _g_rec_pos:     .quad 0
 .zerofill __DATA,__bss,_g_sf_buf,2048,4
 .zerofill __DATA,__bss,_g_sf_url,6144,4
 .zerofill __DATA,__bss,_g_sf_to,128,4
+.zerofill __DATA,__bss,_g_dbl,DBL_BYTES,4    // the developer's blocklist taken (dbl_core.s)
+_g_dbl_n:       .quad -1          // its ids; -1 not read yet
+_g_dbl_ver:     .quad 0
+_g_dbl_next:    .quad 0           // when to fetch it next
 
 .text
 .p2align 2
@@ -35,12 +40,19 @@ _g_rec_pos:     .quad 0
 // ---------------------------------------------------------------------------
 // Blocked
 
-// long _blk_has(uint64 id) -> 1 if blocked
+// long _blk_has(uint64 id) -> 1 if blocked, by us or on the developer's blocklist
 .globl _blk_has
 _blk_has:
     ENTER 0
     mov  x19, x0
     cbz  x19, 8f
+    bl   Ldbl_load
+    ADRL x0, _g_dbl
+    ADRL x8, _g_dbl_n
+    ldr  x1, [x8]
+    mov  x2, x19
+    bl   _dbl_has
+    cbnz x0, 9f
     bl   Lblk_load
     ADRL x8, _g_blk_n
     ldr  x9, [x8]
@@ -55,7 +67,7 @@ _blk_has:
     mov  x0, #1
     LEAVE 0
 8:  mov  x0, #0
-    LEAVE 0
+9:  LEAVE 0
 
 // void _blk_set(uint64 id, long on) — block or unblock, and remember it
 .globl _blk_set
@@ -184,6 +196,195 @@ Lblk_save:
     LEAVE 0
 
 // ---------------------------------------------------------------------------
+// The developer's blocklist (tools/blocklist/blocklist.py): shipped in the app, fetched daily
+
+// Ldbl_load — once: the list shipped in the app, then the one fetched last, whichever is newer
+Ldbl_load:
+    ENTER 0
+    ADRL x8, _g_dbl_n
+    ldr  x9, [x8]
+    tbz  x9, #63, 9f
+    str  xzr, [x8]
+    ADRL x0, Ldbl_ship                    // shipped
+    ADRL x1, Ldbl_ship_end
+    sub  x1, x1, x0
+    bl   Ldbl_take
+    ADRL x0, Ls_k_dbl                     // fetched (as hex in the defaults)
+    bl   _pref_len
+    cbz  x0, 9f
+    mov  x19, x0
+    add  x0, x19, #1
+    bl   _malloc
+    cbz  x0, 9f
+    mov  x20, x0
+    ADRL x0, Ls_k_dbl
+    mov  x1, x20
+    add  x2, x19, #1
+    bl   _pref_get
+    mov  x0, x20                          // hex to bytes, in place
+    bl   Ldbl_unhex
+    mov  x1, x0
+    mov  x0, x20
+    bl   Ldbl_take
+    mov  x0, x20
+    bl   _free
+9:  LEAVE 0
+
+// long Ldbl_take(data, len) -> 1 if it was a good list newer than ours, and is ours now
+Ldbl_take:
+    ENTER 0
+    mov  x19, x0
+    mov  x20, x1
+    mov  x0, #DBL_BYTES
+    cmp  x20, x0
+    b.hi 8f
+    mov  x0, x19
+    mov  x1, x20
+    ADRL x2, Ldbl_pub
+    bl   _dbl_verify
+    tbnz x0, #63, 8f
+    mov  x21, x0
+    ADRL x8, _g_dbl_ver                   // newer only: an old list can't unban anyone
+    ldr  x9, [x8]
+    cmp  x1, x9
+    b.ls 8f
+    str  x1, [x8]
+    ADRL x0, _g_dbl
+    mov  x1, x19
+    mov  x2, x20
+    bl   _memcpy
+    ADRL x8, _g_dbl_n
+    str  x21, [x8]
+    mov  x0, #1
+    LEAVE 0
+8:  mov  x0, #0
+    LEAVE 0
+
+// long Ldbl_unhex(char *s) -> bytes written over it (leaf)
+.macro DBL_NIB reg                        // a hex digit to its value, in place
+    sub  w15, \reg, #'0'
+    cmp  w15, #9
+    b.ls Ldn_\@
+    orr  w15, \reg, #0x20
+    sub  w15, w15, #('a' - 10)
+Ldn_\@:
+    and  \reg, w15, #15
+.endm
+Ldbl_unhex:
+    mov  x9, #0                           // in
+    mov  x10, #0                          // out
+1:  ldrb w11, [x0, x9]
+    cbz  w11, 3f
+    add  x12, x9, #1
+    ldrb w12, [x0, x12]
+    cbz  w12, 3f
+    DBL_NIB w11
+    DBL_NIB w12
+    orr  w13, w12, w11, lsl #4
+    strb w13, [x0, x10]
+    add  x10, x10, #1
+    add  x9, x9, #2
+    b    1b
+3:  mov  x0, x10
+    ret
+
+// long _pref_len(const char *key) -> the length of the string kept under key (0: none)
+_pref_len:
+    ENTER 0
+    mov  x19, x0
+    bl   _defaults
+    mov  x20, x0
+    mov  x0, x19
+    bl   _nsstr
+    mov  x2, x0
+    mov  x0, x20
+    MSG1 Ls_stringForKey
+    cbz  x0, 8f
+    MSG0 Ls_UTF8String
+    cbz  x0, 8f
+    bl   _strlen
+    LEAVE 0
+8:  mov  x0, #0
+    LEAVE 0
+
+// void _dbl_tick(void) — every second (scanner.s, ios_ui.s): fetch the list, daily, if the
+//   app says where from
+.globl _dbl_tick
+_dbl_tick:
+    ENTER 0
+    ADRL x9, Ldbl_url_text
+    ldrb w9, [x9]
+    cbz  w9, 9f
+    mov  x0, #0
+    bl   _time
+    ADRL x8, _g_dbl_next
+    ldr  x9, [x8]
+    cbnz x9, 1f
+    add  x9, x0, #30                      // the first time: 30 s after starting
+    str  x9, [x8]
+    b    9f
+1:  cmp  x0, x9
+    b.lo 9f
+    MOVI x10, 86400
+    add  x9, x0, x10
+    str  x9, [x8]
+    ADRL x0, Ls_get
+    ADRL x1, Ldbl_url_text
+    mov  x2, #0
+    mov  x3, #0
+    ADRL x4, Ls_tag_dbl
+    bl   _http
+9:  LEAVE 0
+
+// void _dbl_response(tag, json, long status, id error, NSData *data) — net.s ('d')
+.globl _dbl_response
+_dbl_response:
+    ENTER 0
+    cmp  x2, #200
+    b.ne 9f
+    cbz  x4, 9f
+    mov  x19, x4
+    bl   Ldbl_load
+    mov  x0, x19
+    MSG0 Ls_length
+    mov  x20, x0
+    mov  x0, x19
+    MSG0 Ls_bytes
+    mov  x1, x20
+    bl   Ldbl_take
+    cbz  x0, 9f
+    lsl  x0, x20, #1                      // kept, as hex, for the next start
+    add  x0, x0, #1
+    bl   _malloc
+    cbz  x0, 9f
+    mov  x21, x0
+    mov  x0, x19
+    MSG0 Ls_bytes
+    mov  x9, #0
+    ADRL x11, Ls_hex
+1:  cmp  x9, x20
+    b.hs 2f
+    ldrb w10, [x0, x9]
+    lsr  w12, w10, #4
+    ldrb w12, [x11, x12]
+    add  x13, x21, x9, lsl #1
+    strb w12, [x13]
+    and  w12, w10, #15
+    ldrb w12, [x11, x12]
+    strb w12, [x13, #1]
+    add  x9, x9, #1
+    b    1b
+2:  add  x13, x21, x20, lsl #1
+    strb wzr, [x13]
+    ADRL x0, Ls_k_dbl
+    mov  x1, x21
+    bl   _pref_set
+    mov  x0, x21
+    bl   _free
+    bl   _ui_lists_changed
+9:  LEAVE 0
+
+// ---------------------------------------------------------------------------
 // The filter, and what people said lately (for reports)
 
 // void _chat_clean(char *text) — the filter on what someone sent, unless it's off
@@ -257,6 +458,7 @@ _sf_report:
     str  x20, [sp]
     add  x9, sp, #96
     str  x9, [sp, #8]
+    str  x19, [sp, #16]                   // the full id: what the developer's blocklist takes
     bl   _snprintf
     mov  x22, #0                          // their lines, oldest first
     mov  x23, #0                          //   how many
@@ -754,6 +956,14 @@ _am_report_to_set:
     LEAVE 0
 
 // ---------------------------------------------------------------------------
+.section __TEXT,__const
+.p2align 3
+.include "dbl_key.inc"                    // the developer's public key and the list's URL
+.p2align 3
+Ldbl_ship:                                // the list shipped in this build (may be empty)
+.incbin "dbl_list.bin"
+Ldbl_ship_end:
+
 .section __TEXT,__cstring,cstring_literals
 Ls_hex:             .asciz "0123456789abcdef"
 Ls_nl:              .asciz "\n"
@@ -762,6 +972,13 @@ Ls_zero:            .asciz "0"
 Ls_k_blocked:       .asciz "blocked"
 Ls_k_filter:        .asciz "chatFilter"
 Ls_k_report:        .asciz "reportTo"
+Ls_k_dbl:           .asciz "devBlocklist"
+Ls_get:             .asciz "GET"
+Ls_tag_dbl:         .asciz "dbl"
+Ls_length:          .asciz "length"
+Ls_bytes:           .asciz "bytes"
+Ls_stringForKey:    .asciz "stringForKey:"
+Ls_UTF8String:      .asciz "UTF8String"
 Ls_w_all:           .asciz "all"
 Ls_w_block:         .asciz "block"
 Ls_w_unblock:       .asciz "unblock"
@@ -771,7 +988,7 @@ Ls_mailto:          .asciz "mailto:"
 Ls_q_subject:       .asciz "?subject="
 Ls_q_body:          .asciz "&body="
 Ls_rep_subject:     .asciz "asmmesh report: "
-Ls_rep_head:        .asciz "A report from asmmesh.\n\nAbout: %s (key %s)\n\nWhat they sent here lately:\n"
+Ls_rep_head:        .asciz "A report from asmmesh.\n\nAbout: %s (key %s, id %016llx)\n\nWhat they sent here lately:\n"
 Ls_rep_dash:        .asciz "- "
 Ls_rep_nolines:     .asciz "(nothing this device still has)\n"
 Ls_rep_tail:        .asciz "\nThey are blocked on the device that sent this report. Write what happened above."

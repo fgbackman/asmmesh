@@ -40,6 +40,8 @@ extern long nf_play_selftest(void) F(nf_play_selftest) __attribute__((weak));
 extern long ch_core_selftest(void) F(ch_core_selftest) __attribute__((weak));
 extern long ch_play_selftest(void) F(ch_play_selftest) __attribute__((weak));
 extern long cf_core_selftest(void) F(cf_core_selftest) __attribute__((weak));
+extern long dbl_core_selftest(void) F(dbl_core_selftest) __attribute__((weak));
+extern long dbl_verify(const void *, long, const void *) F(dbl_verify);
 extern long cf_filter(char *) F(cf_filter);
 extern long ch_fen_in(void *, const char *) F(ch_fen_in);
 extern unsigned long ch_perft(const void *, long) F(ch_perft);
@@ -214,7 +216,7 @@ static long unhex(const char *s, unsigned char *p) {
 int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IONBF, 0);   /* a crash shows right after the last test that ran */
     if (argc > 1 && !strcmp(argv[1], "selftest")) {
-        long f = bc_selftest() + bc_link_selftest() + bc_packet_selftest() + bc_peer_selftest() + term_selftest() + hue_core_selftest() + bc_noise_selftest() + nf_core_selftest() + nf_play_selftest() + ch_core_selftest() + ch_play_selftest() + cf_core_selftest();
+        long f = bc_selftest() + bc_link_selftest() + bc_packet_selftest() + bc_peer_selftest() + term_selftest() + hue_core_selftest() + bc_noise_selftest() + nf_core_selftest() + nf_play_selftest() + ch_core_selftest() + ch_play_selftest() + cf_core_selftest() + dbl_core_selftest();
         printf("%ld failed\n", f);
         return f != 0;
     }
@@ -388,6 +390,7 @@ int main(int argc, char **argv) {
         }
         else if (!strcmp(cmd, "nfcommit")) { nf_commit(A[0], be(A[1], 8), A[2][0], A[3][0], out); hex(out, 16); }
         else if (!strcmp(cmd, "cffilter")) { A[0][N[0]] = 0; long k = cf_filter((char *)A[0]); printf("%ld %s", k, A[0]); }
+        else if (!strcmp(cmd, "dblverify")) printf("%ld", dbl_verify(A[0], N[0], A[1]));
         else if (!strcmp(cmd, "nfhash")) { nf_hash(out); hex(out, 8); }
         else if (!strcmp(cmd, "expire")) printf("%ld", bc_peer_expire(bt, be(A[0], 8)));
         else printf("?");
