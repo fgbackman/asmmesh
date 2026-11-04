@@ -1078,6 +1078,8 @@ _am_nf_new:
 // ---------------------------------------------------------------------------
 .section __TEXT,__const
 Lnf_outer:      .byte 0, 1, 2, 3, 5, 6, 7, 8, 0
+
+.section __DATA,__const                   // a table of addresses: the linker fills them in
 .p2align 3
 Lhw_table:
     .quad Lhw_with, 0, Lhw_and, 0, Lhw_rounds, 1, Lhw_round, 1, Lhw_minutes, 2, Lhw_minute, 2
