@@ -37,6 +37,33 @@ extern long hue_core_selftest(void) F(hue_core_selftest) __attribute__((weak));
 extern long bc_noise_selftest(void) F(bc_noise_selftest) __attribute__((weak));
 extern long nf_core_selftest(void) F(nf_core_selftest) __attribute__((weak));
 extern long nf_play_selftest(void) F(nf_play_selftest) __attribute__((weak));
+extern long ch_core_selftest(void) F(ch_core_selftest) __attribute__((weak));
+extern long ch_fen_in(void *, const char *) F(ch_fen_in);
+extern unsigned long ch_perft(const void *, long) F(ch_perft);
+
+/* chperft: deeper perft than the self-tests, each against its published count */
+static int ch_perft_all(void) {
+    static const struct { const char *fen; int depth; unsigned long want; } t[] = {
+        { "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 4, 197281 },
+        { "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 5, 4865609 },
+        { "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1", 3, 97862 },
+        { "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 4, 43238 },
+        { "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 5, 674624 },
+        { "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", 4, 422333 },
+        { "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", 3, 62379 },
+        { "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", 3, 89890 },
+    };
+    unsigned char pos[136];
+    int bad = 0;
+    for (unsigned i = 0; i < sizeof t / sizeof t[0]; i++) {
+        ch_fen_in(pos, t[i].fen);
+        unsigned long n = ch_perft(pos, t[i].depth);
+        printf("%s  perft %d = %lu (want %lu)  %s\n", n == t[i].want ? "PASS" : "FAIL", t[i].depth, n, t[i].want, t[i].fen);
+        bad += n != t[i].want;
+    }
+    printf("%d failed\n", bad);
+    return bad != 0;
+}
 extern long nf_puzzle(unsigned long, void *) F(nf_puzzle);
 extern long nf_find(const void *, const void *, long) F(nf_find);
 extern void nf_commit(const void *, unsigned long, long, long, void *) F(nf_commit);
@@ -184,11 +211,12 @@ static long unhex(const char *s, unsigned char *p) {
 int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IONBF, 0);   /* a crash shows right after the last test that ran */
     if (argc > 1 && !strcmp(argv[1], "selftest")) {
-        long f = bc_selftest() + bc_link_selftest() + bc_packet_selftest() + bc_peer_selftest() + term_selftest() + hue_core_selftest() + bc_noise_selftest() + nf_core_selftest() + nf_play_selftest();
+        long f = bc_selftest() + bc_link_selftest() + bc_packet_selftest() + bc_peer_selftest() + term_selftest() + hue_core_selftest() + bc_noise_selftest() + nf_core_selftest() + nf_play_selftest() + ch_core_selftest();
         printf("%ld failed\n", f);
         return f != 0;
     }
     if (argc > 1 && !strcmp(argv[1], "nfdemo")) { nf_demo(); return 0; }
+    if (argc > 1 && !strcmp(argv[1], "chperft")) return ch_perft_all();
     static char line[300000];
     unsigned char ctx[208];
     static unsigned char ib[528], fa[8 * 8520], fout[16384], pay[8192], dd[8 + 1000 * 32], bt[32 * 256], pn[32 + 128 * 56];
