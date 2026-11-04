@@ -8,6 +8,11 @@
 .p2align 3
 Lf_acc:      .double 0.0, 0.0, 280.0, 24.0
 
+.data
+.p2align 3
+.globl _g_alert_float
+_g_alert_float: .quad 0                   // _alert_run: the next alert floats above everything
+
 .text
 .p2align 2
 
@@ -759,6 +764,20 @@ Lar_run:
     MSG0 Ls_sharedApplication
     mov  x2, #1
     MSG1 Ls_activateIgnoringOtherApps
+    ADRL x8, _g_alert_float               // one that mustn't wait unseen behind other apps'
+    ldr  x9, [x8]                         //   windows (macOS won't bring us forward)
+    cbz  x9, Lar_modal
+    str  xzr, [x8]
+    mov  x0, x24
+    MSG0 Ls_window
+    mov  x2, #25                          // NSStatusWindowLevel: above every app's windows
+    MSG1 Ls_setLevel
+    CLS  Ls_NSApplication
+    MSG0 Ls_sharedApplication
+    mov  x2, #0                           // NSCriticalRequest: the Dock icon bounces until seen
+    MSG1 Ls_requestUserAttention
+    bl   _NSBeep
+Lar_modal:
     mov  x0, x24
     MSG0 Ls_runModal
     mov  x19, x0
@@ -1492,6 +1511,9 @@ _invite_cb:
     mov  x1, #160
     ADRL x2, Ls_inv_nf_msg
     bl   _snprintf
+    ADRL x8, _g_alert_float           // a game won't wait: in front of everything
+    mov  x9, #1
+    str  x9, [x8]
     add  x0, sp, #96
     ADRL x1, Ls_inv_nf_info
     ADRL x2, Ls_inv_nf_join
@@ -1678,6 +1700,8 @@ Ls_name_msg:          .asciz "Your name on the mesh"
 Ls_name_info:         .asciz "Pick one or type your own, up to 23 characters. Everyone sees it next to your messages and in their People list."
 Ls_inv_msg:           .asciz "%s invites you to #%s"
 Ls_inv_nf_prefix:     .asciz "Ninefold "
+Ls_setLevel:          .asciz "setLevel:"
+Ls_requestUserAttention: .asciz "requestUserAttention:"
 Ls_inv_nf_msg:        .asciz "%s invites you to play Ninefold"
 Ls_inv_nf_info:       .asciz "A word game over the mesh: nine letters, a few minutes a round. Everyone\342\200\231s words stay hidden until the round ends, and only the players see the game."
 Ls_inv_nf_join:       .asciz "Join Game"
