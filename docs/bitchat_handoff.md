@@ -273,6 +273,8 @@ The original plan, for reference:
   Our messages go in pieces of 96 bytes.
 - **Signing bytes** are rebuilt from the wire (TTL 0, no signature, no RSR, padded), so compressed
   packets verify without recompressing.
-- **The protocol moves:** everything here follows bitchat commit `04995f6` (Oct 25, 2026). Check
-  its current `BinaryProtocol.swift`, `Packets.swift`, `BLEService.swift` and
-  `NoiseEncryptionService.swift` before Milestone 3.
+- **The protocol moves:** everything here follows bitchat commit `04995f6` (Oct 25, 2026).
+  `make bitchat-check` (`tools/bitchat/watch.py`) compares the 20 files that define bitchat's
+  wire format (`tools/bitchat/baseline.json`) at that commit and at bitchat's main now: every
+  constant changed, removed or added, and the commits. A scheduled task runs it weekly and
+  notifies on a change. After updating `src/bc_*.s`, `watch.py --accept` moves the baseline.

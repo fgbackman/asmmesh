@@ -1,0 +1,27 @@
+{
+  "commit": "04995f68e470a18d1fc99f86fa326c2a87bab4f2",
+  "date": "2026-10-25",
+  "note": "the bitchat commit src/bc_*.s follows; the files that define its wire format",
+  "files": [
+    "localPackages/BitFoundation/Sources/BitFoundation/BinaryProtocol.swift",
+    "localPackages/BitFoundation/Sources/BitFoundation/MessageType.swift",
+    "localPackages/BitFoundation/Sources/BitFoundation/PacketPayloadLimits.swift",
+    "localPackages/BitFoundation/Sources/BitFoundation/CompressionUtil.swift",
+    "localPackages/BitFoundation/Sources/BitFoundation/MessagePadding.swift",
+    "localPackages/BitFoundation/Sources/BitFoundation/AnnounceV2Packet.swift",
+    "bitchat/Protocols/Packets.swift",
+    "bitchat/Protocols/BitchatProtocol.swift",
+    "bitchat/Models/NoisePayload.swift",
+    "bitchat/Noise/NoiseProtocol.swift",
+    "bitchat/Noise/NoiseSession.swift",
+    "bitchat/Noise/NoiseSessionManager.swift",
+    "bitchat/Noise/NoiseSecurityConstants.swift",
+    "bitchat/Services/BLE/BLEService.swift",
+    "bitchat/Services/BLE/BLENoisePacketHandler.swift",
+    "bitchat/Services/BLE/BLEFragmentHandler.swift",
+    "bitchat/Services/BLE/BLEFragmentAssemblyBuffer.swift",
+    "bitchat/Services/BLE/BLEAnnounceHandler.swift",
+    "bitchat/Services/BLE/BLEIngressPacketGuard.swift",
+    "bitchat/Services/RelayController.swift"
+  ]
+}

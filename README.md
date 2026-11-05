@@ -239,6 +239,8 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
     src/test.s     `asmmesh --selftest`
     src/util.s     objc_msgSend shortcuts, NSString helpers, chat formatting
     src/macros.inc frame and messaging macros
+    tools/bitchat/ watch.py: has bitchat changed its protocol since the commit asmmesh follows?
+                   (`make bitchat-check`; baseline.json names that commit and the files)
     tools/qemu/    runs the bitchat and typing self-tests under qemu on Linux (run.sh), checks them against
                    Python's cryptography and a Python copy of bitchat's rules (run.sh diff), and lints (lint.py)
 

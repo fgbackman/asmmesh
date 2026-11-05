@@ -65,3 +65,8 @@ clean:
 	rm -rf $(OBJS) asmmesh $(APP)
 
 .PHONY: all run selftest install clean
+
+# has bitchat changed its protocol since the commit src/bc_*.s follows? (tools/bitchat/watch.py)
+bitchat-check:
+	python3 tools/bitchat/watch.py
+.PHONY: bitchat-check
