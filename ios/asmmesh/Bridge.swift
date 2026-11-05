@@ -62,6 +62,18 @@ func iosChPop() {
     Mesh.shared.showChess = true
 }
 
+// Fivefold (ff_mesh.s): the game changed / it should come up
+@_cdecl("ios_ff_changed")
+func iosFfChanged() {
+    Mesh.shared.fivefoldChanged()
+}
+
+@_cdecl("ios_ff_pop")
+func iosFfPop() {
+    Mesh.shared.fivefoldChanged()
+    Mesh.shared.showFivefold = true
+}
+
 // Files on Wi-Fi: its address as a QR code; "airdrop": pick files, then the share sheet
 @_cdecl("ios_show_qr")
 func iosShowQR(_ text: UnsafePointer<CChar>?) {

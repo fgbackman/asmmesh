@@ -662,6 +662,11 @@ Lst_mesh:
 1:  mov  x0, x19                      // a chess move in its room (ch_mesh.s)
     mov  x1, x20
     bl   _chm_typed
+    cbz  x0, 3f
+    LEAVE 0
+3:  mov  x0, x19                      // a Fivefold guess in its room (ff_mesh.s)
+    mov  x1, x20
+    bl   _ffm_typed
     cbz  x0, 2f
     LEAVE 0
 2:  mov  x0, x20                      // a device command typed here? run it in Home
@@ -1387,7 +1392,11 @@ Lrx_game:                             // a Ninefold packet in a room we're in
     b.ne 1f
     bl   _chm_rx
     b    Lrx_relay
-1:  bl   _nf_rx
+1:  cmp  w9, #'F'                     // 'F': Fivefold (ff_mesh.s)
+    b.ne 2f
+    bl   _ffm_rx
+    b    Lrx_relay
+2:  bl   _nf_rx
     b    Lrx_relay
 Lrx_msg_plain:                        // unencrypted: only fine in Main with no passphrase
     ldr  x9, [x19, #12]

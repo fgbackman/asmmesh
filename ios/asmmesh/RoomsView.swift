@@ -43,6 +43,7 @@ struct RoomList: View {
     let split: Bool
     @State private var newGame = false
     @State private var newChess = false
+    @State private var newFivefold = false
 
     var body: some View {
         ScrollView {
@@ -83,6 +84,23 @@ struct RoomList: View {
                     }
                     .buttonStyle(.plain)
                 }
+                if mesh.fivefold.mode >= 2 {
+                    Button { mesh.fivefoldChanged(); mesh.showFivefold = true } label: {
+                        Card(padding: 12) {
+                            HStack(spacing: 12) {
+                                IconBadge(symbol: "square.grid.3x2.fill", color: Theme.orange)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(mesh.fivefold.mode == 2 ? "Fivefold Race" : "Fivefold Duel")
+                                        .font(.headline).lineLimit(1)
+                                    Text(mesh.fivefold.status).font(.caption).foregroundStyle(Theme.dim).lineLimit(2)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.footnote).foregroundStyle(Theme.dim)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
                 ForEach(mesh.rooms) { room in
                     roomRow(room)
                 }
@@ -92,6 +110,10 @@ struct RoomList: View {
         .background(Theme.bg)
         .navigationTitle("Rooms")
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { newFivefold = true } label: { Image(systemName: "square.grid.3x2.fill") }
+                    .accessibilityLabel("Play Fivefold")
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { newChess = true } label: { Image(systemName: "checkerboard.rectangle") }
                     .accessibilityLabel("Play Chess")
@@ -110,6 +132,9 @@ struct RoomList: View {
         }
         .sheet(isPresented: $newChess) {
             ChessSheet().environmentObject(mesh)
+        }
+        .sheet(isPresented: $newFivefold) {
+            FivefoldSheet().environmentObject(mesh)
         }
     }
 

@@ -127,6 +127,19 @@ const char *am_ch_opponent(void);
 long am_ch_move(long from, long to);         // 1 if played
 void am_ch_say(const char *word);            // "resign", "draw"
 
+// Fivefold (ff_mesh.s): the game shown is a race or duel whose room is here, else today's word
+long am_ff_mode(void);                       // 0 none, 1 today's word, 2 race, 3 duel
+long am_ff_state(void);                      // 1 a duel: choosing their word, 2 guessing, 3 done
+long am_ff_room(void);                       // a race or duel's room index, or -1
+long am_ff_cell(long row, long col);         // letter << 8 | colour (0 1 2, 3 sent); 0 empty
+long am_ff_key(long letter);                 // 'a'-'z': 3 not tried, else its best colour
+long am_ff_status(char *buf, long cap);
+long am_ff_share(char *buf, long cap);       // the squares (never the word)
+long am_ff_others(char *buf, long cap);      // a race's other players and their colours
+long am_ff_try(const char *text);            // a guess (a duel's first: their word): row, or < 0
+const char *am_ff_why(long code);            // why a guess didn't count
+void am_ff_solo(void);                       // today's word, on the screen
+
 // block, report, the chat filter (safety.s)
 long am_blk_node(long node);                 // 1 if that person is blocked
 void am_blk_set_node(long node, long on);

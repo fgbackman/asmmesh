@@ -79,10 +79,11 @@ Lc_rc_r:     .double 0.70
 Lc_rc_g:     .double 1.0
 Lc_rc_b:     .double 0.80
 // frames: x, y, w, h
-Lf_roomslbl: .double 16.0, 610.0, 150.0, 16.0
+Lf_roomslbl: .double 16.0, 610.0, 66.0, 16.0
 Lf_addroom:  .double 206.0, 604.0, 36.0, 28.0
 Lf_ninefold: .double 166.0, 604.0, 36.0, 28.0   // the game button, left of +
 Lf_chessbtn: .double 126.0, 604.0, 36.0, 28.0   // chess, left of that
+Lf_ffbtn:    .double 86.0, 604.0, 36.0, 28.0    // Fivefold, left of chess
 Lf_rooms:    .double 6.0, 306.0, 240.0, 294.0
 Lf_peoplelbl: .double 16.0, 284.0, 196.0, 16.0
 Lf_people:   .double 6.0, 128.0, 240.0, 152.0
@@ -170,6 +171,13 @@ Lmethods:
     .quad Ls_m_chResign,    _chw_resign,        Ls_ty_v1
     .quad Ls_m_chDraw,      _chw_draw,          Ls_ty_v1
     .quad Ls_m_playChess,   _ch_dialog,         Ls_ty_v1
+    .quad Ls_m_playFivefold, _ff_dialog,        Ls_ty_v1
+    .quad Ls_m_ffTile,      _ffw_tile,          Ls_ty_v1
+    .quad Ls_m_ffKey,       _ffw_key,           Ls_ty_v1
+    .quad Ls_m_ffEnter,     _ffw_enter,         Ls_ty_v1
+    .quad Ls_m_ffShare,     _ffw_share,         Ls_ty_v1
+    .quad Ls_m_ffRace,      _ffw_race,          Ls_ty_v1
+    .quad Ls_m_ffDuel,      _ffw_duel,          Ls_ty_v1
     .quad Ls_m_blockPerson, _ui_block_person,   Ls_ty_v1
     .quad Ls_m_reportPerson, _ui_report_person, Ls_ty_v1
     .quad Ls_m_meshPass,    _crypto_dialog,     Ls_ty_v1
@@ -386,6 +394,8 @@ _build_ui:
     bl   Lmk_nf_button
     mov  x0, x21                      // and chess, left of it
     bl   Lmk_ch_button
+    mov  x0, x21                      // and Fivefold, left of chess
+    bl   Lmk_ff_button
 
     mov  x0, #8
     mov  x1, #0                       // no header
@@ -1310,6 +1320,11 @@ _build_menus:
     ADRL x3, Ls_key_8
     bl   _add_item
     mov  x0, x21
+    ADRL x1, Ls_ff_item
+    ADRL x2, Ls_m_playFivefold
+    ADRL x3, Ls_key_5
+    bl   _add_item
+    mov  x0, x21
     ADRL x1, Ls_block_item
     ADRL x2, Ls_m_blockPerson
     ADRL x3, Ls_empty
@@ -1635,6 +1650,45 @@ Lmk_nf_button:
     bl   _tooltip
     LEAVE 0
 
+// Lmk_ff_button(id content) — the amber Fivefold button left of chess: today's word
+Lmk_ff_button:
+    ENTER 0
+    mov  x21, x0
+    ADRL x0, Ls_empty
+    ADRL x1, Ls_m_playFivefold
+    mov  x2, #8
+    mov  x3, x21
+    ADRL x8, Lf_ffbtn
+    ldp  d0, d1, [x8]
+    ldp  d2, d3, [x8, #16]
+    bl   _mk_button
+    mov  x19, x0
+    mov  x1, #0xB82E
+    movk x1, #0xF5, lsl #16
+    mov  x2, #1
+    bl   _pill
+    ADRL x0, Ls_ff_symbol
+    bl   _symbol_image
+    cbz  x0, 1f
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_setImage
+    CLS  Ls_NSColor
+    MSG0 Ls_blackColor
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_setContentTintColor
+    b    2f
+1:  ADRL x0, Ls_ff_text
+    bl   _nsstr
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_setTitle
+2:  mov  x0, x19
+    ADRL x1, Ls_ff_tip
+    bl   _tooltip
+    LEAVE 0
+
 // Lmk_ch_button(id content) — the amber chess button left of ▦: Mesh › Play Chess…
 Lmk_ch_button:
     ENTER 0
@@ -1899,6 +1953,18 @@ Ls_key_8:              .asciz "8"
 Ls_chess_symbol:       .asciz "checkerboard.rectangle"
 Ls_chess_text:         .asciz "\342\231\236"
 Ls_chess_tip:          .asciz "Play Chess"
+Ls_m_playFivefold:     .asciz "playFivefold:"
+Ls_m_ffTile:           .asciz "ffTile:"
+Ls_m_ffKey:            .asciz "ffKey:"
+Ls_m_ffEnter:          .asciz "ffEnter:"
+Ls_m_ffShare:          .asciz "ffShare:"
+Ls_m_ffRace:           .asciz "ffRace:"
+Ls_m_ffDuel:           .asciz "ffDuel:"
+Ls_ff_item:            .asciz "Play Fivefold\342\200\246"
+Ls_key_5:              .asciz "5"
+Ls_ff_symbol:          .asciz "square.grid.3x2"
+Ls_ff_text:            .asciz "5"
+Ls_ff_tip:             .asciz "Fivefold: today\342\200\231s word, or a race or duel"
 Ls_m_meshPass:         .asciz "meshPassphrase:"
 Ls_m_fmShow:           .asciz "fmShow:"
 Ls_m_fmApply:          .asciz "fmApply:"

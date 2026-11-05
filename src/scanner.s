@@ -176,6 +176,7 @@ Ltk_second:
     bl   _bc_tick                     // bitchat: announce, forget people gone quiet
     bl   _nf_tick                     // Ninefold: the clock, rounds, reveals
     bl   _chm_tick                    // chess: moves sent again until answered
+    bl   _ffm_tick                    // Fivefold: words and guesses sent again
     bl   _dbl_tick                    // the developer's blocklist, fetched daily
 Ltk_hello:
     mov  x9, #150

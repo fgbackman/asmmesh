@@ -256,3 +256,19 @@ For where the bitchat work stands and what comes next, start with `docs/bitchat_
   dbl_core.s `_dbl_piece`, `_dbl_piece_in` (self-test 219); safety.s `_dbl_rx` (mesh.s
   Lrx_dbl), announces and paced sending in `_dbl_tick`. The web fetch only when defaults
   "blocklistFetch" is "1" (Home: blocklist fetch on/off); `blocklist` shows the state.
+
+## Fivefold, the five-letter word game (Nov 5, branch claude/ninefold)
+- New files: `src/ff_core.s`, `src/ff_play.s` (pure; qemu self-tests 220-223), `src/ff_mesh.s`
+  (Mac and iPhone), `src/ff_win.s` (Mac), `src/ff_defs.inc`, `src/ff_words.bin`
+  (`tools/ninefold/ff.py pack`), `ios/asmmesh/FivefoldView.swift`. `docs/fivefold/README.md`.
+- Game packets: byte 0 'F' (`_ffm_rx`, from mesh.s `Lrx_game`). Kinds FK_RACE 1 … FK_REVEAL 6.
+  mesh.s `Lst_mesh` asks `_ffm_typed` after chess. `_ffm_tick` next to `_chm_tick`.
+- Home words (rules.s): fivefold, fivefold today, fivefold share, fivefold race [with] A, B,
+  fivefold duel [with] A. Rooms "Fivefold <nick>" get the game wording in invites (ui.s,
+  ios_ui.s). Selecting the race/duel room brings the board up.
+- Two game structs: `_g_ffs` (today's, saved in defaults "fivefoldToday" as "day:w,w"),
+  `_g_ffg` (race or duel). The screens show `_g_ffg` while its room exists, else `_g_ffs`.
+- Hooks `_ff_ui_show`, `_ff_ui_pop` (ff_win.s on the Mac; ios_ui.s -> `ios_ff_changed` /
+  `ios_ff_pop`). Mac: Mesh › Play Fivefold… (⌘5), the amber button left of chess (x=86).
+- `tools/qemu/run.sh ffmesh` (ff_mesh.s with stand-ins, tests 224-226: today, race, duel).
+- Not tried on a Mac or iPhone yet.

@@ -154,6 +154,7 @@ _am_tick:
     bl   _bc_tick                     // bitchat: announce, forget people gone quiet
     bl   _nf_tick                     // Ninefold: the clock, rounds, reveals
     bl   _chm_tick                    // chess: moves sent again until answered
+    bl   _ffm_tick                    // Fivefold: words and guesses sent again
     bl   _dbl_tick                    // the developer's blocklist, fetched daily
     bl   _ios_alert_open              // a rule may ask something: not on top of another prompt
     cbnz x0, Lat_hello
@@ -295,7 +296,11 @@ _ui_select_room:
     str  xzr, [x8, #R_UNREAD]
     mov  x0, x19
     bl   _ios_select_room
-    LEAVE 0
+    bl   _am_ff_room                  // a Fivefold race or duel's room: its board
+    cmp  x0, x19
+    b.ne 1f
+    bl   _ff_ui_pop
+1:  LEAVE 0
 
 // void _ui_rooms_changed(void)
 .globl _ui_rooms_changed
@@ -1766,6 +1771,14 @@ _ch_ui_show:
 _ch_ui_pop:
     b    _ios_ch_pop
 
+// void _ff_ui_show(void), _ff_ui_pop(void) — Fivefold (ff_mesh.s): redraw, bring it up
+.globl _ff_ui_show
+_ff_ui_show:
+    b    _ios_ff_changed
+.globl _ff_ui_pop
+_ff_ui_pop:
+    b    _ios_ff_pop
+
 // void _nf_ui_pop(void) — the game's screen comes up (a game made or joined, every round)
 .globl _nf_ui_pop
 _nf_ui_pop:
@@ -1842,9 +1855,17 @@ _invite_cb:
     ADRL x1, Ls_inv_ch_prefix
     mov  x2, #6
     bl   _strncmp
-    cbnz w0, 1f
+    cbnz w0, 5f
     ADRL x2, Ls_inv_ch_msg
     ADRL x3, Ls_inv_ch_info
+    b    4f
+5:  add  x0, x19, #8                  // a Fivefold race or duel
+    ADRL x1, Ls_inv_ff_prefix
+    mov  x2, #9
+    bl   _strncmp
+    cbnz w0, 1f
+    ADRL x2, Ls_inv_ff_msg
+    ADRL x3, Ls_inv_ff_info
 4:  str  x3, [sp, #24]                // (the varargs area: snprintf reads [sp] only)
     add  x9, x19, #40
     str  x9, [sp]
@@ -2038,6 +2059,9 @@ Ls_name_info:         .asciz "Pick one or type your own, up to 23 characters. Ev
 Ls_inv_msg:           .asciz "%s invites you to #%s"
 Ls_inv_nf_prefix:     .asciz "Ninefold "
 Ls_inv_ch_prefix:     .asciz "Chess "
+Ls_inv_ff_prefix:     .asciz "Fivefold "
+Ls_inv_ff_msg:        .asciz "%s invites you to play Fivefold"
+Ls_inv_ff_info:       .asciz "Guess a five-letter word in six tries, over the mesh: a race (the same word for everyone) or a duel (each of you picks the other\342\200\231s word, sealed until the end). Only the players see the game."
 Ls_inv_ch_msg:        .asciz "%s invites you to play chess"
 Ls_inv_ch_info:       .asciz "A game of chess over the mesh: every move is checked on both devices, and only the two of you see the game."
 Ls_inv_nf_msg:        .asciz "%s invites you to play Ninefold"

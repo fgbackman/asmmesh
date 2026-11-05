@@ -156,6 +156,13 @@ Lsimple:
     .quad Lw_ninefold,       1, _h_ninefold, 0
     .quad Lw_chess,          0, _h_chess, 0
     .quad Lw_chess,          1, _h_chess, 0
+    .quad Lw_fivefold,       0, _h_fivefold, 1
+    .quad Lw_ff_today,       0, _h_fivefold, 1
+    .quad Lw_ff_share,       0, _h_fivefold, 4
+    .quad Lw_ff_race,        0, _h_fivefold, 5
+    .quad Lw_ff_race,        1, _h_fivefold, 2
+    .quad Lw_ff_duel,        0, _h_fivefold, 5
+    .quad Lw_ff_duel,        1, _h_fivefold, 3
     .quad Lw_block,          1, _h_safety, 1
     .quad Lw_unblock,        1, _h_safety, 2
     .quad Lw_blocked,        0, _h_safety, 3
@@ -2884,6 +2891,11 @@ Lw_bc_name:      .asciz "bitchat name"
 Lw_bc_chat:      .asciz "bitchat chat"
 Lw_ninefold:     .asciz "ninefold"
 Lw_chess:        .asciz "chess"
+Lw_fivefold:     .asciz "fivefold"
+Lw_ff_today:     .asciz "fivefold today"
+Lw_ff_share:     .asciz "fivefold share"
+Lw_ff_race:      .asciz "fivefold race"
+Lw_ff_duel:      .asciz "fivefold duel"
 Lw_block:        .asciz "block"
 Lw_unblock:      .asciz "unblock"
 Lw_blocked:      .asciz "blocked"

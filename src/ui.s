@@ -209,7 +209,11 @@ _ui_select_room:
     cmp  x0, x19
     b.ne 2f
     bl   _ch_ui_pop
-2:  bl   _term_hide                   // suggestions are Home's
+2:  bl   _am_ff_room                  // a Fivefold race or duel's room: its board
+    cmp  x0, x19
+    b.ne 3f
+    bl   _ff_ui_pop
+3:  bl   _term_hide                   // suggestions are Home's
     ADRL x8, _g_cur_room
     str  x19, [x8]
     ADRL x8, _g_rooms
@@ -1574,9 +1578,17 @@ _invite_cb:
     ADRL x1, Ls_inv_ch_prefix
     mov  x2, #6
     bl   _strncmp
-    cbnz w0, 1f
+    cbnz w0, 5f
     ADRL x2, Ls_inv_ch_msg
     ADRL x3, Ls_inv_ch_info
+    b    4f
+5:  add  x0, x19, #8                  // a Fivefold race or duel
+    ADRL x1, Ls_inv_ff_prefix
+    mov  x2, #9
+    bl   _strncmp
+    cbnz w0, 1f
+    ADRL x2, Ls_inv_ff_msg
+    ADRL x3, Ls_inv_ff_info
 4:  str  x3, [sp, #24]                // (the varargs area: snprintf reads [sp] only)
     add  x9, x19, #40
     str  x9, [sp]
@@ -1786,6 +1798,9 @@ Ls_ui_unblocked:      .asciz "\302\267 Unblocked %s."
 Ls_ui_pick:           .asciz "Pick someone in People first"
 Ls_ui_pick_info:      .asciz "Click a person in the People list, then choose Block Person or Report Person again. For a bitchat person, type block or report in your private chat with them."
 Ls_inv_ch_prefix:     .asciz "Chess "
+Ls_inv_ff_prefix:     .asciz "Fivefold "
+Ls_inv_ff_msg:        .asciz "%s invites you to play Fivefold"
+Ls_inv_ff_info:       .asciz "Guess a five-letter word in six tries, over the mesh: a race (the same word for everyone) or a duel (each of you picks the other\342\200\231s word, sealed until the end). Only the players see the game."
 Ls_inv_ch_msg:        .asciz "%s invites you to play chess"
 Ls_inv_ch_info:       .asciz "A game of chess over the mesh: every move is checked on both devices, and only the two of you see the game."
 Ls_setLevel:          .asciz "setLevel:"

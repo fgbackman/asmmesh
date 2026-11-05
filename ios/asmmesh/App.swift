@@ -81,6 +81,8 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $mesh.showGame) { GameScreen().environmentObject(mesh) }
         // chess too (ChessView.swift)
         .fullScreenCover(isPresented: $mesh.showChess) { ChessScreen().environmentObject(mesh) }
+        // and Fivefold (FivefoldView.swift)
+        .fullScreenCover(isPresented: $mesh.showFivefold) { FivefoldScreen().environmentObject(mesh) }
         .sheet(item: $mesh.qrText) { qr in
             QRSheet(text: qr.text)
                 .presentationDetents([.medium, .large])

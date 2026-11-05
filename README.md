@@ -116,6 +116,13 @@ Nine letters in a 3×3 grid; make words of 4 to 9 letters that use the centre le
 - **Secure and walled off:** every move, whoever sends it, is checked against the rules on both devices (illegal, out-of-turn and other people's moves are refused; catching up after a lost move only ever fills in the other player's moves). Game packets are sealed with the room's key. Over bitchat only text crosses the wall: the game never touches asmmesh's rooms, devices, rules or keys, and nothing from bitchat runs as a command. The rules engine is pure code, checked by perft (the count of every position a few moves deep, from standard test positions, against the published numbers: 4,865,609 at depth 5 from the start).
 - The game ends by checkmate, resignation, an agreed draw, stalemate, the fifty-move rule, threefold repetition, or when neither side can mate. One game at a time.
 
+## Fivefold: a five-letter word in six tries
+
+- **Today's word:** the amber Fivefold button left of chess above Rooms, **Mesh › Play Fivefold…** (⌘5), or `fivefold` in Home. On iPhone: the grid button on Rooms. The same word for everyone that day; type a guess and press Enter (or the on-screen keys). **Amber** is the right letter in the right place, **blue** is in the word somewhere else, **dark** isn't in it; the keyboard shows what you know of each letter. Your board is kept, so reopening the app doesn't give a fresh start. `fivefold share` (or Share) puts your squares in Main, never the word.
+- **A race:** `fivefold race with Anna, Sam` (or Race… in the window). An invite-only room, "Fivefold" and your name; everyone gets the same word (from a seed the host sends), and each sees the others' colours as they go, never their letters.
+- **A duel:** `fivefold duel with Anna` (or Duel…). Each of you types a five-letter word for the other; it's sealed (SHA-256 with a salt and your id) and can't be changed. Their device answers your guesses with colours and yours answers theirs; at the end both words are revealed and every answer is checked, so a lying answer is caught. Fewer guesses wins.
+- In a race's or duel's room, a single five-letter word is a guess; anything else is chat. Packets are sealed with the room's key. The words: 2,016 that can be the answer, 3,005 that count as guesses, from the same lists as Ninefold. How it works: `docs/fivefold/README.md`.
+
 ## Block, report, and the chat filter
 
 - **Block** someone: Mesh › Block Person (with them picked in People) on the Mac, their ⋯ in People on iPhone, or `block Anna` in Home; in a private bitchat chat, type `block`. Their messages, invitations, game moves and asks to join aren't shown or taken any more (their packets are still passed on for others: that's the mesh). `unblock Anna`, `unblock all`, `blocked` lists them. Kept between launches.
@@ -174,6 +181,10 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
     src/ch_play.s  a chess game, pure: turns, packets, catching up, how it ends, the board and moves as text
     src/ch_mesh.s  chess on the mesh and over bitchat text; Home's "chess", what the boards read
     src/ch_win.s   the Mac's chess window (src/nf_win.s: Ninefold's)
+    src/ff_core.s  Fivefold's rules, pure: the words (ff_words.bin), colours, today's word, a race's word, sealing
+    src/ff_play.s  a Fivefold game, pure: today's word, a race, a duel; packets, checks, the squares and status
+    src/ff_mesh.s  Fivefold on the mesh: Home's "fivefold", packets sent until taken, what the screens read
+    src/ff_win.s   the Mac's Fivefold window
     src/cf_core.s  the chat filter, pure (its words: cf_words.inc, made by tools/ninefold/make_chat_filter.py)
     src/safety.s   block, report, the filter's setting, the developer blocklist's loading and fetching, Home's words
     src/dbl_core.s the developer blocklist, pure: a signed list checked, an id looked up

@@ -164,6 +164,17 @@ struct Chess: Equatable {
     var opponent = ""
 }
 
+/// The Fivefold game, as the core has it (ff_mesh.s)
+struct Fivefold: Equatable {
+    var mode = 0             // 0 none, 1 today's word, 2 race, 3 duel
+    var state = 0            // 1 a duel: choosing their word, 2 guessing, 3 done
+    var room = -1
+    var cells = [Int](repeating: 0, count: 30)
+    var keys = [Int](repeating: 3, count: 26)
+    var status = ""
+    var others = ""
+}
+
 /// The Ninefold game, as the core has it (nf_mesh.s)
 struct Game: Equatable {
     struct Player: Equatable, Hashable { let name: String; let words: Int; let score: Int }
@@ -207,6 +218,8 @@ final class Mesh: ObservableObject {
     @Published var showGame = false      // the game full screen (GameScreen)
     @Published var chess = Chess()
     @Published var showChess = false     // the board full screen (ChessScreen)
+    @Published var fivefold = Fivefold()
+    @Published var showFivefold = false  // FivefoldScreen
     var talking: Bool { talkTitle.contains("Stop") }
 
     private var started = false
@@ -438,6 +451,24 @@ final class Mesh: ObservableObject {
         }
         if c != chess { chess = c }
         if c.state == 0 && showChess { showChess = false }
+    }
+
+    func fivefoldChanged() {
+        var f = Fivefold()
+        f.mode = am_ff_mode()
+        f.room = am_ff_room()
+        if f.mode != 0 {
+            f.state = am_ff_state()
+            for r in 0..<6 { for c in 0..<5 { f.cells[r * 5 + c] = am_ff_cell(r, c) } }
+            for k in 0..<26 { f.keys[k] = am_ff_key(97 + k) }
+            var buf = [CChar](repeating: 0, count: 1600)
+            _ = am_ff_status(&buf, 600)
+            f.status = String(cString: buf)
+            _ = am_ff_others(&buf, 1600)
+            f.others = String(cString: buf).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if f != fivefold { fivefold = f }
+        if f.mode == 0 && showFivefold { showFivefold = false }
     }
 
     /// Typed into the game room as if by keyboard: a word, "start", "shuffle"
