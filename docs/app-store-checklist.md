@@ -17,6 +17,10 @@ current pages when you get to it, because they change.
 - **Fivefold:** never say "Wordle" anywhere in the store listing (name, subtitle, keywords,
   description, screenshots): the NYT owns the name, and Apple pulled Wordle copies under 4.1
   in 2022. Call it "a five-letter word game"; its own name and amber/blue colours stay.
+- **bitchat:** say "works with bitchat" only (no logo, no hint of endorsement); review notes
+  explain the wall (nothing from bitchat runs as a command or reaches rooms, devices, keys)
+  and that block/report/filter cover bitchat chats; recheck bitchat's licence and credit it in
+  `CREDITS.md`; test against the current bitchat release just before submitting.
 - **Mac:** ship outside the store first (Developer ID + notarization); the sandbox list is in
   section 5.
 
