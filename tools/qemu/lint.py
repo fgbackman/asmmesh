@@ -1,6 +1,9 @@
 # lint.py — checks for mistakes the assembler doesn't catch, in src/*.s:
 #   - a function whose LEAVE doesn't match its ENTER (the stack would come back wrong)
 #   - bc_ble.s's LINK macro given x17, its scratch register, or the same register twice
+#   - a list of strings (an .asciz with no label of its own) in __cstring: the Mac's linker
+#     treats each string there on its own (merges, moves, drops the empty end), breaking
+#     the list, though Linux keeps it (so qemu passes); such lists belong in __TEXT,__const
 # Usage: python3 tools/qemu/lint.py   (exit 1 if anything is found)
 import glob, os, re, sys
 
@@ -26,5 +29,32 @@ for f in sorted(glob.glob(os.path.join(src, '*.s'))):
             print('%s:%d: LINK %s, %s: x17 is its scratch, and the two must differ'
                   % (os.path.basename(f), n, m.group(1), m.group(2)))
             bad += 1
+
+def cstring_lists(path, shown, in_cstring=False):
+    """unlabelled .asciz lines in __cstring (following .include into .inc files)"""
+    found = 0
+    labelled = False
+    for n, line in enumerate(open(path, errors='replace'), 1):
+        code = line.split('//')[0].strip()
+        if code.startswith('.section') or code in ('.text', '.data'):
+            in_cstring = 'cstring' in code
+            continue
+        inc = re.match(r'\.include\s+"([\w.]+)"', code)
+        if inc and in_cstring:
+            found += cstring_lists(os.path.join(src, inc.group(1)), shown, True)
+            continue
+        if re.match(r'^[\w.]+:\s*$', code):
+            labelled = True
+            continue
+        if in_cstring and code.startswith('.asciz') and not labelled:
+            print('%s:%d: a string with no label in __cstring (a list? put it in __TEXT,__const)'
+                  % (os.path.basename(path), n))
+            found += 1
+        if code:
+            labelled = False
+    return found
+
+for f in sorted(glob.glob(os.path.join(src, '*.s'))):
+    bad += cstring_lists(f, set())
 print('%d found' % bad)
 sys.exit(1 if bad else 0)

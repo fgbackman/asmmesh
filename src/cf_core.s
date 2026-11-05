@@ -218,13 +218,18 @@ Lcf_tests:
     .quad Lct_i8, Lct_o8, 1
     .quad 0, 0, 0
 
-.section __TEXT,__cstring,cstring_literals
+// the lists: strings one after another, an empty one last. Not in __cstring: the Mac's
+// linker treats each string there on its own (merges the same ones, moves them, drops the
+// empty end), which breaks a list; __TEXT,__const keeps them as written.
+.section __TEXT,__const
 .include "cf_words.inc"
 Lcf_names:
     .asciz "dick"
     .asciz "mongol"
     .asciz "coon"
     .byte 0
+
+.section __TEXT,__cstring,cstring_literals
 Lct_i1:         .asciz "what the fuck is this"
 Lct_o1:         .asciz "what the f*** is this"
 Lct_i2:         .asciz "Shit happens"
