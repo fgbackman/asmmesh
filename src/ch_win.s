@@ -16,6 +16,7 @@ _g_chw_btn:     .space 512                // 64 buttons, by place on screen (0 t
 .zerofill __DATA,__bss,_g_chw_shown,128,4 // what each shows now: piece, colour
 .zerofill __DATA,__bss,_g_chw_targets,32,4
 _g_chw_ntargets: .quad 0
+_g_chw_style:   .quad 0, 0                // the pieces' text attributes: white, black
 .zerofill __DATA,__bss,_g_chw_buf,2048,4
 .zerofill __DATA,__bss,_g_chw_text,2048,4
 
@@ -24,7 +25,12 @@ _g_chw_ntargets: .quad 0
 Lw_zero:    .double 0.0
 Lw_W:       .double 520.0
 Lw_H:       .double 640.0
-Lw_glyph:   .double 34.0
+Lw_glyph:   .double 42.0
+Lw_stroke:  .double -2.5
+Lw_sh_x:    .double 1.5
+Lw_sh_y:    .double -2.5
+Lw_sh_blur: .double 3.0
+Lw_sh_alpha: .double 0.55
 Lw_s13:     .double 13.0
 Lw_sq:      .double 56.0
 Lw_x0:      .double 36.0
@@ -203,7 +209,8 @@ Lcw_colour:
 4:  mov  x0, x20
     LEAVE 0
 
-// Lcw_draw(x0 button, x1 piece, x2 colour index) — a square: its colour and its piece
+// Lcw_draw(x0 button, x1 piece, x2 colour index) — a square: its colour and its piece, drawn
+//   as the solid figure (white or black, with an outline and a shadow), never as an emoji
 Lcw_draw:
     ENTER 16
     mov  x19, x0
@@ -214,20 +221,14 @@ Lcw_draw:
     mov  x2, x0
     mov  x0, x19
     MSG1 Ls_setBezelColor
-    ADRL x8, Lw_glyphs                    // the piece's symbol (4 bytes each)
-    and  x9, x20, #15
-    ldr  w9, [x8, x9, lsl #2]
-    str  w9, [sp, #96]
-    strb wzr, [sp, #100]
-    LDD  d0, Lw_glyph
-    mov  w0, #0
-    bl   _font
-    mov  x21, x0
-    CLS  Ls_NSColor
-    MSG0 Ls_blackColor
-    mov  x1, x0
-    mov  x0, x21
-    bl   _dict2
+    ADRL x8, Lw_glyphs                    // the piece's figure (8 bytes each)
+    and  x9, x20, #7
+    ldr  x9, [x8, x9, lsl #3]
+    str  x9, [sp, #96]
+    strb wzr, [sp, #104]
+    tst  x20, #8                          // its look: white or black
+    cset x0, ne
+    bl   Lcw_style
     mov  x21, x0
     add  x0, sp, #96
     bl   _nsstr
@@ -241,6 +242,84 @@ Lcw_draw:
     mov  x0, x19
     MSG1 Ls_setAttributedTitle
     LEAVE 16
+
+// id Lcw_style(x0 0 white, 1 black) -> the pieces' text attributes, made once: a big bold
+//   font, the fill, an outline in the other colour, a drop shadow
+Lcw_style:
+    ENTER 48                              // [96] objects (5)  [136] keys (5)
+    mov  x19, x0
+    ADRL x8, _g_chw_style
+    ldr  x0, [x8, x19, lsl #3]
+    cbnz x0, 9f
+    LDD  d0, Lw_glyph
+    mov  w0, #1
+    bl   _font
+    str  x0, [sp, #96]
+    CLS  Ls_NSColor                       // fill: white or black
+    ADRL x1, Ls_whiteColor
+    cbz  x19, 1f
+    ADRL x1, Ls_blackColor
+1:  bl   _msg0
+    str  x0, [sp, #104]
+    mov  x0, #0x1A1A                      // outline: near black, or light grey
+    movk x0, #0x1A, lsl #16
+    cbz  x19, 2f
+    mov  x0, #0xD0D0
+    movk x0, #0xD0, lsl #16
+2:  bl   _rgb
+    str  x0, [sp, #112]
+    CLS  Ls_NSNumber                      // stroke width: negative = fill and outline
+    mov  x21, x0
+    SELX1 Ls_numberWithDouble             // (after the class: CLS would wipe x1)
+    mov  x0, x21
+    LDD  d0, Lw_stroke
+    bl   _objc_msgSend
+    str  x0, [sp, #120]
+    CLS  Ls_NSShadow                      // the shadow
+    MSG0 Ls_new
+    mov  x20, x0
+    SELX1 Ls_setShadowOffset
+    mov  x0, x20
+    LDD  d0, Lw_sh_x
+    LDD  d1, Lw_sh_y
+    bl   _objc_msgSend
+    SELX1 Ls_setShadowBlurRadius
+    mov  x0, x20
+    LDD  d0, Lw_sh_blur
+    bl   _objc_msgSend
+    CLS  Ls_NSColor
+    mov  x21, x0
+    SELX1 Ls_colorWithWhite
+    mov  x0, x21
+    LDD  d0, Lw_zero
+    LDD  d1, Lw_sh_alpha
+    bl   _objc_msgSend
+    mov  x2, x0
+    mov  x0, x20
+    MSG1 Ls_setShadowColor
+    str  x20, [sp, #128]
+    LDGOT x8, _NSFontAttributeName        // the keys
+    ldr  x9, [x8]
+    LDGOT x8, _NSForegroundColorAttributeName
+    ldr  x10, [x8]
+    stp  x9, x10, [sp, #136]
+    LDGOT x8, _NSStrokeColorAttributeName
+    ldr  x9, [x8]
+    LDGOT x8, _NSStrokeWidthAttributeName
+    ldr  x10, [x8]
+    stp  x9, x10, [sp, #152]
+    LDGOT x8, _NSShadowAttributeName
+    ldr  x9, [x8]
+    str  x9, [sp, #168]
+    CLS  Ls_NSDictionary
+    add  x2, sp, #96
+    add  x3, sp, #136
+    mov  x4, #5
+    MSG3 Ls_dictWithObjectsForKeys
+    MSG0 Ls_retain
+    ADRL x8, _g_chw_style
+    str  x0, [x8, x19, lsl #3]
+9:  LEAVE 48
 
 // Lcw_build — the window, once
 Lcw_build:
@@ -445,23 +524,15 @@ _ch_dialog:
 
 // ---------------------------------------------------------------------------
 .section __TEXT,__const
-Lw_glyphs:
-    .byte 0x20, 0, 0, 0                   // empty
-    .byte 0xE2, 0x99, 0x99, 0             // ♙ ♘ ♗ ♖ ♕ ♔
-    .byte 0xE2, 0x99, 0x98, 0
-    .byte 0xE2, 0x99, 0x97, 0
-    .byte 0xE2, 0x99, 0x96, 0
-    .byte 0xE2, 0x99, 0x95, 0
-    .byte 0xE2, 0x99, 0x94, 0
-    .byte 0x20, 0, 0, 0
-    .byte 0x20, 0, 0, 0
-    .byte 0xE2, 0x99, 0x9F, 0             // ♟ ♞ ♝ ♜ ♛ ♚
-    .byte 0xE2, 0x99, 0x9E, 0
-    .byte 0xE2, 0x99, 0x9D, 0
-    .byte 0xE2, 0x99, 0x9C, 0
-    .byte 0xE2, 0x99, 0x9B, 0
-    .byte 0xE2, 0x99, 0x9A, 0
-    .byte 0x20, 0, 0, 0
+Lw_glyphs:                                // by piece type: the solid figure + U+FE0E
+    .byte 0x20, 0, 0, 0, 0, 0, 0, 0       // empty
+    .byte 0xE2, 0x99, 0x9F, 0xEF, 0xB8, 0x8E, 0, 0   // pawn
+    .byte 0xE2, 0x99, 0x9E, 0xEF, 0xB8, 0x8E, 0, 0   // knight
+    .byte 0xE2, 0x99, 0x9D, 0xEF, 0xB8, 0x8E, 0, 0   // bishop
+    .byte 0xE2, 0x99, 0x9C, 0xEF, 0xB8, 0x8E, 0, 0   // rook
+    .byte 0xE2, 0x99, 0x9B, 0xEF, 0xB8, 0x8E, 0, 0   // queen
+    .byte 0xE2, 0x99, 0x9A, 0xEF, 0xB8, 0x8E, 0, 0   // king
+    .byte 0x20, 0, 0, 0, 0, 0, 0, 0
 
 .section __TEXT,__cstring,cstring_literals
 Ls_empty:           .asciz ""
@@ -490,6 +561,18 @@ Ls_setString:       .asciz "setString:"
 Ls_scrollToEndOfDocument: .asciz "scrollToEndOfDocument:"
 Ls_setBezelColor:   .asciz "setBezelColor:"
 Ls_blackColor:      .asciz "blackColor"
+Ls_whiteColor:      .asciz "whiteColor"
+Ls_NSNumber:        .asciz "NSNumber"
+Ls_numberWithDouble: .asciz "numberWithDouble:"
+Ls_NSShadow:        .asciz "NSShadow"
+Ls_new:             .asciz "new"
+Ls_setShadowOffset: .asciz "setShadowOffset:"
+Ls_setShadowBlurRadius: .asciz "setShadowBlurRadius:"
+Ls_setShadowColor:  .asciz "setShadowColor:"
+Ls_colorWithWhite:  .asciz "colorWithWhite:alpha:"
+Ls_NSDictionary:    .asciz "NSDictionary"
+Ls_dictWithObjectsForKeys: .asciz "dictionaryWithObjects:forKeys:count:"
+Ls_retain:          .asciz "retain"
 Ls_alloc:           .asciz "alloc"
 Ls_initWithStringAttributes: .asciz "initWithString:attributes:"
 Ls_setAttributedTitle: .asciz "setAttributedTitle:"

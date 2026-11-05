@@ -75,10 +75,7 @@ struct ChessScreen: View {
         return Button { tap(sq) } label: {
             ZStack {
                 colour
-                Text(Self.glyph(c.pieces[sq]))
-                    .font(.system(size: 30))
-                    .foregroundStyle(.black)
-                    .minimumScaleFactor(0.5)
+                Self.piece(c.pieces[sq])
             }
             .aspectRatio(1, contentMode: .fit)
         }
@@ -104,9 +101,28 @@ struct ChessScreen: View {
         if n > 0 { picked = sq; targets = Set(out.prefix(n).map { Int($0) }) } else { picked = nil; targets = [] }
     }
 
+    /// The solid figure for both sides (U+FE0E: as text, never the pawn's emoji), white with
+    /// a dark outline or black with a light one, and a drop shadow
+    @ViewBuilder static func piece(_ p: Int) -> some View {
+        let g = glyph(p)
+        if !g.isEmpty {
+            let black = p & 8 != 0
+            let edge: Color = black ? Color(white: 0.85) : Color(white: 0.08)
+            Text(g)
+                .font(.system(size: 36, weight: .black))
+                .minimumScaleFactor(0.4)
+                .foregroundStyle(black ? Color.black : Color.white)
+                .shadow(color: edge, radius: 0, x: 1, y: 0)      // an outline, from four sides
+                .shadow(color: edge, radius: 0, x: -1, y: 0)
+                .shadow(color: edge, radius: 0, x: 0, y: 1)
+                .shadow(color: edge, radius: 0, x: 0, y: -1)
+                .shadow(color: .black.opacity(0.55), radius: 3, x: 1.5, y: 2.5)
+        }
+    }
+
     static func glyph(_ p: Int) -> String {
-        ["", "\u{2659}", "\u{2658}", "\u{2657}", "\u{2656}", "\u{2655}", "\u{2654}", "", "",
-         "\u{265F}", "\u{265E}", "\u{265D}", "\u{265C}", "\u{265B}", "\u{265A}", ""][p & 15]
+        let solid = ["", "\u{265F}", "\u{265E}", "\u{265D}", "\u{265C}", "\u{265B}", "\u{265A}", ""][p & 7]
+        return solid.isEmpty ? "" : solid + "\u{FE0E}"
     }
     static func name(_ sq: Int) -> String {
         String(UnicodeScalar(UInt8(97 + (sq & 7)))) + String((sq >> 4) + 1)
