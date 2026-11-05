@@ -272,3 +272,8 @@ For where the bitchat work stands and what comes next, start with `docs/bitchat_
   `ios_ff_pop`). Mac: Mesh › Play Fivefold… (⌘5), the amber button left of chess (x=86).
 - `tools/qemu/run.sh ffmesh` (ff_mesh.s with stand-ins, tests 224-226: today, race, duel).
 - Not tried on a Mac or iPhone yet.
+
+## When the user starts on the App Store (they asked to be reminded)
+- Bring up "Reminders saved for when the App Store work starts" at the top of
+  `docs/app-store-checklist.md` first: SPIN gestures 20-24 beyond SPIN's spec, CREDITS.md in
+  About, hiding web pages on iPhone, the Mac outside the store first.

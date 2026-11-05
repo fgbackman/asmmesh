@@ -5,6 +5,18 @@ App Store (iPhone and iPad) and the Mac App Store. Each item says what's done al
 follows Apple's App Review Guidelines as we know them; check each point against Apple's
 current pages when you get to it, because they change.
 
+## Reminders saved for when the App Store work starts
+
+- **SPIN remote:** gestures 20-24 (touch-scroll, double-tap, sleep/wake) and the old LED
+  service go beyond SPIN's published spec (they came from SPIN's Android app). Decide whether
+  to keep them or limit the store build to the documented gestures 0-19. Show `CREDITS.md`
+  (SPIN's MIT notice) in the app's About. Review notes: the app works without a SPIN; offer
+  a video.
+- **Web pages over the mesh:** hide them on iPhone for the first submission (unfiltered web
+  access means a 17+ rating).
+- **Mac:** ship outside the store first (Developer ID + notarization); the sandbox list is in
+  section 5.
+
 - ✅ done
 - ⬜ to do
 - ⚠️ a decision, or a risk that review may reject it
