@@ -14,6 +14,9 @@ current pages when you get to it, because they change.
   a video.
 - **Web pages over the mesh:** hide them on iPhone for the first submission (unfiltered web
   access means a 17+ rating).
+- **Fivefold:** never say "Wordle" anywhere in the store listing (name, subtitle, keywords,
+  description, screenshots): the NYT owns the name, and Apple pulled Wordle copies under 4.1
+  in 2022. Call it "a five-letter word game"; its own name and amber/blue colours stay.
 - **Mac:** ship outside the store first (Developer ID + notarization); the sandbox list is in
   section 5.
 
