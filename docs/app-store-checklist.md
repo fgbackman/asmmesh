@@ -55,7 +55,7 @@ must still make sense alone: see 4.
 | Privacy policy at a public URL: what's stored on the device (Keychain keys, room keys, history, rules), what goes over the mesh, what goes to which services (Hue, SmartThings, Home Assistant, LIFX, Govee, ntfy, Pushover, weather) | ⬜ |
 | App Store "privacy nutrition label": most likely "Data Not Collected" by the developer, but answer it for location, audio and identifiers honestly                          | ⬜    |
 | Export compliance: asmmesh uses encryption beyond HTTPS (P-256, X25519, Ed25519, ChaCha20-Poly1305, AES). Set `ITSAppUsesNonExemptEncryption` and answer App Store Connect's questions; this usually means a yearly self-classification report to the US Bureau of Industry and Security, and some countries (France) ask for a declaration | ⬜ ⚠️ |
-| Credits in the app (About): ENABLE (public domain), SCOWL, wordfreq, WordNet, LDNOOBW (CC BY 4.0), Wiktionary (CC BY-SA 4.0): `tools/ninefold/SOURCES.md` | ⬜ |
+| Credits in the app (About): `CREDITS.md` — SPIN remote's MIT notice, and ENABLE (public domain), SCOWL, wordfreq, WordNet, LDNOOBW (CC BY 4.0), Wiktionary (CC BY-SA 4.0) from `tools/ninefold/SOURCES.md` | ✅ written, ⬜ shown in the app |
 
 ## 4. App Review: what's likely to be looked at
 
@@ -69,6 +69,7 @@ must still make sense alone: see 4.
 | 2.5.1 Public APIs only            | Mac: `IOBluetoothDevice batteryPercentSingle/Left/Right` are not documented (AirPods' batteries) and may count as private API; `system_profiler` is a public tool | ⬜ ⚠️ |
 | 4.2 Minimum functionality         | Fine: a lot works without other people                                                                                                         | ✅     |
 | 5.1.2 Data use                    | Nothing is sent to the developer; say so                                                                                                       | ✅     |
+| SPIN remote                       | Follows SPIN's published, MIT-licensed developer spec (`CREDITS.md`); gestures 20-24 go beyond it. Review notes: the app works fully without a SPIN; offer a video | ✅ ⬜ the notes |
 | 5.2 Intellectual property         | Names of other products (Hue, SmartThings, bitchat, AirPods) only to say what it works with; no logos. Ninefold is our own game and puzzles   | ✅ ⬜ reread the texts |
 | 4.7 / 2.5.2 Code that downloads code | none                                                                                                                                         | ✅     |
 | Interop with bitchat              | asmmesh talks to another app's open protocol; keep it walled off as now, and say so in the review notes                                        | ⚠️    |

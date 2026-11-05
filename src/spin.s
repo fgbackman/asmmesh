@@ -2,7 +2,11 @@
 // as an input device for asmmesh. Spin it, tap it, swipe its top; each gesture drives
 // your lights, TV, rooms — and a long press is a panic button.
 //
-// Protocol reverse-engineered from the SPIN remote Android app (see docs/spin_protocol.md).
+// Protocol: SPIN remote B.V.'s published spec, "SPIN remote Bluetooth Smart Services v1.0",
+// in their MIT-licensed SDK (github.com/SPINremote/sdc-1-quickstart-ios): the service, the
+// Command characteristic (08 01 force action notifications, 09 R G B set the LED colour) and
+// the Action characteristic (gestures 0-19). Gestures 20-24 and the older LED service (a
+// fallback) are beyond that spec, from SPIN's own app. See docs/spin_protocol.md, CREDITS.md.
 //   interaction service  5E5A10D3-6EC7-17AF-D743-3CF1679C1CC7
 //     action char        182BEC1F-51A4-458E-4B48-C431EA701A3B   notify, 1 byte = gesture
 //   LED service          BDF1ED51-6FF4-9DB7-F646-007627DD7DF3
@@ -10,7 +14,7 @@
 // No proprietary handshake: we just subscribe to notifications. macOS may ask to pair
 // the remote the first time; that's normal.
 //
-// gesture bytes (from the app's enum):
+// gesture bytes (0-19 in the spec; 20-24 from SPIN's app):
 //   0/1 spin CW/CCW (right side up)   2/3 on its side   4/5 upside down
 //   6-9 swipe up/down/left/right      10-14 press N/S/E/W/center
 //   15-19 long-press N/S/E/W/center   20/21 touch-scroll CW/CCW

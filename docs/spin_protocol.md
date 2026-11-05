@@ -1,5 +1,16 @@
-# SPIN remote (SDC1) BLE protocol — reverse-engineered from SPIN remote v1.1.0.14 APK
-# package com.spinremote.sdc1sdk / com.spinremote.spinble
+# SPIN remote (SDC-1) Bluetooth LE protocol
+
+**Source:** SPIN remote B.V. publishes the protocol for developers: *SPIN remote Bluetooth
+Smart Services v1.0* (27-01-2017), a PDF in their SDK
+[github.com/SPINremote/sdc-1-quickstart-ios](https://github.com/SPINremote/sdc-1-quickstart-ios),
+MIT licence, © 2017 SPIN remote B.V. (see `CREDITS.md`). It covers the SPIN service
+`5E5A10D3-…`, the Command characteristic `92E92B18-…` (`08 01`: force action notifications;
+`09 R G B`: set the LED colour; `07`: cancel the LED override) and the Action characteristic
+`182BEC1F-…` (gestures 0-19).
+
+**Beyond the spec** (marked reserved there): gestures 20-24, the other characteristics and the
+LED service below. We noted these from SPIN's own Android app (v1.1.0.14). asmmesh uses only
+gestures 20-24 and, for older firmware without the Command characteristic, the LED service.
 
 Connect as BLE central. No proprietary auth for reading gestures — just enable
 notifications (write CCCD 0x2902 = 01 00) on the action characteristic.
