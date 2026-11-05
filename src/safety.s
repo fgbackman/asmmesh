@@ -17,6 +17,10 @@
 .set REC_TEXT,      184
 .set REC_SIZE,      200          // id (8), room id (8), text (184)
 .set DBL_BYTES,     (16 + 8 * 4096 + 64)
+.set DBL_GOSSIP,    8192          // shared over the mesh up to this size (dbl_core.s)
+.set DA_TOTAL,      8
+.set DA_BUF,        40
+.set DA_SIZE,       (40 + 8192)
 
 .data
 .p2align 3
@@ -33,6 +37,12 @@ _g_rec_pos:     .quad 0
 _g_dbl_n:       .quad -1          // its ids; -1 not read yet
 _g_dbl_ver:     .quad 0
 _g_dbl_next:    .quad 0           // when to fetch it next
+_g_dbl_src:     .quad 0           // where ours came from: 1 this app, 2 the web, 3 the mesh
+_g_dbl_ann:     .quad 0           // when we next say which version we have
+_g_dbl_until:   .quad 0           // sending ours to a neighbour until then
+_g_dbl_pos:     .quad 0           //   the next piece
+.zerofill __DATA,__bss,_g_dbl_da,DA_SIZE,4  // a list coming in pieces (dbl_core.s)
+.zerofill __DATA,__bss,_g_dbl_pkt,256,4
 
 .text
 .p2align 2
@@ -209,6 +219,11 @@ Ldbl_load:
     ADRL x1, Ldbl_ship_end
     sub  x1, x1, x0
     bl   Ldbl_take
+    cbz  x0, 1f
+    ADRL x8, _g_dbl_src
+    mov  x9, #1
+    str  x9, [x8]
+1:
     ADRL x0, Ls_k_dbl                     // fetched (as hex in the defaults)
     bl   _pref_len
     cbz  x0, 9f
@@ -226,8 +241,22 @@ Ldbl_load:
     mov  x1, x0
     mov  x0, x20
     bl   Ldbl_take
+    mov  x21, x0
     mov  x0, x20
     bl   _free
+    cbz  x21, 9f
+    ADRL x0, Ls_k_dblfrom                 // where that one came from (2 web, 3 mesh)
+    ADRL x1, _g_sf_to
+    mov  x2, #8
+    bl   _pref_get
+    ADRL x8, _g_sf_to
+    ldrb w9, [x8]
+    sub  w9, w9, #'0'
+    cmp  w9, #3
+    mov  w10, #2
+    csel w9, w10, w9, hi
+    ADRL x8, _g_dbl_src
+    str  x9, [x8]
 9:  LEAVE 0
 
 // long Ldbl_take(data, len) -> 1 if it was a good list newer than ours, and is ours now
@@ -307,26 +336,72 @@ _pref_len:
 8:  mov  x0, #0
     LEAVE 0
 
-// void _dbl_tick(void) — every second (scanner.s, ios_ui.s): fetch the list, daily, if the
-//   app says where from
+// void _dbl_tick(void) — every second (scanner.s, ios_ui.s): say which version we have to
+//   our neighbours (once a minute), send ours in pieces to one that's behind (2 a second),
+//   and, only if switched on (blocklist fetch on), fetch it from the web once a day
 .globl _dbl_tick
 _dbl_tick:
-    ENTER 0
-    ADRL x9, Ldbl_url_text
-    ldrb w9, [x9]
-    cbz  w9, 9f
+    ENTER 16
+    bl   Ldbl_load
     mov  x0, #0
     bl   _time
+    mov  x19, x0
+    ADRL x8, _g_dbl_ann                   // which version we have
+    ldr  x9, [x8]
+    cmp  x19, x9
+    b.lo 1f
+    add  x9, x19, #60
+    str  x9, [x8]
+    mov  x0, #0xFFFF
+    mov  x1, #0
+    mov  x2, #0
+    bl   Ldbl_send
+1:  ADRL x8, _g_dbl_until                 // ours, to a neighbour that's behind
+    ldr  x9, [x8]
+    cmp  x19, x9
+    b.hs 3f
+    mov  x20, #2
+2:  bl   Ldbl_bytes
+    mov  x21, x0
+    cbz  x21, 3f
+    ADRL x8, _g_dbl_pos
+    ldr  x22, [x8]
+    lsl  x9, x22, #7
+    cmp  x9, x21
+    csel x22, xzr, x22, hs                // round again from the start
+    add  x9, x22, #1
+    str  x9, [x8]
+    ADRL x0, _g_dbl
+    mov  x1, x21
+    mov  x2, x22
+    ADRL x3, _g_sf_buf
+    bl   _dbl_piece
+    mov  x2, x0
+    lsl  x0, x22, #7
+    ADRL x1, _g_sf_buf
+    bl   Ldbl_send
+    subs x20, x20, #1
+    b.ne 2b
+3:  ADRL x9, Ldbl_url_text                // the web: only if asked for, and a URL is built in
+    ldrb w9, [x9]
+    cbz  w9, 9f
+    ADRL x0, Ls_k_fetch
+    add  x1, sp, #96
+    mov  x2, #8
+    bl   _pref_get
+    ldrb w9, [sp, #96]
+    cmp  w9, #'1'
+    b.ne 9f
     ADRL x8, _g_dbl_next
     ldr  x9, [x8]
-    cbnz x9, 1f
-    add  x9, x0, #30                      // the first time: 30 s after starting
+    cbnz x9, 4f
+    add  x9, x19, #30                     // the first time: 30 s after starting
     str  x9, [x8]
     b    9f
-1:  cmp  x0, x9
+4:  cmp  x19, x9
     b.lo 9f
     MOVI x10, 86400
-    add  x9, x0, x10
+    add  x9, x19, x10
     str  x9, [x8]
     ADRL x0, Ls_get
     ADRL x1, Ldbl_url_text
@@ -334,6 +409,125 @@ _dbl_tick:
     mov  x3, #0
     ADRL x4, Ls_tag_dbl
     bl   _http
+9:  LEAVE 16
+
+// long Ldbl_bytes -> how long our list is, if we have one and it can go over the mesh, else 0
+Ldbl_bytes:
+    ADRL x8, _g_dbl_n
+    ldr  x9, [x8]
+    mov  x0, #0
+    tbnz x9, #63, 1f
+    ADRL x8, _g_dbl_ver
+    ldr  x10, [x8]
+    cbz  x10, 1f
+    lsl  x0, x9, #3
+    add  x0, x0, #80
+    mov  x10, #DBL_GOSSIP
+    cmp  x0, x10
+    csel x0, xzr, x0, hi
+1:  ret
+
+// Ldbl_send(x0 offset (0xFFFF: which version we have), x1 piece, x2 its length) — a T_DBL
+//   packet to our neighbours only (TTL 1: not passed on)
+Ldbl_send:
+    ENTER 0
+    mov  x19, x0
+    mov  x20, x1
+    mov  x21, x2
+    ADRL x8, _g_id_ready
+    ldr  x9, [x8]
+    cbz  x9, 9f
+    ADRL x0, _g_dbl_pkt
+    mov  w1, #T_DBL
+    bl   _pkt_begin
+    ADRL x22, _g_dbl_pkt
+    mov  w9, #1
+    strb w9, [x22, #2]                    // TTL 1
+    ADRL x8, _g_dbl_ver
+    ldr  x9, [x8]
+    str  w9, [x22, #12]
+    bl   Ldbl_bytes
+    strh w0, [x22, #16]
+    strh w19, [x22, #18]
+    ADRL x8, _g_node_id
+    ldr  x9, [x8]
+    str  x9, [x22, #20]
+    add  x0, x22, #28
+    mov  x1, x20
+    mov  x2, x21
+    cbz  x21, 1f
+    bl   _memcpy
+1:  add  x1, x21, #28
+    mov  x0, x22
+    bl   _pkt_finish
+    cbz  x0, 9f
+    mov  x1, x0
+    mov  x0, x22
+    bl   _ble_broadcast
+9:  LEAVE 0
+
+// void _dbl_rx(const uint8 *pkt, long len) — mesh.s: a T_DBL from a neighbour (signed,
+//   checked). Which version they have: send ours if it's newer. A piece of a newer one:
+//   put it together, and take it once whole and its signature checks out.
+.globl _dbl_rx
+_dbl_rx:
+    ENTER 0
+    mov  x19, x0
+    mov  x20, x1
+    cmp  x20, #28
+    b.lo 9f
+    bl   Ldbl_load
+    mov  x0, #0
+    bl   _time
+    mov  x21, x0
+    ldr  w22, [x19, #12]                  // their version
+    ldrh w23, [x19, #18]                  // offset
+    ADRL x8, _g_dbl_ver
+    ldr  x24, [x8]                        // ours
+    mov  x9, #0xFFFF
+    cmp  x23, x9
+    b.ne 2f
+    cmp  x22, x24                         // they're behind: send ours for 40 s
+    b.hs 9f
+    bl   Ldbl_bytes
+    cbz  x0, 9f
+    ADRL x8, _g_dbl_until
+    ldr  x9, [x8]
+    cmp  x21, x9
+    b.lo 9f                               // sending already
+    add  x9, x21, #40
+    str  x9, [x8]
+    ADRL x8, _g_dbl_pos
+    str  xzr, [x8]
+    b    9f
+2:  cmp  x22, x24                         // a piece: of a newer list only
+    b.ls 9f
+    ADRL x0, _g_dbl_da
+    ldr  x1, [x19, #20]
+    mov  x2, x22
+    ldrh w3, [x19, #16]
+    mov  x4, x23
+    add  x5, x19, #28
+    sub  x6, x20, #28
+    mov  x7, x21
+    bl   _dbl_piece_in
+    cmp  x0, #1
+    b.ne 9f
+    ADRL x8, _g_dbl_da
+    add  x0, x8, #DA_BUF
+    ldr  x1, [x8, #DA_TOTAL]
+    bl   Ldbl_take
+    ADRL x8, _g_dbl_da                    // whole: taken, or not (a bad signature)
+    str  xzr, [x8]
+    cbz  x0, 9f
+    ADRL x8, _g_dbl_src
+    mov  x9, #3
+    str  x9, [x8]
+    bl   Ldbl_bytes
+    mov  x1, x0
+    ADRL x0, _g_dbl
+    bl   Ldbl_keep
+    bl   _ui_lists_changed
 9:  LEAVE 0
 
 // void _dbl_response(tag, json, long status, id error, NSData *data) — net.s ('d')
@@ -353,18 +547,30 @@ _dbl_response:
     mov  x1, x20
     bl   Ldbl_take
     cbz  x0, 9f
-    lsl  x0, x20, #1                      // kept, as hex, for the next start
+    ADRL x8, _g_dbl_src
+    mov  x9, #2
+    str  x9, [x8]
+    ADRL x0, _g_dbl
+    mov  x1, x20
+    bl   Ldbl_keep
+    bl   _ui_lists_changed
+9:  LEAVE 0
+
+// Ldbl_keep(data, len) — the list we took, as hex in the defaults, for the next start
+Ldbl_keep:
+    ENTER 0
+    mov  x19, x0
+    mov  x20, x1
+    lsl  x0, x20, #1
     add  x0, x0, #1
     bl   _malloc
     cbz  x0, 9f
     mov  x21, x0
-    mov  x0, x19
-    MSG0 Ls_bytes
     mov  x9, #0
     ADRL x11, Ls_hex
 1:  cmp  x9, x20
     b.hs 2f
-    ldrb w10, [x0, x9]
+    ldrb w10, [x19, x9]
     lsr  w12, w10, #4
     ldrb w12, [x11, x12]
     add  x13, x21, x9, lsl #1
@@ -381,7 +587,15 @@ _dbl_response:
     bl   _pref_set
     mov  x0, x21
     bl   _free
-    bl   _ui_lists_changed
+    ADRL x8, _g_dbl_src                   // and where it came from
+    ldr  x9, [x8]
+    add  w9, w9, #'0'
+    strb w9, [sp, #-16]!
+    strb wzr, [sp, #1]
+    ADRL x0, Ls_k_dblfrom
+    mov  x1, sp
+    bl   _pref_set
+    add  sp, sp, #16
 9:  LEAVE 0
 
 // ---------------------------------------------------------------------------
@@ -619,6 +833,12 @@ _h_safety:
     b.eq Lhs_status
     cmp  x19, #8
     b.eq Lhs_addr
+    cmp  x19, #9
+    b.eq Lhs_dbl
+    cmp  x19, #10
+    b.eq Lhs_fetch_on
+    cmp  x19, #11
+    b.eq Lhs_fetch_off
     add  x0, sp, #96                      // block / unblock / report: who
     mov  x1, x20
     mov  x2, #64
@@ -753,6 +973,62 @@ Lhs_addr:
     b    Lhs_done
 Lhs_badaddr:
     ADRL x0, Ls_addr_how
+    bl   _home_say0
+    b    Lhs_done
+Lhs_dbl:                                  // "blocklist": what this device has
+    bl   Ldbl_load
+    ADRL x8, Ldbl_pub
+    ldp  x9, x10, [x8]
+    ldp  x11, x12, [x8, #16]
+    orr  x9, x9, x10
+    orr  x11, x11, x12
+    orr  x9, x9, x11
+    cbnz x9, 1f
+    ADRL x0, Ls_dbl_nokey
+    bl   _home_say0
+    b    Lhs_done
+1:  ADRL x0, Ls_k_fetch
+    add  x1, sp, #96
+    mov  x2, #8
+    bl   _pref_get
+    ADRL x3, Ls_off
+    ldrb w9, [sp, #96]
+    cmp  w9, #'1'
+    b.ne 2f
+    ADRL x3, Ls_on
+2:  ADRL x8, _g_dbl_src
+    ldr  x9, [x8]
+    ADRL x10, Lsrc_names
+    ldr  x2, [x10, x9, lsl #3]
+    ADRL x8, _g_dbl_n
+    ldr  x1, [x8]
+    ADRL x8, _g_dbl_ver
+    ldr  x0, [x8]
+    str  x0, [sp]
+    str  x1, [sp, #8]
+    str  x2, [sp, #16]
+    str  x3, [sp, #24]
+    ADRL x0, _g_sf_buf
+    mov  x1, #400
+    ADRL x2, Ls_dbl_status
+    bl   _snprintf
+    ADRL x0, _g_sf_buf
+    bl   _home_say0
+    b    Lhs_done
+Lhs_fetch_on:
+    ADRL x0, Ls_k_fetch
+    ADRL x1, Ls_one
+    bl   _pref_set
+    ADRL x8, _g_dbl_next
+    str  xzr, [x8]
+    ADRL x0, Ls_fetch_on
+    bl   _home_say0
+    b    Lhs_done
+Lhs_fetch_off:
+    ADRL x0, Ls_k_fetch
+    ADRL x1, Ls_zero
+    bl   _pref_set
+    ADRL x0, Ls_fetch_off
     bl   _home_say0
     b    Lhs_done
 Lhs_how:
@@ -956,6 +1232,10 @@ _am_report_to_set:
     LEAVE 0
 
 // ---------------------------------------------------------------------------
+.section __DATA,__const
+.p2align 3
+Lsrc_names:     .quad Lsrc_none, Lsrc_app, Lsrc_web, Lsrc_mesh
+
 .section __TEXT,__const
 .p2align 3
 .include "dbl_key.inc"                    // the developer's public key and the list's URL
@@ -973,6 +1253,18 @@ Ls_k_blocked:       .asciz "blocked"
 Ls_k_filter:        .asciz "chatFilter"
 Ls_k_report:        .asciz "reportTo"
 Ls_k_dbl:           .asciz "devBlocklist"
+Ls_k_fetch:         .asciz "blocklistFetch"
+Ls_k_dblfrom:       .asciz "devBlocklistFrom"
+Ls_on:              .asciz "on"
+Ls_off:             .asciz "off"
+Lsrc_none:          .asciz "none yet"
+Lsrc_app:           .asciz "built into this app"
+Lsrc_web:           .asciz "fetched from the web"
+Lsrc_mesh:          .asciz "passed on over the mesh"
+Ls_dbl_status:      .asciz "\302\267 \360\237\233\241 Developer blocklist: version %ld, %ld ids (%s). Shared with neighbours over the mesh; fetching from the web: %s."
+Ls_dbl_nokey:       .asciz "\302\267 The developer blocklist isn\342\200\231t set up in this build (no key yet: tools/blocklist/blocklist.py keygen)."
+Ls_fetch_on:        .asciz "\302\267 The developer blocklist will also be fetched from the web once a day (this shows the web host this device\342\200\231s address)."
+Ls_fetch_off:       .asciz "\302\267 The developer blocklist comes only with app updates and over the mesh now."
 Ls_get:             .asciz "GET"
 Ls_tag_dbl:         .asciz "dbl"
 Ls_length:          .asciz "length"

@@ -99,6 +99,9 @@
 .set T_ROOMDEL,     10       // the room's owner deleted it (+12 room, +20 owner, +28 nlen, +29 nick)
 .set T_ROOMAD,      12       // a listed room: +12 room +20 owner +28 nlen +29 nick, name (listed.s)
 .set T_JOINREQ,     13       // let me in: +12 room +20 asker +28 nlen +29 nick, owner id (listed.s)
+.set T_DBL,         15       // the developer blocklist between neighbours (safety.s): TTL 1,
+                             //   +12 version u32 +16 total u16 +18 offset u16 (0xFFFF: which version
+                             //   I have) +20 sender +28 a piece (128 at most)
 .set T_SEEK,        14       // finding someone: +12 target +20 sender +28 nlen +29 nick, sealed (seek.s)
 .set T_HP,          11       // headphones: +12 target (0 any) +20 sender +28 nlen +29 nick, op, hash[16]
 .set RL_UNVERIFIED,  1        // limits.s buckets that aren't a sender: packets nobody can check yet

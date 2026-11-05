@@ -1074,7 +1074,17 @@ _mesh_receive:
     b.eq Lrx_vcmd
     cmp  w22, #T_SEEK
     b.eq Lrx_vcmd
+    cmp  w22, #T_DBL
+    b.eq Lrx_vdbl
     b    Lrx_bad
+Lrx_vdbl:                             // the developer blocklist: version, sizes, sender
+    cmp  x20, #28
+    b.lo Lrx_bad
+    mov  x8, #(28 + 128)
+    cmp  x20, x8
+    b.hi Lrx_bad
+    mov  x23, #0
+    b    Lrx_dedupe
 Lrx_vseen:
     cmp  x20, #22
     b.lo Lrx_bad
@@ -1211,6 +1221,8 @@ Lrx_go:
     b.eq Lrx_joinreq
     cmp  w22, #T_SEEK
     b.eq Lrx_seek
+    cmp  w22, #T_DBL
+    b.eq Lrx_dbl
     cmp  w22, #T_NEWS
     b.hs Lrx_web
 
@@ -1353,6 +1365,11 @@ Lrx_msg_rkey:
     mov  x2, #240
     bl   _strlcpy
     b    Lrx_msg_text
+Lrx_dbl:                              // neighbours only (TTL 1): never passed on (safety.s)
+    mov  x0, x19
+    mov  x1, x20
+    bl   _dbl_rx
+    b    Lrx_new
 Lrx_msg_gone:                         // one we deleted? they missed that: say it again
     ldr  x0, [x19, #12]
     bl   _roomdel_again

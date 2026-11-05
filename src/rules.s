@@ -164,6 +164,9 @@ Lsimple:
     .quad Lw_filter_on,      0, _h_safety, 5
     .quad Lw_filter_off,     0, _h_safety, 6
     .quad Lw_filter,         0, _h_safety, 7
+    .quad Lw_bl_fetch_on,    0, _h_safety, 10
+    .quad Lw_bl_fetch_off,   0, _h_safety, 11
+    .quad Lw_blocklist,      0, _h_safety, 9
     .quad Lw_hist,           0, _h_term_history, 3
     .quad Lw_hist_on,        0, _h_term_history, 1
     .quad Lw_hist_off,       0, _h_term_history, 0
@@ -2889,6 +2892,9 @@ Lw_report:       .asciz "report"
 Lw_filter_on:    .asciz "filter on"
 Lw_filter_off:   .asciz "filter off"
 Lw_filter:       .asciz "filter"
+Lw_bl_fetch_on:  .asciz "blocklist fetch on"
+Lw_bl_fetch_off: .asciz "blocklist fetch off"
+Lw_blocklist:    .asciz "blocklist"
 Lw_hist:         .asciz "history"
 Lw_hist_on:      .asciz "history on"
 Lw_hist_off:     .asciz "history off"

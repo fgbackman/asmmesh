@@ -252,3 +252,7 @@ For where the bitchat work stands and what comes next, start with `docs/bitchat_
   dbl_key.inc daily (tag 'd' -> `_dbl_response`, net.s); newest good list kept in defaults
   "devBlocklist". Tool: `tools/blocklist/blocklist.py`; the private key lives in
   ~/.asmmesh-blocklist, never in the repository. Instructions: docs/blocklist.md.
+- Mesh sharing: packet type T_DBL 15 (TTL 1, neighbours only; macros.inc has the layout).
+  dbl_core.s `_dbl_piece`, `_dbl_piece_in` (self-test 219); safety.s `_dbl_rx` (mesh.s
+  Lrx_dbl), announces and paced sending in `_dbl_tick`. The web fetch only when defaults
+  "blocklistFetch" is "1" (Home: blocklist fetch on/off); `blocklist` shows the state.
