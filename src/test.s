@@ -1316,6 +1316,8 @@ _selftest:
     add  x19, x19, x0
     bl   _dbl_core_selftest           // the developer's blocklist (dbl_core.s)
     add  x19, x19, x0
+    bl   _ff_core_selftest            // Fivefold: colours, words, the day's word (ff_core.s)
+    add  x19, x19, x0
     bl   _t_hard                      // fuzzing, flood limits, full tables (last: it fills them)
     add  x19, x19, x0
 
