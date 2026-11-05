@@ -127,6 +127,14 @@ const char *am_ch_opponent(void);
 long am_ch_move(long from, long to);         // 1 if played
 void am_ch_say(const char *word);            // "resign", "draw"
 
+// Your shortcuts (quick.s): a name for Home commands, kept between launches
+long am_qk_count(void);
+const char *am_qk_name(long i);
+const char *am_qk_cmds(long i);
+void am_qk_run(long i);                      // runs each command in Home
+long am_qk_save(const char *name, const char *commands);  // 0, -1 full, -2 bad name, -3 empty
+long am_qk_delete(long i);
+
 // Fivefold (ff_mesh.s): the game shown is a race or duel whose room is here, else today's word
 long am_ff_mode(void);                       // 0 none, 1 today's word, 2 race, 3 duel
 long am_ff_state(void);                      // 1 a duel: choosing their word, 2 guessing, 3 done

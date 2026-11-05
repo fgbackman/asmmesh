@@ -130,6 +130,11 @@ Nine letters in a 3×3 grid; make words of 4 to 9 letters that use the centre le
 - **The developer blocklist:** ids you ban for everyone, signed with your key, shipped in the app and passed from device to device over the mesh (fetching from a web address is optional, off unless `blocklist fetch on`): `docs/blocklist.md`, `tools/blocklist/blocklist.py`. Reports carry the person's id for it. `blocklist` shows what a device has.
 - **The chat filter** (on unless `filter off`; Settings › Privacy on iPhone): vulgar words and slurs in what others send show as `f***`. Only words Wiktionary itself labels vulgar, offensive or a slur (the same 37 as Ninefold's family filter), whole words with -s or -es: Scunthorpe, assess and Dickens are untouched, and so are Dick and Mongol written as names.
 
+## Your shortcuts, and devices remembered
+
+- **A shortcut** gives a few Home commands one name: `shortcut movie: dim living room to 20%; tv on` (split them with `;` or "then"). Say `movie` in Home to run them in order, or pick it from the **Shortcuts** menu on the Mac (Shortcuts › New Shortcut… makes one there too), or tap it under **Your shortcuts** on the iPhone's Nearby tab (+ makes one; hold one to delete it). `shortcuts` lists them, `delete shortcut movie` removes one. Up to 24, kept between launches like your rooms. Each command runs as if you typed it, so an unlock still asks; a shortcut can't run another one, and shortcuts are only made on the device itself, never from the mesh.
+- **Devices remembered:** the lights, scenes and devices your services find are saved (every 30 s, when the list changes) and listed straight away at the next launch, before the hubs answer; each service updates its own as it comes in. Their on/off and level show as unknown until then. Bluetooth bulbs and sensors aren't kept (they need the radio). `forget devices` clears the saved list.
+
 ## Typing: history and suggestions
 
 On the Mac the input line works like a terminal's: monospaced, with a ❯ prompt.
@@ -185,6 +190,7 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
     src/ff_play.s  a Fivefold game, pure: today's word, a race, a duel; packets, checks, the squares and status
     src/ff_mesh.s  Fivefold on the mesh: Home's "fivefold", packets sent until taken, what the screens read
     src/ff_win.s   the Mac's Fivefold window
+    src/quick.s    your shortcuts (saved Home commands) and the devices kept between launches
     src/cf_core.s  the chat filter, pure (its words: cf_words.inc, made by tools/ninefold/make_chat_filter.py)
     src/safety.s   block, report, the filter's setting, the developer blocklist's loading and fetching, Home's words
     src/dbl_core.s the developer blocklist, pure: a signed list checked, an id looked up

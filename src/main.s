@@ -43,6 +43,7 @@ _g_people_table:  .quad 0
 _g_people_lbl:    .quad 0           // "PEOPLE ON THE MESH": moves with the Rooms list's height
 .globl _g_ctl
 _g_ctl:           .quad 0
+_g_qk_menu:       .quad 0                 // the Shortcuts menu (quick.s fills it)
 .globl _g_font
 _g_font:          .quad 0
 .globl _g_sitem
@@ -172,6 +173,9 @@ Lmethods:
     .quad Ls_m_chDraw,      _chw_draw,          Ls_ty_v1
     .quad Ls_m_playChess,   _ch_dialog,         Ls_ty_v1
     .quad Ls_m_playFivefold, _ff_dialog,        Ls_ty_v1
+    .quad Ls_m_qkRun,       _qk_menu_run,       Ls_ty_v1
+    .quad Ls_m_qkNew,       _qk_menu_new,       Ls_ty_v1
+    .quad Ls_m_qkDelete,    _qk_menu_delete,    Ls_ty_v1
     .quad Ls_m_ffTile,      _ffw_tile,          Ls_ty_v1
     .quad Ls_m_ffKey,       _ffw_key,           Ls_ty_v1
     .quad Ls_m_ffEnter,     _ffw_enter,         Ls_ty_v1
@@ -1435,10 +1439,134 @@ _build_menus:
     ADRL x3, Ls_empty
     bl   _add_item
 
+    mov  x0, x20                      // Shortcuts: yours, one click each (quick.s)
+    ADRL x1, Ls_qk_menu
+    bl   _add_submenu
+    ADRL x8, _g_qk_menu
+    str  x0, [x8]
+    bl   _qk_ui_changed
+
     mov  x0, x19
     mov  x2, x20
     MSG1 Ls_setMainMenu
     LEAVE 0
+
+// void _qk_ui_changed(void) — quick.s: the shortcuts changed; the Shortcuts menu again
+.globl _qk_ui_changed
+_qk_ui_changed:
+    ENTER 16
+    ADRL x8, _g_qk_menu
+    ldr  x19, [x8]
+    cbz  x19, 9f
+    mov  x0, x19
+    MSG0 Ls_qk_removeAll
+    mov  x20, #0
+1:  bl   _am_qk_count
+    cmp  x20, x0
+    b.hs 2f
+    mov  x0, x20
+    bl   _am_qk_name
+    mov  x1, x0
+    mov  x0, x19
+    ADRL x2, Ls_m_qkRun
+    ADRL x3, Ls_empty
+    bl   _add_item
+    mov  x21, x0
+    mov  x2, x20
+    MSG1 Ls_qk_setTag
+    mov  x0, x20                      // its commands, as the tip
+    bl   _am_qk_cmds
+    bl   _nsstr
+    mov  x2, x0
+    mov  x0, x21
+    MSG1 Ls_qk_setToolTip
+    add  x20, x20, #1
+    b    1b
+2:  cbz  x20, 3f
+    CLS  Ls_NSMenuItem
+    MSG0 Ls_separatorItem
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_addItem
+3:  mov  x0, x19
+    ADRL x1, Ls_qk_new_item
+    ADRL x2, Ls_m_qkNew
+    ADRL x3, Ls_empty
+    bl   _add_item
+    cbz  x20, 9f
+    mov  x0, x19
+    ADRL x1, Ls_qk_del_item
+    ADRL x2, Ls_m_qkDelete
+    ADRL x3, Ls_empty
+    bl   _add_item
+9:  LEAVE 16
+
+// - qkRun:(id)sender — Shortcuts › a shortcut: run it (its lines appear in Home)
+.globl _qk_menu_run
+_qk_menu_run:
+    ENTER 0
+    mov  x0, x2
+    MSG0 Ls_qk_tag
+    bl   _am_qk_run
+    LEAVE 0
+
+// - qkNew:(id)sender — Shortcuts › New Shortcut…: a name, then its commands
+.globl _qk_menu_new
+_qk_menu_new:
+    ENTER 640                         // [96] name (64)  [160] commands (224)  [384] line
+    strb wzr, [sp, #96]
+    strb wzr, [sp, #160]
+    ADRL x0, Ls_qk_dlg_title
+    ADRL x1, Ls_qk_dlg_name
+    ADRL x2, Ls_qk_ph_name
+    add  x3, sp, #96
+    mov  x4, #0
+    add  x5, sp, #96
+    mov  x6, #31
+    bl   _ask_text
+    cbz  x0, 9f
+    ADRL x0, Ls_qk_dlg_title
+    ADRL x1, Ls_qk_dlg_cmds
+    ADRL x2, Ls_qk_ph_cmds
+    add  x3, sp, #160
+    mov  x4, #0
+    add  x5, sp, #160
+    mov  x6, #223
+    bl   _ask_text
+    cbz  x0, 9f
+    add  x9, sp, #96
+    str  x9, [sp]
+    add  x9, sp, #160
+    str  x9, [sp, #8]
+    add  x0, sp, #384
+    mov  x1, #256
+    ADRL x2, Ls_qk_fmt
+    bl   _snprintf
+    mov  x0, #1
+    add  x1, sp, #384
+    add  x2, sp, #384
+    bl   _h_quick
+9:  LEAVE 640
+
+// - qkDelete:(id)sender — Shortcuts › Delete a Shortcut…
+.globl _qk_menu_delete
+_qk_menu_delete:
+    ENTER 64                          // [96] the name (48)
+    strb wzr, [sp, #96]
+    ADRL x0, Ls_qk_del_title
+    ADRL x1, Ls_qk_del_info
+    ADRL x2, Ls_qk_ph_name
+    add  x3, sp, #96
+    mov  x4, #0
+    add  x5, sp, #96
+    mov  x6, #47
+    bl   _ask_text
+    cbz  x0, 9f
+    mov  x0, #3
+    add  x1, sp, #96
+    add  x2, sp, #96
+    bl   _h_quick
+9:  LEAVE 64
 
 // id _add_submenu(id menubar, const char *title)
 _add_submenu:
@@ -1954,6 +2082,24 @@ Ls_chess_symbol:       .asciz "checkerboard.rectangle"
 Ls_chess_text:         .asciz "\342\231\236"
 Ls_chess_tip:          .asciz "Play Chess"
 Ls_m_playFivefold:     .asciz "playFivefold:"
+Ls_m_qkRun:            .asciz "qkRun:"
+Ls_m_qkNew:            .asciz "qkNew:"
+Ls_m_qkDelete:         .asciz "qkDelete:"
+Ls_qk_menu:            .asciz "Shortcuts"
+Ls_qk_removeAll:       .asciz "removeAllItems"
+Ls_qk_setTag:          .asciz "setTag:"
+Ls_qk_tag:             .asciz "tag"
+Ls_qk_setToolTip:      .asciz "setToolTip:"
+Ls_qk_new_item:        .asciz "New Shortcut\342\200\246"
+Ls_qk_del_item:        .asciz "Delete a Shortcut\342\200\246"
+Ls_qk_dlg_title:       .asciz "New Shortcut"
+Ls_qk_dlg_name:        .asciz "Its name: what you'll say or click to run it (up to 30 letters)."
+Ls_qk_dlg_cmds:        .asciz "What it does: Home commands, split by ; (for example: dim living room to 20%; tv on; kitchen lamp off)."
+Ls_qk_ph_name:         .asciz "movie"
+Ls_qk_ph_cmds:         .asciz "dim living room to 20%; tv on"
+Ls_qk_fmt:             .asciz "%s: %s"
+Ls_qk_del_title:       .asciz "Delete a Shortcut"
+Ls_qk_del_info:        .asciz "The name of the shortcut to delete (Home: shortcuts lists them)."
 Ls_m_ffTile:           .asciz "ffTile:"
 Ls_m_ffKey:            .asciz "ffKey:"
 Ls_m_ffEnter:          .asciz "ffEnter:"

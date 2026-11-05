@@ -157,6 +157,14 @@ Lsimple:
     .quad Lw_chess,          0, _h_chess, 0
     .quad Lw_chess,          1, _h_chess, 0
     .quad Lw_fivefold,       0, _h_fivefold, 1
+    .quad Lw_qk_list,        0, _h_quick, 2
+    .quad Lw_qk_list2,       0, _h_quick, 2
+    .quad Lw_qk_one,         0, _h_quick, 5
+    .quad Lw_qk_delete,      1, _h_quick, 3
+    .quad Lw_qk_remove,      1, _h_quick, 3
+    .quad Lw_qk_new,         1, _h_quick, 1
+    .quad Lw_qk_save,        1, _h_quick, 1
+    .quad Lw_qk_forget,      0, _h_quick, 4
     .quad Lw_ff_today,       0, _h_fivefold, 1
     .quad Lw_ff_share,       0, _h_fivefold, 4
     .quad Lw_ff_race,        0, _h_fivefold, 5
@@ -2892,6 +2900,14 @@ Lw_bc_chat:      .asciz "bitchat chat"
 Lw_ninefold:     .asciz "ninefold"
 Lw_chess:        .asciz "chess"
 Lw_fivefold:     .asciz "fivefold"
+Lw_qk_list:      .asciz "shortcuts"
+Lw_qk_list2:     .asciz "my shortcuts"
+Lw_qk_one:       .asciz "shortcut"
+Lw_qk_delete:    .asciz "delete shortcut"
+Lw_qk_remove:    .asciz "remove shortcut"
+Lw_qk_new:       .asciz "shortcut"
+Lw_qk_save:      .asciz "save shortcut"
+Lw_qk_forget:    .asciz "forget devices"
 Lw_ff_today:     .asciz "fivefold today"
 Lw_ff_share:     .asciz "fivefold share"
 Lw_ff_race:      .asciz "fivefold race"

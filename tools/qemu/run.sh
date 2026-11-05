@@ -4,6 +4,7 @@
 #   tools/qemu/run.sh            the self-tests (the same ones `asmmesh --selftest` runs)
 #   tools/qemu/run.sh chmesh     chess's glue (ch_mesh.s) with stand-ins for the app: both transports
 #   tools/qemu/run.sh ffmesh     Fivefold's glue (ff_mesh.s) with stand-ins: today, race, duel
+#   tools/qemu/run.sh quick      your shortcuts and the devices kept between launches (quick.s)
 #   tools/qemu/run.sh chperft    chess perft, deeper than the self-tests, against published counts
 #   tools/qemu/run.sh nfdiff [N] N random seeds: Ninefold's puzzles against tools/ninefold/nf.py
 #   tools/qemu/run.sh diff [N]   N random cases each, checked against Python's `cryptography`,
@@ -44,6 +45,14 @@ case "$1" in
             "$src/ff_mesh.s" > "$out/ff_mesh.s"
         printf '.text\nLsnprintf_apple:\n    ldr x3, [sp]\n    ldr x4, [sp, #8]\n    ldr x5, [sp, #16]\n    b snprintf\n' >> "$out/ff_mesh.s"
         aarch64-linux-gnu-gcc -O1 -static -I "$here" -I "$src" -o "$out/ffmesh" "$here/ffmesh.c" "$out/bc_crypto.s" "$out/ff_core.s" "$out/ff_play.s" "$out/ff_mesh.s" && qemu-aarch64 "$out/ffmesh" ;;
+    quick)                     # your shortcuts and the saved devices, with stand-ins for the app
+        sed -e 's/^\.include "macros\.inc"/.include "elf.inc"\n.include "quick.inc"/' \
+            -e 's/^\.section __TEXT,__cstring,cstring_literals/.section .rodata/' \
+            -e 's/^\.zerofill __DATA,__bss,\([_a-z]*\),\(.*\),4.*/.comm \1,\2,16/' \
+            -e 's/bl   _snprintf$/bl   Lsnprintf_apple/' \
+            "$src/quick.s" > "$out/quick.s"
+        printf '.text\nLsnprintf_apple:\n    ldr x3, [sp]\n    ldr x4, [sp, #8]\n    ldr x5, [sp, #16]\n    b snprintf\n' >> "$out/quick.s"
+        aarch64-linux-gnu-gcc -O1 -static -I "$here" -I "$src" -o "$out/quick" "$here/quick.c" "$out/quick.s" && qemu-aarch64 "$out/quick" ;;
     nfdemo) qemu-aarch64 "$out/harness" nfdemo ;;
     nfdiff) python3 "$here/nfdiff.py" "$out/harness" "${2:-200}" ;;
     *)    qemu-aarch64 "$out/harness" selftest ;;

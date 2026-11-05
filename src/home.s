@@ -1010,6 +1010,8 @@ Lhi_go:
     bl   _home_say0
     bl   _rules_init
     bl   _spin_init
+    bl   _dv_load                     // the devices found last time (quick.s)
+    bl   _qk_load                     // your shortcuts
     bl   _svc_load                    // every integration has a switch; all start off
     bl   _svc_start_all               //   (services.s starts the ones you turned on)
     mov  x0, #0                       // saved tokens: read off the main thread, because
@@ -1057,6 +1059,9 @@ _home_command:
     ldrb w9, [x19]
     cmp  w9, #'@'
     b.eq Lhc_remote
+    mov  x0, x19                      // one of your shortcuts? (quick.s)
+    bl   _qk_try
+    cbnz x0, Lhc_done
     mov  x0, x19                      // weather, rules, where is my …
     bl   _extra_command
     cbnz x0, Lhc_done

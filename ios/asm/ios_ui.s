@@ -155,6 +155,7 @@ _am_tick:
     bl   _nf_tick                     // Ninefold: the clock, rounds, reveals
     bl   _chm_tick                    // chess: moves sent again until answered
     bl   _ffm_tick                    // Fivefold: words and guesses sent again
+    bl   _dv_tick                     // the devices found: saved when they change (quick.s)
     bl   _dbl_tick                    // the developer's blocklist, fetched daily
     bl   _ios_alert_open              // a rule may ask something: not on top of another prompt
     cbnz x0, Lat_hello
@@ -1770,6 +1771,11 @@ _ch_ui_show:
 .globl _ch_ui_pop
 _ch_ui_pop:
     b    _ios_ch_pop
+
+// void _qk_ui_changed(void) — quick.s: the shortcuts changed
+.globl _qk_ui_changed
+_qk_ui_changed:
+    b    _ios_qk_changed
 
 // void _ff_ui_show(void), _ff_ui_pop(void) — Fivefold (ff_mesh.s): redraw, bring it up
 .globl _ff_ui_show

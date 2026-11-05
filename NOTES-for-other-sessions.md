@@ -277,3 +277,15 @@ For where the bitchat work stands and what comes next, start with `docs/bitchat_
 - Bring up "Reminders saved for when the App Store work starts" at the top of
   `docs/app-store-checklist.md` first: SPIN gestures 20-24 beyond SPIN's spec, CREDITS.md in
   About, hiding web pages on iPhone, the Mac outside the store first.
+
+## Shortcuts and saved devices (Nov 6, branch claude/ninefold)
+- `src/quick.s` (Mac and iPhone). Shortcuts: defaults "quickShortcuts" ("name\tcommands\n"),
+  24 at most; `_qk_try` runs first in `_home_command` (home.s), each part through
+  `_home_command` again with a depth guard. Home words (rules.s): shortcut NAME: …, shortcuts,
+  delete/remove shortcut, forget devices. Hook `_qk_ui_changed`: main.s rebuilds the
+  Shortcuts menu (qkRun:/qkNew:/qkDelete:); ios_ui.s -> `ios_qk_changed` (Nearby tab).
+- Devices: `_dv_load` in `_home_init` before the services start, `_dv_tick` once a second
+  (saves every 30 s when the packed table differs) into defaults "savedDevices" (NSData of
+  256-byte entries). K_HUE_BLE and K_BLES are never kept; D_OBJ zeroed, state -1, CAP_LINKED off.
+- `tools/qemu/run.sh quick` (tests 227-229, stand-ins for Home and the defaults).
+- Not tried on a Mac or iPhone yet.

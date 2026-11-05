@@ -164,6 +164,14 @@ struct Chess: Equatable {
     var opponent = ""
 }
 
+/// One of your shortcuts (quick.s)
+struct QuickShortcut: Identifiable, Equatable {
+    let index: Int
+    let name: String
+    let commands: String
+    var id: String { name.lowercased() }
+}
+
 /// The Fivefold game, as the core has it (ff_mesh.s)
 struct Fivefold: Equatable {
     var mode = 0             // 0 none, 1 today's word, 2 race, 3 duel
@@ -219,6 +227,7 @@ final class Mesh: ObservableObject {
     @Published var chess = Chess()
     @Published var showChess = false     // the board full screen (ChessScreen)
     @Published var fivefold = Fivefold()
+    @Published var shortcuts: [QuickShortcut] = []
     @Published var showFivefold = false  // FivefoldScreen
     var talking: Bool { talkTitle.contains("Stop") }
 
@@ -246,6 +255,28 @@ final class Mesh: ObservableObject {
         nameChanged()
         listsNow()
         loadServices()
+        shortcutsChanged()
+    }
+
+    // MARK: your shortcuts (quick.s)
+
+    func shortcutsChanged() {
+        let list = (0..<am_qk_count()).map { i in
+            QuickShortcut(index: i, name: String(cString: am_qk_name(i)), commands: String(cString: am_qk_cmds(i)))
+        }
+        if list != shortcuts { shortcuts = list }
+    }
+
+    /// -> nil when saved, else why not
+    func saveShortcut(name: String, commands: String) -> String? {
+        let r = name.withCString { n in commands.withCString { c in am_qk_save(n, c) } }
+        shortcutsChanged()
+        switch r {
+        case 0: return nil
+        case -1: return "That\u{2019}s 24 shortcuts already: delete one first."
+        case -2: return "A name of up to 30 letters, without : or ;."
+        default: return "Add at least one command."
+        }
     }
 
     // MARK: from the core

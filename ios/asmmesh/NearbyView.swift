@@ -10,6 +10,7 @@ struct NearbyView: View {
     @State private var picked: ScanRow?
     @State private var showing = 0            // 0 all, 1 Bluetooth, 2 Wi-Fi & internet
     @State private var showBatteries = false
+    @State private var newShortcut = false
 
     var body: some View {
         NavigationStack {
@@ -27,6 +28,7 @@ struct NearbyView: View {
                             mesh.home("headphones here")
                         }
                     }
+                    shortcutsSection
                     Text("Answers appear in the Home room.")
                         .font(.caption).foregroundStyle(Theme.dim)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -143,6 +145,80 @@ struct NearbyView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+extension NearbyView {
+    /// your shortcuts: one tap runs each of its commands in Home; hold one to delete it
+    var shortcutsSection: some View {
+        VStack(spacing: 10) {
+            HStack {
+                SectionTitle(text: "Your shortcuts")
+                Spacer()
+                Button { newShortcut = true } label: { Image(systemName: "plus.circle.fill") }
+                    .accessibilityLabel("New Shortcut")
+            }
+            if mesh.shortcuts.isEmpty {
+                Card {
+                    Text("Give a few Home commands one name, like \u{201C}movie\u{201D}: dim living room to 20%; tv on. Tap + to make one, or type shortcut movie: … in Home. Saying the name in Home runs it too.")
+                        .font(.callout).foregroundStyle(Theme.dim)
+                }
+            }
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                ForEach(mesh.shortcuts) { s in
+                    QuickButton(title: s.name, symbol: "bolt.fill", color: Theme.orange) {
+                        coreLater { am_qk_run(s.index) }
+                    }
+                    .contextMenu {
+                        Text(s.commands)
+                        Button(role: .destructive) {
+                            coreLater { _ = am_qk_delete(s.index); Mesh.shared.shortcutsChanged() }
+                        } label: { Label("Delete", systemImage: "trash") }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $newShortcut) { ShortcutSheet().environmentObject(mesh) }
+    }
+}
+
+/// Nearby › + : a new shortcut
+struct ShortcutSheet: View {
+    @EnvironmentObject var mesh: Mesh
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var commands = ""
+    @State private var problem = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Name") {
+                    TextField("movie", text: $name).textInputAutocapitalization(.never)
+                }
+                Section {
+                    TextField("dim living room to 20%; tv on", text: $commands, axis: .vertical)
+                        .textInputAutocapitalization(.never)
+                        .lineLimit(2...5)
+                } header: { Text("Commands") } footer: {
+                    Text("Anything you'd type in Home, split by ; or \u{201C}then\u{201D}. They run in order.")
+                }
+                if !problem.isEmpty {
+                    Text(problem).foregroundStyle(Theme.red)
+                }
+            }
+            .navigationTitle("New Shortcut")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        if let why = mesh.saveShortcut(name: name, commands: commands) { problem = why } else { dismiss() }
+                    }
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || commands.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
     }
 }
 

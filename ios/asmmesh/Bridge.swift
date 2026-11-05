@@ -62,6 +62,12 @@ func iosChPop() {
     Mesh.shared.showChess = true
 }
 
+// your shortcuts (quick.s) changed
+@_cdecl("ios_qk_changed")
+func iosQkChanged() {
+    Mesh.shared.shortcutsChanged()
+}
+
 // Fivefold (ff_mesh.s): the game changed / it should come up
 @_cdecl("ios_ff_changed")
 func iosFfChanged() {
