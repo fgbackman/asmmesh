@@ -192,6 +192,10 @@ _cd_view:
     ldr  x9, [x8]
     cmp  x19, x9
     b.eq Lcv_person
+    ADRL x8, _g_qk_table
+    ldr  x9, [x8]
+    cmp  x19, x9
+    b.eq Lcv_qk
 Lcv_nil:
     mov  x0, #0
     LEAVE 160
@@ -236,6 +240,27 @@ Lcv_room:
     add  x2, x21, #R_NAME
     mov  x3, x23
     ldr  x4, [x21, #R_UNREAD]
+    ldr  d0, [sp, #96]
+    bl   _cd_card
+    LEAVE 160
+
+Lcv_qk:                               // a shortcut: ⚡, its name, its commands; click runs it
+    bl   _am_qk_count
+    cmp  x20, x0
+    b.hs Lcv_nil
+    mov  x0, x20
+    bl   _am_qk_cmds
+    bl   _nsstr
+    mov  x23, x0
+    mov  x0, x20
+    bl   _am_qk_name
+    mov  x2, x0
+    ADRL x0, Ls_y_bolt
+    mov  x1, #0xB82E                  // amber, like the Shortcuts button
+    movk x1, #0xF5, lsl #16
+    mov  x3, x23
+    mov  x4, #0
+    mov  x5, #0
     ldr  d0, [sp, #96]
     bl   _cd_card
     LEAVE 160
@@ -671,6 +696,7 @@ _cd_round:
     LEAVE 32
 
 .section __TEXT,__cstring,cstring_literals
+Ls_y_bolt:           .asciz "bolt.fill"
 Ls_cls:              .asciz "AMeshCards"
 Ls_NSObject:         .asciz "NSObject"
 Ls_NSView:           .asciz "NSView"

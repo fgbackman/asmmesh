@@ -40,6 +40,9 @@ _g_namebtn:       .quad 0
 _g_rooms_table:   .quad 0
 .globl _g_people_table
 _g_people_table:  .quad 0
+_g_qk_lbl:        .quad 0           // SHORTCUTS, and its table of cards
+.globl _g_qk_table
+_g_qk_table:      .quad 0
 _g_people_lbl:    .quad 0           // "PEOPLE ON THE MESH": moves with the Rooms list's height
 .globl _g_ctl
 _g_ctl:           .quad 0
@@ -445,6 +448,35 @@ _build_ui:
     LDD  d0, Lc_colw
     bl   _add_col
     ADRL x8, _g_people_table
+    ldr  x0, [x8]
+    bl   _cards_attach
+
+    ADRL x0, Ls_qk_lbl                // SHORTCUTS: yours as cards, under Rooms (quick.s)
+    mov  x1, #8
+    mov  x2, #1
+    mov  x3, x21
+    ADRL x8, Lf_peoplelbl
+    ldp  d0, d1, [x8]
+    ldp  d2, d3, [x8, #16]
+    LDD  d4, Lc_11
+    bl   _mk_label
+    bl   _dim_label
+    ADRL x8, _g_qk_lbl
+    str  x0, [x8]
+    mov  x0, #0
+    mov  x1, #0
+    mov  x2, x21
+    ADRL x8, Lf_people
+    ldp  d0, d1, [x8]
+    ldp  d2, d3, [x8, #16]
+    bl   _mk_table
+    ADRL x8, _g_qk_table
+    str  x0, [x8]
+    ADRL x1, Ls_col_main
+    mov  x2, #0
+    LDD  d0, Lc_colw
+    bl   _add_col
+    ADRL x8, _g_qk_table
     ldr  x0, [x8]
     bl   _cards_attach
 
@@ -879,13 +911,21 @@ _dim_label:
 //   (up to what leaves People two cards); People's label and list move down under it
 .globl _sidebar_fit
 _sidebar_fit:
-    ENTER 32                          // [96] Rooms' height  [104] its y  [112] the label's y
-    ADRL x8, _g_rooms_table
+    ENTER 64                          // [96] Rooms' height  [104] its y  [112] People's label y
+    ADRL x8, _g_rooms_table           //   [120] Shortcuts' height  [128] their label y  [136] y
     ldr  x19, [x8]
     cbz  x19, Lsf_done
     ADRL x8, _g_content
     ldr  x20, [x8]
     cbz  x20, Lsf_done
+    bl   _am_qk_count                 // Shortcuts: as many cards as there are, 4 in view
+    cmp  x0, #4
+    mov  x9, #4
+    csel x0, x9, x0, hi
+    scvtf d0, x0
+    LDD  d1, Lc_sb_card
+    fmul d0, d0, d1
+    str  d0, [sp, #120]
     mov  x0, x19
     MSG0 Ls_numberOfRows
     mov  x21, x0
@@ -899,13 +939,31 @@ _sidebar_fit:
     LDD  d4, Lc_sb_top
     fsub d4, d3, d4                   // Rooms' top
     LDD  d5, Lc_sb_low
-    fsub d6, d4, d5                   // the most it may take
-    fmin d0, d0, d6
+    fsub d6, d4, d5                   // the most it may take: less what Shortcuts needs
+    ldr  d7, [sp, #120]
+    fcmp d7, #0.0
+    b.eq 1f
+    fsub d6, d6, d7
+    LDD  d5, Lc_sb_lgap
+    fsub d6, d6, d5
+1:  fmin d0, d0, d6
     fmax d0, d0, d1
     str  d0, [sp, #96]
     fsub d7, d4, d0
     str  d7, [sp, #104]
-    LDD  d5, Lc_sb_lgap
+    LDD  d5, Lc_sb_lgap               // Shortcuts' label under Rooms, its cards under that
+    fsub d7, d7, d5
+    str  d7, [sp, #128]
+    LDD  d5, Lc_sb_pgap
+    fsub d7, d7, d5
+    ldr  d6, [sp, #120]
+    fsub d7, d7, d6
+    str  d7, [sp, #136]
+    ldr  d7, [sp, #104]               // People's label: under Shortcuts, or under Rooms
+    fcmp d6, #0.0
+    b.eq 2f
+    ldr  d7, [sp, #136]
+2:  LDD  d5, Lc_sb_lgap
     fsub d7, d7, d5
     str  d7, [sp, #112]
     mov  x0, x19
@@ -919,6 +977,7 @@ _sidebar_fit:
     LDD  d2, Lc_sb_w
     ldr  d3, [sp, #96]
     bl   _objc_msgSend
+    bl   Lsf_shortcuts
     ADRL x8, _g_people_lbl
     ldr  x22, [x8]
     cbz  x22, Lsf_done
@@ -946,7 +1005,49 @@ _sidebar_fit:
     fsub d3, d3, d1
     bl   _objc_msgSend
 Lsf_done:
-    LEAVE 32
+    LEAVE 64
+
+// Lsf_shortcuts (inside _sidebar_fit: its frame) — the Shortcuts label and cards, placed, or
+//   hidden while there are none
+Lsf_shortcuts:
+    stp  x29, x30, [sp, #-16]!
+    mov  x29, sp
+    add  x23, sp, #16                 // _sidebar_fit's sp
+    ldr  d6, [x23, #120]
+    fcmp d6, #0.0
+    cset x24, eq                      // 1: none, hide them
+    ADRL x8, _g_qk_lbl
+    ldr  x0, [x8]
+    cbz  x0, 9f
+    mov  x2, x24
+    MSG1 Ls_setHidden
+    ADRL x8, _g_qk_table
+    ldr  x0, [x8]
+    cbz  x0, 9f
+    MSG0 Ls_enclosingScrollView
+    cbz  x0, 9f
+    mov  x22, x0
+    mov  x2, x24
+    MSG1 Ls_setHidden
+    cbnz x24, 9f
+    ADRL x8, _g_qk_lbl
+    ldr  x21, [x8]
+    SELX1 Ls_setFrame
+    mov  x0, x21
+    LDD  d0, Lc_sb_lx
+    ldr  d1, [x23, #128]
+    LDD  d2, Lc_sb_lw
+    LDD  d3, Lc_sb_lh
+    bl   _objc_msgSend
+    SELX1 Ls_setFrame
+    mov  x0, x22
+    LDD  d0, Lc_sb_x
+    ldr  d1, [x23, #136]
+    LDD  d2, Lc_sb_w
+    ldr  d3, [x23, #120]
+    bl   _objc_msgSend
+9:  ldp  x29, x30, [sp], #16
+    ret
 
 // id _mk_button(const char *title, const char *selname, mask, id parent, frame d0-d3)
 .globl _mk_button
@@ -1480,7 +1581,12 @@ _qk_ui_changed:
     ADRL x8, _g_qk_pop                // the sidebar button's
     ldr  x0, [x8]
     bl   Lqk_fill
-    LEAVE 0
+    ADRL x8, _g_qk_table              // the sidebar's cards
+    ldr  x0, [x8]
+    cbz  x0, 1f
+    MSG0 Ls_reloadData
+    bl   _sidebar_fit
+1:  LEAVE 0
 
 // Lqk_fill(x0 menu, or 0) — the shortcuts, then New Shortcut… (and Delete a Shortcut…)
 Lqk_fill:
@@ -2153,6 +2259,9 @@ Ls_chess_tip:          .asciz "Play Chess"
 Ls_m_playFivefold:     .asciz "playFivefold:"
 Ls_m_qkRun:            .asciz "qkRun:"
 Ls_m_qkPop:            .asciz "qkPop:"
+Ls_qk_lbl:             .asciz "SHORTCUTS"
+Ls_setHidden:          .asciz "setHidden:"
+Ls_reloadData:         .asciz "reloadData"
 Ls_m_appearChanged:    .asciz "appearChanged:"
 Ls_qk_popUp:           .asciz "popUpMenuPositioningItem:atLocation:inView:"
 Ls_qk_btn_title:       .asciz "\342\232\241 Shortcuts"

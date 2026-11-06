@@ -546,8 +546,14 @@ _ds_rows:
     ldr  x9, [x8]
     cmp  x2, x9
     b.eq Ldr_scan
+    ADRL x8, _g_qk_table              // your shortcuts (quick.s)
+    ldr  x9, [x8]
+    cmp  x2, x9
+    b.eq Ldr_qk
     mov  x0, #0
     ret
+Ldr_qk:
+    b    _am_qk_count
 Ldr_scan:
     b    _scan_rows
 Ldr_rooms:                            // our rooms, then other people's listed ones
@@ -664,6 +670,10 @@ _ds_selchange:
     ldr  x9, [x8]
     cmp  x0, x9
     b.eq Lds_scan
+    ADRL x8, _g_qk_table
+    ldr  x9, [x8]
+    cmp  x0, x9
+    b.eq Lds_qk
     ADRL x8, _g_rooms_table
     ldr  x9, [x8]
     cmp  x0, x9
@@ -683,6 +693,17 @@ Lds_done:
     LEAVE 0
 Lds_scan:
     bl   _scanner_selected
+    LEAVE 0
+Lds_qk:                               // a shortcut's card: run it, and let go of it again
+    mov  x19, x0
+    MSG0 Ls_selectedRow
+    tbnz x0, #63, Lds_done
+    mov  x20, x0
+    mov  x0, x19
+    mov  x2, #0
+    MSG1 Ls_deselectAll
+    mov  x0, x20
+    bl   _am_qk_run
     LEAVE 0
 Lds_ad:                               // someone else's listed room: ask, once the click is done
     sub  x0, x0, x9
@@ -1700,6 +1721,7 @@ Lic_free:
 
 // ---------------------------------------------------------------------------
 .section __TEXT,__cstring,cstring_literals
+Ls_deselectAll:       .asciz "deselectAll:"
 Ls_length:            .asciz "length"
 Ls_string:            .asciz "string"
 Ls_lineRangeForRange: .asciz "lineRangeForRange:"
