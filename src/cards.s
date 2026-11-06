@@ -414,7 +414,7 @@ _cd_card:
     movk x0, #0xFF, lsl #16
     mov  x1, #0x1111
     movk x1, #0x11, lsl #16
-    bl   _rgb2
+    bl   _rgb_now2                    //   (a layer's colour: chosen for the mode now)
     MSG0 Ls_CGColor
     mov  x2, x0
     mov  x0, x21

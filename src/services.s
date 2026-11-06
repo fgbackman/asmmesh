@@ -689,8 +689,8 @@ _card:
     mov  x0, x19
     mov  x2, #1
     MSG1 Ls_setWantsLayer
-    mov  x0, x20
-    bl   _rgb
+    mov  x0, x20                      // for the mode now (a layer's colour can't follow it)
+    bl   _rgb_now
     MSG0 Ls_CGColor
     mov  x21, x0
     mov  x0, x19

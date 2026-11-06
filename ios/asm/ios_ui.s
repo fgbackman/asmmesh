@@ -1780,6 +1780,9 @@ _rgb_dyn:
 .globl _appear_border
 _appear_border:
     ret
+.globl _rgb_now
+_rgb_now:
+    b    _rgb
 .globl _rgb2
 _rgb2:
     mov  x0, #0

@@ -24,6 +24,7 @@
 .data
 .p2align 3
 _g_dyn_n:       .quad 0
+_g_appear_dark: .quad 0                   // 1: dark (set by _appear_apply)
 .zerofill __DATA,__bss,_g_dyn,(DYN_N * DY_SIZE),4
 .zerofill __DATA,__bss,_g_appear_buf,32,4
 
@@ -89,6 +90,37 @@ _rgb_dyn:
     b    _rgb2
 8:  mov  x0, #0
     ret
+
+// id _rgb_now(long 0xRRGGBB) — a plain colour for the mode the app is in now: for what's set
+//   once and can't follow (a layer's CGColor). One of the greys or accents: its dark or its
+//   light colour, as _appear_apply decided; anything else: itself.
+.globl _rgb_now
+_rgb_now:
+    ADRL x8, _g_appear_dark
+    ldr  x8, [x8]
+    ADRL x9, Lpal
+1:  ldp  x10, x11, [x9], #16
+    cbz  x10, 2f
+    cmp  x10, x0
+    b.ne 1b
+    b    4f
+2:  ADRL x9, Lacc
+3:  ldp  x10, x11, [x9], #16
+    cbz  x10, 5f
+    cmp  x10, x0
+    b.ne 3b
+4:  cbnz x8, 5f                       // dark: the colour as given
+    mov  x0, x11                      // light: its light partner
+5:  b    Lrgb_plain
+
+// id _rgb_now2(long dark, long light) — the same for a pair
+.globl _rgb_now2
+_rgb_now2:
+    ADRL x8, _g_appear_dark
+    ldr  x8, [x8]
+    cbnz x8, 1f
+    mov  x0, x1
+1:  b    Lrgb_plain
 
 // long _rgb_is_dyn(long 0xRRGGBB) -> 1 if it's one of the greys that go light (leaf)
 .globl _rgb_is_dyn
@@ -213,16 +245,10 @@ Lrgb_plain:
 //   borders, which can't follow by themselves)
 .globl _appear_light_now
 _appear_light_now:
-    ENTER 0
-    CLS  Ls_NSApplication
-    MSG0 Ls_sharedApplication
-    MSG0 Ls_effectiveAppearance
-    cbz  x0, 8f
-    bl   _appear_is_dark
+    ADRL x8, _g_appear_dark           // decided by _appear_apply (the system's setting, or yours)
+    ldr  x0, [x8]
     eor  x0, x0, #1
-    LEAVE 0
-8:  mov  x0, #0
-    LEAVE 0
+    ret
 
 // void _appear_border(CALayer *layer, long 0xRRGGBB fill) — light mode, a card of the
 //   app's greys: a 1 px grey border (Graphite); dark mode: none
@@ -270,40 +296,57 @@ _appear_apply:
     ADRL x1, _g_appear_buf
     mov  x2, #32
     bl   _pref_get
-    mov  x19, #0                      // nil: the system's
+    mov  x19, #0                      // the app's appearance: nil, the system's
+    mov  x22, #0                      // dark?
     ADRL x0, _g_appear_buf
     ADRL x1, Ls_light
     bl   _strcmp
     cbnz w0, 1f
-    LDGOT x8, _NSAppearanceNameAqua
+    LDGOT x8, _NSAppearanceNameAqua   // yours: light
     ldr  x19, [x8]
     b    2f
 1:  ADRL x0, _g_appear_buf
     ADRL x1, Ls_dark
     bl   _strcmp
-    cbnz w0, 2f
-    LDGOT x8, _NSAppearanceNameDarkAqua
+    cbnz w0, 11f
+    LDGOT x8, _NSAppearanceNameDarkAqua   // yours: dark
     ldr  x19, [x8]
-2:  cbz  x19, 3f
+    mov  x22, #1
+    b    2f
+11: ADRL x0, Ls_k_style               // the system's: AppleInterfaceStyle is "Dark" in dark
+    ADRL x1, _g_appear_buf            //   mode (also while Auto has it dark), absent in light;
+    mov  x2, #32                      //   right from launch, unlike effectiveAppearance
+    bl   _pref_get
+    ADRL x0, _g_appear_buf
+    ADRL x1, Ls_Dark
+    bl   _strcmp
+    cmp  w0, #0
+    cset x22, eq
+2:  ADRL x8, _g_appear_dark
+    str  x22, [x8]
+    cbz  x19, 3f
     CLS  Ls_NSAppearance
     mov  x2, x19
     MSG1 Ls_appearanceNamed
     mov  x19, x0
 3:  CLS  Ls_NSApplication
     MSG0 Ls_sharedApplication
-    mov  x20, x0
     mov  x2, x19
     MSG1 Ls_setAppearance
-    CLS  Ls_NSAppearance              // colours turned into layers' CGColors now use it too
+    CLS  Ls_NSAppearance              // what's turned into a layer's CGColor uses the same
     mov  x21, x0                      //   (the class first: CLS is a call, it wipes x2)
-    mov  x0, x20
-    MSG0 Ls_effectiveAppearance
-    cbz  x0, 4f
+    LDGOT x8, _NSAppearanceNameAqua
+    ldr  x2, [x8]
+    cbz  x22, 4f
+    LDGOT x8, _NSAppearanceNameDarkAqua
+    ldr  x2, [x8]
+4:  mov  x0, x21
+    MSG1 Ls_appearanceNamed
+    cbz  x0, 5f
     mov  x2, x0
     mov  x0, x21
     MSG1 Ls_setCurrentAppearance
-4:
-    LEAVE 0
+5:  LEAVE 0
 
 // void _appear_dark(id window) — this window stays dark (a game board, the scanner)
 .globl _appear_dark
@@ -355,6 +398,7 @@ _h_appear:
 Lsig_provide:   .asciz "@16@?0@8"
 Ls_Dark:        .asciz "Dark"
 Ls_k_appear:    .asciz "appearance"
+Ls_k_style:     .asciz "AppleInterfaceStyle"
 Ls_light:       .asciz "light"
 Ls_dark:        .asciz "dark"
 Ls_empty:       .asciz ""
