@@ -178,6 +178,7 @@ Lmethods:
     .quad Ls_m_playFivefold, _ff_dialog,        Ls_ty_v1
     .quad Ls_m_qkRun,       _qk_menu_run,       Ls_ty_v1
     .quad Ls_m_qkPop,       _qk_menu_pop,       Ls_ty_v1
+    .quad Ls_m_appearChanged, _appear_changed,  Ls_ty_v1
     .quad Ls_m_qkNew,       _qk_menu_new,       Ls_ty_v1
     .quad Ls_m_qkDelete,    _qk_menu_delete,    Ls_ty_v1
     .quad Ls_m_ffTile,      _ffw_tile,          Ls_ty_v1
@@ -313,6 +314,7 @@ _build_ui:
     mov  x22, x0
     ADRL x8, _g_ctl
     str  x22, [x8]
+    bl   _appear_watch                // macOS switching light/dark: the cards follow (appear.s)
     mov  x0, x19
     mov  x2, x22
     MSG1 Ls_setDelegate
@@ -2151,6 +2153,7 @@ Ls_chess_tip:          .asciz "Play Chess"
 Ls_m_playFivefold:     .asciz "playFivefold:"
 Ls_m_qkRun:            .asciz "qkRun:"
 Ls_m_qkPop:            .asciz "qkPop:"
+Ls_m_appearChanged:    .asciz "appearChanged:"
 Ls_qk_popUp:           .asciz "popUpMenuPositioningItem:atLocation:inView:"
 Ls_qk_btn_title:       .asciz "\342\232\241 Shortcuts"
 Ls_m_qkNew:            .asciz "qkNew:"

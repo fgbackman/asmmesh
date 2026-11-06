@@ -250,31 +250,57 @@ _appear_light_now:
     eor  x0, x0, #1
     ret
 
-// void _appear_border(CALayer *layer, long 0xRRGGBB fill) — light mode, a card of the
-//   app's greys: a 1 px grey border (Graphite); dark mode: none
+// void _appear_border(CALayer *layer, long 0xRRGGBB fill) — services.s's _card, once per
+//   card: the layer remembers its colour ("amColor") so _appear_refresh can paint it again
+//   when the mode changes; then its border: light mode, one of the greys: 1 px grey
+//   (Graphite); otherwise none
 .globl _appear_border
 _appear_border:
     ENTER 0
     mov  x19, x0
     cbz  x19, 9f
     mov  x20, x1
+    CLS  Ls_NSNumber
+    mov  x2, x20
+    MSG1 Ls_numberWithLong
+    mov  x21, x0
+    ADRL x0, Ls_amColor
+    bl   _nsstr
+    mov  x3, x0
+    mov  x2, x21
+    mov  x0, x19
+    MSG2 Ls_setValueForKey
+    mov  x0, x19
+    mov  x1, x20
+    bl   Lap_edge
+9:  LEAVE 0
+
+// Lap_edge(x0 layer, x1 colour) — the border for the mode now
+Lap_edge:
+    ENTER 0
+    mov  x19, x0
+    mov  x20, x1
+    mov  x21, #0                      // no border
     mov  x9, #0x1A1C                  // not the windows' own colours (only cards get one)
     movk x9, #0x1A, lsl #16
     cmp  x20, x9
-    b.eq 9f
+    b.eq 1f
     mov  x9, #0x1C1E
     movk x9, #0x1C, lsl #16
     cmp  x20, x9
-    b.eq 9f
+    b.eq 1f
     mov  x0, x20
     bl   _rgb_is_dyn
-    cbz  x0, 9f
+    cbz  x0, 1f
     bl   _appear_light_now
-    cbz  x0, 9f
-    SELX1 Ls_setBorderWidth
+    mov  x21, x0
+1:  SELX1 Ls_setBorderWidth
     mov  x0, x19
+    fmov d0, xzr
+    cbz  x21, 2f
     fmov d0, #1.0
-    bl   _objc_msgSend
+2:  bl   _objc_msgSend
+    cbz  x21, 9f
     mov  x0, #0xC9C9
     movk x0, #0xC9, lsl #16
     bl   Lrgb_plain
@@ -283,6 +309,104 @@ _appear_border:
     mov  x0, x19
     MSG1 Ls_setBorderColor
 9:  LEAVE 0
+
+// void _appear_refresh(void) — the mode changed: every card in every window painted for it
+//   (a layer's colour can't follow by itself), and the lists' cards made again
+.globl _appear_refresh
+_appear_refresh:
+    ENTER 16
+    CLS  Ls_NSApplication
+    MSG0 Ls_sharedApplication
+    MSG0 Ls_windows
+    cbz  x0, 9f
+    mov  x19, x0
+    MSG0 Ls_count
+    mov  x20, x0
+    mov  x21, #0
+1:  cmp  x21, x20
+    b.hs 8f
+    mov  x0, x19
+    mov  x2, x21
+    MSG1 Ls_objectAtIndex
+    MSG0 Ls_contentView
+    cbz  x0, 2f
+    bl   Lap_walk
+2:  add  x21, x21, #1
+    b    1b
+8:  bl   _ui_lists_changed            // the Rooms and People cards, made again
+9:  LEAVE 16
+
+// Lap_walk(x0 view) — this view and everything in it
+Lap_walk:
+    ENTER 16
+    mov  x19, x0
+    MSG0 Ls_layer
+    cbz  x0, 3f
+    mov  x20, x0
+    ADRL x0, Ls_amColor
+    bl   _nsstr
+    mov  x2, x0
+    mov  x0, x20
+    MSG1 Ls_valueForKey
+    cbz  x0, 3f
+    MSG0 Ls_longValue
+    mov  x21, x0
+    bl   _rgb_now                     // its fill, for the mode now
+    MSG0 Ls_CGColor
+    mov  x2, x0
+    mov  x0, x20
+    MSG1 Ls_setBackgroundColor
+    mov  x0, x20
+    mov  x1, x21
+    bl   Lap_edge
+3:  mov  x0, x19
+    MSG0 Ls_subviews
+    cbz  x0, 9f
+    mov  x20, x0
+    MSG0 Ls_count
+    mov  x21, x0
+    mov  x22, #0
+4:  cmp  x22, x21
+    b.hs 9f
+    mov  x0, x20
+    mov  x2, x22
+    MSG1 Ls_objectAtIndex
+    bl   Lap_walk
+    add  x22, x22, #1
+    b    4b
+9:  LEAVE 16
+
+// void _appear_watch(void) — main.s, once: macOS switching light/dark (System Settings, or
+//   Auto at sunset) calls the controller's appearChanged:
+.globl _appear_watch
+_appear_watch:
+    ENTER 0
+    CLS  Ls_NSDistributedNotificationCenter
+    MSG0 Ls_defaultCenter
+    mov  x19, x0
+    ADRL x0, Ls_theme_note
+    bl   _nsstr
+    mov  x20, x0
+    ADRL x0, Ls_m_appearChanged
+    bl   _sel_registerName
+    mov  x21, x0
+    SELX1 Ls_addObserver
+    mov  x0, x19
+    ADRL x8, _g_ctl
+    ldr  x2, [x8]
+    mov  x3, x21
+    mov  x4, x20
+    mov  x5, #0
+    bl   _objc_msgSend
+    LEAVE 0
+
+// - appearChanged:(NSNotification *)n — the system's mode changed (main.s's table)
+.globl _appear_changed
+_appear_changed:
+    ENTER 0
+    bl   _appear_apply
+    bl   _appear_refresh
+    LEAVE 0
 
 // ---------------------------------------------------------------------------
 // Which appearance
@@ -380,6 +504,7 @@ _h_appear:
 1:  ADRL x0, Ls_k_appear
     bl   _pref_set
     bl   _appear_apply
+    bl   _appear_refresh
 5:  ADRL x0, Ls_k_appear
     ADRL x1, _g_appear_buf
     mov  x2, #32
@@ -418,5 +543,23 @@ Ls_retain:      .asciz "retain"
 Ls_setBorderWidth: .asciz "setBorderWidth:"
 Ls_setBorderColor: .asciz "setBorderColor:"
 Ls_CGColor:     .asciz "CGColor"
+Ls_NSNumber:    .asciz "NSNumber"
+Ls_numberWithLong: .asciz "numberWithLong:"
+Ls_longValue:   .asciz "longValue"
+Ls_amColor:     .asciz "amColor"
+Ls_setValueForKey: .asciz "setValue:forKey:"
+Ls_valueForKey: .asciz "valueForKey:"
+Ls_setBackgroundColor: .asciz "setBackgroundColor:"
+Ls_windows:     .asciz "windows"
+Ls_count:       .asciz "count"
+Ls_objectAtIndex: .asciz "objectAtIndex:"
+Ls_contentView: .asciz "contentView"
+Ls_layer:       .asciz "layer"
+Ls_subviews:    .asciz "subviews"
+Ls_NSDistributedNotificationCenter: .asciz "NSDistributedNotificationCenter"
+Ls_defaultCenter: .asciz "defaultCenter"
+Ls_addObserver: .asciz "addObserver:selector:name:object:"
+Ls_theme_note:  .asciz "AppleInterfaceThemeChangedNotification"
+Ls_m_appearChanged: .asciz "appearChanged:"
 Ls_name:        .asciz "name"
 Ls_UTF8String:  .asciz "UTF8String"
