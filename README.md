@@ -132,7 +132,7 @@ Nine letters in a 3×3 grid; make words of 4 to 9 letters that use the centre le
 
 ## Light and dark mode (Mac)
 
-- asmmesh follows the system (System Settings › Appearance). To pick one for asmmesh alone: `appearance light`, `appearance dark` (or `light mode`, `dark mode`); `appearance auto` follows the system again, `appearance` says which. The windows, cards, fields and grey buttons go light; the accent colours stay. The game boards (Ninefold, chess, Fivefold) and the scanner stay dark. The game buttons above Rooms are yellow, their symbols black in dark mode and white in light mode. Switching while asmmesh is open changes most things at once; the cards' backgrounds follow at the next launch. The iPhone app stays dark for now.
+- asmmesh follows the system (System Settings › Appearance). To pick one for asmmesh alone: `appearance light`, `appearance dark` (or `light mode`, `dark mode`); `appearance auto` follows the system again, `appearance` says which. Light mode is the "Graphite" palette: light-grey windows, white cards and fields, light-grey buttons, black text, and the yellow and blue a little deeper. The game boards (Ninefold, chess, Fivefold) and the scanner stay dark. The game buttons above Rooms are yellow, their symbols black in dark mode and white in light mode. Switching while asmmesh is open changes most things at once; the cards' backgrounds follow at the next launch. The iPhone app stays dark for now.
 
 ## Your shortcuts, and devices remembered
 

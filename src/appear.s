@@ -47,12 +47,18 @@ Ldyn_desc:
 .section __TEXT,__const
 .p2align 3
 // the app's dark greys and what they are in light mode
+// Light mode is "Graphite": white and black, the highest contrast of the six prototyped
 Lpal:
-    .quad 0x1A1A1C, 0xF2F2F7          // the main window
-    .quad 0x1C1C1E, 0xECECF0          // Settings, SPIN, FM windows
+    .quad 0x1A1A1C, 0xF3F3F3          // the main window
+    .quad 0x1C1C1E, 0xF3F3F3          // Settings, SPIN, FM windows
     .quad 0x222426, 0xFFFFFF          // cards
     .quad 0x2C2C2E, 0xFFFFFF          // cards and fields in Settings, the input box
-    .quad 0x3A3A3C, 0xD1D1D6          // grey pills
+    .quad 0x3A3A3C, 0xEDEDED          // grey pills
+    .quad 0, 0
+// accents a little deeper in light mode (their text stays as it is: not in Lpal)
+Lacc:
+    .quad 0xF5B82E, 0xF0AE00          // amber: the game buttons, +, Shortcuts
+    .quad 0x0A84FF, 0x0057D9          // blue: Services, send
     .quad 0, 0
 Lc_255:     .double 255.0
 Lc_one:     .double 1.0
@@ -66,9 +72,16 @@ Lc_one:     .double 1.0
 _rgb_dyn:
     ADRL x9, Lpal
 1:  ldp  x10, x11, [x9], #16
-    cbz  x10, 8f
+    cbz  x10, 2f
     cmp  x10, x0
     b.ne 1b
+    mov  x1, x11
+    b    _rgb2
+2:  ADRL x9, Lacc
+3:  ldp  x10, x11, [x9], #16
+    cbz  x10, 8f
+    cmp  x10, x0
+    b.ne 3b
     mov  x1, x11
     b    _rgb2
 8:  mov  x0, #0
