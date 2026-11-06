@@ -157,6 +157,13 @@ Lsimple:
     .quad Lw_chess,          0, _h_chess, 0
     .quad Lw_chess,          1, _h_chess, 0
     .quad Lw_fivefold,       0, _h_fivefold, 1
+    .quad Lw_ap,             0, _h_appear, 4
+    .quad Lw_ap_light,       0, _h_appear, 1
+    .quad Lw_ap_dark,        0, _h_appear, 2
+    .quad Lw_ap_auto,        0, _h_appear, 3
+    .quad Lw_ap_system,      0, _h_appear, 3
+    .quad Lw_light_mode,     0, _h_appear, 1
+    .quad Lw_dark_mode,      0, _h_appear, 2
     .quad Lw_qk_list,        0, _h_quick, 2
     .quad Lw_qk_list2,       0, _h_quick, 2
     .quad Lw_qk_one,         0, _h_quick, 5
@@ -2900,6 +2907,13 @@ Lw_bc_chat:      .asciz "bitchat chat"
 Lw_ninefold:     .asciz "ninefold"
 Lw_chess:        .asciz "chess"
 Lw_fivefold:     .asciz "fivefold"
+Lw_ap:           .asciz "appearance"
+Lw_ap_light:     .asciz "appearance light"
+Lw_ap_dark:      .asciz "appearance dark"
+Lw_ap_auto:      .asciz "appearance auto"
+Lw_ap_system:    .asciz "appearance system"
+Lw_light_mode:   .asciz "light mode"
+Lw_dark_mode:    .asciz "dark mode"
 Lw_qk_list:      .asciz "shortcuts"
 Lw_qk_list2:     .asciz "my shortcuts"
 Lw_qk_one:       .asciz "shortcut"

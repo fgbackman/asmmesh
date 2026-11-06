@@ -659,6 +659,8 @@ Lhw_done:
 _rgb:
     ENTER 16
     mov  x19, x0
+    bl   _rgb_dyn                     // one of the app's greys: light in light mode (appear.s)
+    cbnz x0, 9f
     SELX1 Ls_colorWithSRGB
     mov  x20, x1
     CLS  Ls_NSColor
@@ -675,7 +677,7 @@ _rgb:
     fdiv d2, d2, d4
     LDD  d3, Lc1
     bl   _objc_msgSend
-    LEAVE 16
+9:  LEAVE 16
 
 // void _card(id view, long 0xRRGGBB, double radius /*d0*/) — rounded colour fill
 .globl _card

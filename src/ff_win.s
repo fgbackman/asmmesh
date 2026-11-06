@@ -331,6 +331,8 @@ Lfw_build:
     mov  x20, x0
     ADRL x8, _g_ffw
     str  x20, [x8]
+    mov  x0, x20                          // a board: dark in light mode too (appear.s)
+    bl   _appear_dark
     ADRL x0, Ls_w_title
     bl   _nsstr
     mov  x2, x0

@@ -1772,6 +1772,16 @@ _ch_ui_show:
 _ch_ui_pop:
     b    _ios_ch_pop
 
+// the Mac's light/dark colours (appear.s) aren't on the iPhone: plain colours, its Settings
+.globl _rgb_dyn
+_rgb_dyn:
+    mov  x0, #0
+    ret
+.globl _h_appear
+_h_appear:
+    ADRL x0, Ls_appear_ios
+    b    _home_say0
+
 // void _qk_ui_changed(void) — quick.s: the shortcuts changed
 .globl _qk_ui_changed
 _qk_ui_changed:
@@ -2066,6 +2076,7 @@ Ls_inv_msg:           .asciz "%s invites you to #%s"
 Ls_inv_nf_prefix:     .asciz "Ninefold "
 Ls_inv_ch_prefix:     .asciz "Chess "
 Ls_inv_ff_prefix:     .asciz "Fivefold "
+Ls_appear_ios:        .asciz "\302\267 Light and dark mode are set on the Mac for now; the iPhone app stays dark."
 Ls_inv_ff_msg:        .asciz "%s invites you to play Fivefold"
 Ls_inv_ff_info:       .asciz "Guess a five-letter word in six tries, over the mesh: a race (the same word for everyone) or a duel (each of you picks the other\342\200\231s word, sealed until the end). Only the players see the game."
 Ls_inv_ch_msg:        .asciz "%s invites you to play chess"

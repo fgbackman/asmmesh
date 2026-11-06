@@ -307,13 +307,7 @@ _build_ui:
     mov  x19, x0                      // x19 = NSApp
     mov  x2, #0                       // NSApplicationActivationPolicyRegular
     MSG1 Ls_setActivationPolicy
-    CLS  Ls_NSAppearance              // dark, like the Productive app
-    LDGOT x8, _NSAppearanceNameDarkAqua
-    ldr  x2, [x8]
-    MSG1 Ls_appearanceNamed
-    mov  x2, x0
-    mov  x0, x19
-    MSG1 Ls_setAppearance
+    bl   _appear_apply                // light or dark: the system's, or yours (appear.s)
 
     bl   _make_controller
     mov  x22, x0
@@ -1018,9 +1012,15 @@ _pill:
     CLS  Ls_NSColor
     MSG0 Ls_whiteColor
     mov  x24, x0
-    cbz  x21, Lpl_attrs
+    cbz  x21, 1f
     CLS  Ls_NSColor
     MSG0 Ls_blackColor
+    mov  x24, x0
+1:  mov  x0, x20                      // a grey that goes light: the text follows (dark/light)
+    bl   _rgb_is_dyn
+    cbz  x0, Lpl_attrs
+    CLS  Ls_NSColor
+    MSG0 Ls_labelColor
     mov  x24, x0
 Lpl_attrs:
     mov  x0, x23
@@ -1789,6 +1789,36 @@ _symbol_image:
     MSG2 Ls_imageWithSymbol
     LEAVE 0
 
+// id Lsym_game(NSImage *symbol) -> the game buttons' symbol: black in dark mode, white in
+//   light mode, drawn in that colour (a palette symbol, not a template the button tints)
+Lsym_game:
+    ENTER 16
+    mov  x19, x0
+    mov  x0, #0                       // dark mode: black; light mode: white
+    mov  x1, #0xFFFF
+    movk x1, #0xFF, lsl #16
+    bl   _rgb2
+    mov  x20, x0
+    CLS  Ls_NSImageSymbolConfiguration
+    cbz  x0, 8f                       // before macOS 12: tinted instead
+    mov  x21, x0
+    CLS  Ls_NSArray
+    mov  x2, x20
+    MSG1 Ls_arrayWithObject
+    mov  x2, x0
+    mov  x0, x21
+    MSG1 Ls_configurationWithPaletteColors
+    cbz  x0, 8f
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_imageWithSymbolConfiguration
+    cbz  x0, 8f
+    mov  x19, x0
+    mov  x2, #0
+    MSG1 Ls_setTemplate
+8:  mov  x0, x19
+    LEAVE 16
+
 // Lmk_nf_button(id content) — the amber ▦ button left of +: Mesh › Play Ninefold…
 Lmk_nf_button:
     ENTER 0
@@ -1802,20 +1832,17 @@ Lmk_nf_button:
     ldp  d2, d3, [x8, #16]
     bl   _mk_button
     mov  x19, x0
-    mov  x1, #0                       // black, like the iPhone's (white symbol)
-    mov  x2, #0
+    mov  x1, #0xB82E                  // amber; the symbol black in dark mode, white in light
+    movk x1, #0xF5, lsl #16
+    mov  x2, #1
     bl   _pill
     ADRL x0, Ls_grid_symbol
     bl   _symbol_image
     cbz  x0, 1f                       // before macOS 11: a text grid instead
+    bl   Lsym_game                    // drawn in its colours, not tinted by the button
     mov  x2, x0
     mov  x0, x19
     MSG1 Ls_setImage
-    CLS  Ls_NSColor
-    MSG0 Ls_whiteColor
-    mov  x2, x0
-    mov  x0, x19
-    MSG1 Ls_setContentTintColor
     b    2f
 1:  ADRL x0, Ls_grid_text
     bl   _nsstr
@@ -1840,20 +1867,17 @@ Lmk_ff_button:
     ldp  d2, d3, [x8, #16]
     bl   _mk_button
     mov  x19, x0
-    mov  x1, #0                       // black, like the iPhone's (white symbol)
-    mov  x2, #0
+    mov  x1, #0xB82E                  // amber; the symbol black in dark mode, white in light
+    movk x1, #0xF5, lsl #16
+    mov  x2, #1
     bl   _pill
     ADRL x0, Ls_ff_symbol
     bl   _symbol_image
     cbz  x0, 1f
+    bl   Lsym_game                    // drawn in its colours, not tinted by the button
     mov  x2, x0
     mov  x0, x19
     MSG1 Ls_setImage
-    CLS  Ls_NSColor
-    MSG0 Ls_whiteColor
-    mov  x2, x0
-    mov  x0, x19
-    MSG1 Ls_setContentTintColor
     b    2f
 1:  ADRL x0, Ls_ff_text
     bl   _nsstr
@@ -1878,20 +1902,17 @@ Lmk_ch_button:
     ldp  d2, d3, [x8, #16]
     bl   _mk_button
     mov  x19, x0
-    mov  x1, #0                       // black, like the iPhone's (white symbol)
-    mov  x2, #0
+    mov  x1, #0xB82E                  // amber; the symbol black in dark mode, white in light
+    movk x1, #0xF5, lsl #16
+    mov  x2, #1
     bl   _pill
     ADRL x0, Ls_chess_symbol
     bl   _symbol_image
     cbz  x0, 1f
+    bl   Lsym_game                    // drawn in its colours, not tinted by the button
     mov  x2, x0
     mov  x0, x19
     MSG1 Ls_setImage
-    CLS  Ls_NSColor
-    MSG0 Ls_whiteColor
-    mov  x2, x0
-    mov  x0, x19
-    MSG1 Ls_setContentTintColor
     b    2f
 1:  ADRL x0, Ls_chess_text
     bl   _nsstr
@@ -2004,7 +2025,6 @@ Ls_setDocumentView:    .asciz "setDocumentView:"
 Ls_systemStatusBar:    .asciz "systemStatusBar"
 Ls_statusItemWithLength: .asciz "statusItemWithLength:"
 Ls_button:             .asciz "button"
-Ls_setTemplate:        .asciz "setTemplate:"
 Ls_setImage:           .asciz "setImage:"
 Ls_setImagePosition:   .asciz "setImagePosition:"
 Ls_separatorItem:      .asciz "separatorItem"
@@ -2245,6 +2265,12 @@ Ls_setContentTintColor: .asciz "setContentTintColor:"
 Ls_invite_title:       .asciz "Invite to Chat"
 Ls_scanner_title:      .asciz "Mesh Scanner"
 Ls_scanner_short:      .asciz "Scanner"
+Ls_NSImageSymbolConfiguration: .asciz "NSImageSymbolConfiguration"
+Ls_NSArray:            .asciz "NSArray"
+Ls_arrayWithObject:    .asciz "arrayWithObject:"
+Ls_configurationWithPaletteColors: .asciz "configurationWithPaletteColors:"
+Ls_imageWithSymbolConfiguration: .asciz "imageWithSymbolConfiguration:"
+Ls_setTemplate:        .asciz "setTemplate:"
 Ls_send_title:         .asciz "Send"
 Ls_talk_tip:           .asciz "Talk (\342\214\230T)"
 Ls_y_send:             .asciz "arrow.up"

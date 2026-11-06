@@ -229,6 +229,8 @@ _build_scanner:
     mov  x19, x0
     ADRL x8, _g_scan_window
     str  x19, [x8]
+    mov  x0, x19                      // the radar is drawn for dark (appear.s)
+    bl   _appear_dark
     ADRL x0, Ls_scan_title
     bl   _nsstr
     mov  x2, x0
