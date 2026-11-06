@@ -1802,9 +1802,8 @@ Lmk_nf_button:
     ldp  d2, d3, [x8, #16]
     bl   _mk_button
     mov  x19, x0
-    mov  x1, #0xB82E                  // amber, like +
-    movk x1, #0xF5, lsl #16
-    mov  x2, #1
+    mov  x1, #0                       // black, like the iPhone's (white symbol)
+    mov  x2, #0
     bl   _pill
     ADRL x0, Ls_grid_symbol
     bl   _symbol_image
@@ -1813,7 +1812,7 @@ Lmk_nf_button:
     mov  x0, x19
     MSG1 Ls_setImage
     CLS  Ls_NSColor
-    MSG0 Ls_blackColor
+    MSG0 Ls_whiteColor
     mov  x2, x0
     mov  x0, x19
     MSG1 Ls_setContentTintColor
@@ -1841,9 +1840,8 @@ Lmk_ff_button:
     ldp  d2, d3, [x8, #16]
     bl   _mk_button
     mov  x19, x0
-    mov  x1, #0xB82E
-    movk x1, #0xF5, lsl #16
-    mov  x2, #1
+    mov  x1, #0                       // black, like the iPhone's (white symbol)
+    mov  x2, #0
     bl   _pill
     ADRL x0, Ls_ff_symbol
     bl   _symbol_image
@@ -1852,7 +1850,7 @@ Lmk_ff_button:
     mov  x0, x19
     MSG1 Ls_setImage
     CLS  Ls_NSColor
-    MSG0 Ls_blackColor
+    MSG0 Ls_whiteColor
     mov  x2, x0
     mov  x0, x19
     MSG1 Ls_setContentTintColor
@@ -1880,9 +1878,8 @@ Lmk_ch_button:
     ldp  d2, d3, [x8, #16]
     bl   _mk_button
     mov  x19, x0
-    mov  x1, #0xB82E
-    movk x1, #0xF5, lsl #16
-    mov  x2, #1
+    mov  x1, #0                       // black, like the iPhone's (white symbol)
+    mov  x2, #0
     bl   _pill
     ADRL x0, Ls_chess_symbol
     bl   _symbol_image
@@ -1891,7 +1888,7 @@ Lmk_ch_button:
     mov  x0, x19
     MSG1 Ls_setImage
     CLS  Ls_NSColor
-    MSG0 Ls_blackColor
+    MSG0 Ls_whiteColor
     mov  x2, x0
     mov  x0, x19
     MSG1 Ls_setContentTintColor
