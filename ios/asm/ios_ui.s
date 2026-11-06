@@ -1777,6 +1777,13 @@ _ch_ui_pop:
 _rgb_dyn:
     mov  x0, #0
     ret
+.globl _appear_border
+_appear_border:
+    ret
+.globl _rgb2
+_rgb2:
+    mov  x0, #0
+    ret
 .globl _h_appear
 _h_appear:
     ADRL x0, Ls_appear_ios

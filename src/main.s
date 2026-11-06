@@ -485,8 +485,8 @@ _build_ui:
     ldp  d0, d1, [x8]
     ldp  d2, d3, [x8, #16]
     bl   _mk_button
-    mov  x1, #0x0A84                  // blue, like the app's add button
-    movk x1, #0xFF, lsl #16
+    mov  x1, #0x84FF                  // blue (0x0A84FF: the bytes were the wrong way round, pink)
+    movk x1, #0x0A, lsl #16
     mov  x2, #0
     bl   _pill
 
@@ -537,7 +537,7 @@ _build_ui:
     bl   _mk_textview
     ADRL x8, _g_chatview
     str  x0, [x8]
-    mov  x1, #0x1A1C                  // flat on the window, like the iPhone's chat
+    mov  x1, #0x1A1B                  // flat on the window in dark; a white card in light
     movk x1, #0x1A, lsl #16
     bl   _card_scroll
 
@@ -609,7 +609,7 @@ _build_ui:
     ADRL x1, Ls_m_send
     mov  x2, #33                      // MinXMargin | MaxYMargin
     mov  x3, x21
-    mov  x4, #0x9E0A                  // amber, black arrow
+    mov  x4, #0x9E0B                  // amber, black arrow; blue, white arrow in light (appear.s)
     movk x4, #0xFF, lsl #16
     mov  x5, #1
     ADRL x8, Lf_send

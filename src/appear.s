@@ -54,11 +54,14 @@ Lpal:
     .quad 0x222426, 0xFFFFFF          // cards
     .quad 0x2C2C2E, 0xFFFFFF          // cards and fields in Settings, the input box
     .quad 0x3A3A3C, 0xEDEDED          // grey pills
+    .quad 0x1A1A1B, 0xFFFFFF          // the transcript: flat in dark, a white card in light
     .quad 0, 0
 // accents a little deeper in light mode (their text stays as it is: not in Lpal)
 Lacc:
     .quad 0xF5B82E, 0xF0AE00          // amber: the game buttons, +, Shortcuts
-    .quad 0x0A84FF, 0x0057D9          // blue: Services, send
+    .quad 0x0A84FF, 0x0057D9          // blue: Services
+    .quad 0xFF9E0B, 0x0057D9          // Send: amber in dark, blue in light
+    .quad 0xFF9E0C, 0x0057D9          // unread badges: the same
     .quad 0, 0
 Lc_255:     .double 255.0
 Lc_one:     .double 1.0
@@ -206,6 +209,55 @@ Lrgb_plain:
     bl   _objc_msgSend
     LEAVE 16
 
+// long _appear_light_now(void) -> 1 if the app is light right now (for what's set once:
+//   borders, which can't follow by themselves)
+.globl _appear_light_now
+_appear_light_now:
+    ENTER 0
+    CLS  Ls_NSApplication
+    MSG0 Ls_sharedApplication
+    MSG0 Ls_effectiveAppearance
+    cbz  x0, 8f
+    bl   _appear_is_dark
+    eor  x0, x0, #1
+    LEAVE 0
+8:  mov  x0, #0
+    LEAVE 0
+
+// void _appear_border(CALayer *layer, long 0xRRGGBB fill) — light mode, a card of the
+//   app's greys: a 1 px grey border (Graphite); dark mode: none
+.globl _appear_border
+_appear_border:
+    ENTER 0
+    mov  x19, x0
+    cbz  x19, 9f
+    mov  x20, x1
+    mov  x9, #0x1A1C                  // not the windows' own colours (only cards get one)
+    movk x9, #0x1A, lsl #16
+    cmp  x20, x9
+    b.eq 9f
+    mov  x9, #0x1C1E
+    movk x9, #0x1C, lsl #16
+    cmp  x20, x9
+    b.eq 9f
+    mov  x0, x20
+    bl   _rgb_is_dyn
+    cbz  x0, 9f
+    bl   _appear_light_now
+    cbz  x0, 9f
+    SELX1 Ls_setBorderWidth
+    mov  x0, x19
+    fmov d0, #1.0
+    bl   _objc_msgSend
+    mov  x0, #0xC9C9
+    movk x0, #0xC9, lsl #16
+    bl   Lrgb_plain
+    MSG0 Ls_CGColor
+    mov  x2, x0
+    mov  x0, x19
+    MSG1 Ls_setBorderColor
+9:  LEAVE 0
+
 // ---------------------------------------------------------------------------
 // Which appearance
 
@@ -319,5 +371,8 @@ Ls_setAppearance: .asciz "setAppearance:"
 Ls_effectiveAppearance: .asciz "effectiveAppearance"
 Ls_setCurrentAppearance: .asciz "setCurrentAppearance:"
 Ls_retain:      .asciz "retain"
+Ls_setBorderWidth: .asciz "setBorderWidth:"
+Ls_setBorderColor: .asciz "setBorderColor:"
+Ls_CGColor:     .asciz "CGColor"
 Ls_name:        .asciz "name"
 Ls_UTF8String:  .asciz "UTF8String"

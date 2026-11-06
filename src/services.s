@@ -706,6 +706,9 @@ _card:
     mov  x0, x22
     mov  x2, #1
     MSG1 Ls_setMasksToBounds
+    mov  x0, x22                      // light mode: a thin grey border (appear.s)
+    mov  x1, x20
+    bl   _appear_border
 Lcd_done:
     LEAVE 32
 

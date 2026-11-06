@@ -410,9 +410,11 @@ _cd_card:
     mov  x0, x21
     LDD  d0, Lc_2
     bl   _objc_msgSend
-    mov  x0, #0x9E0A
+    mov  x0, #0x9E0A                  // amber; black in light mode (Graphite)
     movk x0, #0xFF, lsl #16
-    bl   _rgb
+    mov  x1, #0x1111
+    movk x1, #0x11, lsl #16
+    bl   _rgb2
     MSG0 Ls_CGColor
     mov  x2, x0
     mov  x0, x21
@@ -501,13 +503,15 @@ Lcc_badge:
     mov  x21, x0
     mov  x2, #1                       // NSTextAlignmentCenter (arm64 values)
     MSG1 Ls_setAlignment
-    CLS  Ls_NSColor
-    MSG0 Ls_blackColor
+    mov  x0, #0                       // the count: black on amber; white on blue in light
+    mov  x1, #0xFFFF
+    movk x1, #0xFF, lsl #16
+    bl   _rgb2
     mov  x2, x0
     mov  x0, x21
     MSG1 Ls_setTextColor
     mov  x0, x21
-    mov  x1, #0x9E0A
+    mov  x1, #0x9E0C                  // the badge: amber; blue in light (appear.s)
     movk x1, #0xFF, lsl #16
     LDD  d0, Lc_r8
     bl   _card
@@ -653,8 +657,10 @@ _cd_round:
     CLS  Ls_NSColor
     MSG0 Ls_whiteColor
     cbz  x24, 1f
-    CLS  Ls_NSColor
-    MSG0 Ls_blackColor
+    mov  x0, #0                       // a dark glyph: black in dark mode, white in light
+    mov  x1, #0xFFFF
+    movk x1, #0xFF, lsl #16
+    bl   _rgb2
 1:  mov  x2, x0
     mov  x0, x19
     MSG1 Ls_setContentTintColor
