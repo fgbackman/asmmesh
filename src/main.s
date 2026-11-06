@@ -44,6 +44,7 @@ _g_people_lbl:    .quad 0           // "PEOPLE ON THE MESH": moves with the Room
 .globl _g_ctl
 _g_ctl:           .quad 0
 _g_qk_menu:       .quad 0                 // the Shortcuts menu (quick.s fills it)
+_g_qk_pop:        .quad 0                 //   and the sidebar button's copy
 .globl _g_font
 _g_font:          .quad 0
 .globl _g_sitem
@@ -89,6 +90,7 @@ Lf_rooms:    .double 6.0, 306.0, 240.0, 294.0
 Lf_peoplelbl: .double 16.0, 284.0, 196.0, 16.0
 Lf_people:   .double 6.0, 128.0, 240.0, 152.0
 // _sidebar_fit: Rooms grows to fit its cards; People keeps the rest, at least two cards
+Lc_qk_popy:  .double 34.0         // the Shortcuts menu opens just above its button
 Lc_sb_card:  .double 58.0         // one card's row
 Lc_sb_top:   .double 40.0         // Rooms' top, below the window's top edge
 Lc_sb_low:   .double 270.0        // Rooms' bottom stays above this: People's 128 + 2 cards + label
@@ -101,8 +103,9 @@ Lc_sb_lh:    .double 16.0
 Lc_sb_pb:    .double 128.0        // People's bottom (Invite and the buttons are under it)
 Lc_sb_pgap:  .double 4.0
 Lf_invite:   .double 8.0, 88.0, 236.0, 32.0
-Lf_scanner:  .double 8.0, 50.0, 236.0, 32.0
-Lf_services: .double 8.0, 12.0, 236.0, 32.0
+Lf_qkbtn:    .double 8.0, 50.0, 236.0, 32.0    // Shortcuts: yours, in a menu (quick.s)
+Lf_scanner:  .double 8.0, 12.0, 116.0, 32.0
+Lf_services: .double 128.0, 12.0, 116.0, 32.0
 Lf_header:   .double 266.0, 606.0, 360.0, 22.0
 Lf_namebtn:  .double 632.0, 602.0, 176.0, 30.0
 Lf_status:   .double 266.0, 586.0, 542.0, 16.0
@@ -174,6 +177,7 @@ Lmethods:
     .quad Ls_m_playChess,   _ch_dialog,         Ls_ty_v1
     .quad Ls_m_playFivefold, _ff_dialog,        Ls_ty_v1
     .quad Ls_m_qkRun,       _qk_menu_run,       Ls_ty_v1
+    .quad Ls_m_qkPop,       _qk_menu_pop,       Ls_ty_v1
     .quad Ls_m_qkNew,       _qk_menu_new,       Ls_ty_v1
     .quad Ls_m_qkDelete,    _qk_menu_delete,    Ls_ty_v1
     .quad Ls_m_ffTile,      _ffw_tile,          Ls_ty_v1
@@ -457,7 +461,20 @@ _build_ui:
     ldp  d2, d3, [x8, #16]
     bl   _mk_button
 
-    ADRL x0, Ls_scanner_title
+    ADRL x0, Ls_qk_btn_title           // ⚡ Shortcuts: a menu of yours, and New Shortcut…
+    ADRL x1, Ls_m_qkPop
+    mov  x2, #32
+    mov  x3, x21
+    ADRL x8, Lf_qkbtn
+    ldp  d0, d1, [x8]
+    ldp  d2, d3, [x8, #16]
+    bl   _mk_button
+    mov  x1, #0xB82E                  // amber, like the game buttons
+    movk x1, #0xF5, lsl #16
+    mov  x2, #1
+    bl   _pill
+
+    ADRL x0, Ls_scanner_short          // (half width now: Shortcuts is above)
     ADRL x1, Ls_m_showScanner
     mov  x2, #32
     mov  x3, x21
@@ -1454,9 +1471,19 @@ _build_menus:
 // void _qk_ui_changed(void) — quick.s: the shortcuts changed; the Shortcuts menu again
 .globl _qk_ui_changed
 _qk_ui_changed:
+    ENTER 0
+    ADRL x8, _g_qk_menu               // the menu bar's
+    ldr  x0, [x8]
+    bl   Lqk_fill
+    ADRL x8, _g_qk_pop                // the sidebar button's
+    ldr  x0, [x8]
+    bl   Lqk_fill
+    LEAVE 0
+
+// Lqk_fill(x0 menu, or 0) — the shortcuts, then New Shortcut… (and Delete a Shortcut…)
+Lqk_fill:
     ENTER 16
-    ADRL x8, _g_qk_menu
-    ldr  x19, [x8]
+    mov  x19, x0
     cbz  x19, 9f
     mov  x0, x19
     MSG0 Ls_qk_removeAll
@@ -1500,6 +1527,29 @@ _qk_ui_changed:
     ADRL x3, Ls_empty
     bl   _add_item
 9:  LEAVE 16
+
+// - qkPop:(id)sender — the sidebar's Shortcuts button: its menu, just above it
+.globl _qk_menu_pop
+_qk_menu_pop:
+    ENTER 0
+    mov  x20, x2
+    ADRL x8, _g_qk_pop
+    ldr  x0, [x8]
+    cbnz x0, 1f
+    CLS  Ls_NSMenu                    // made the first time
+    MSG0 Ls_new
+    ADRL x8, _g_qk_pop
+    str  x0, [x8]
+    bl   _qk_ui_changed
+1:  SELX1 Ls_qk_popUp
+    ADRL x8, _g_qk_pop
+    ldr  x0, [x8]
+    mov  x2, #0
+    fmov d0, xzr
+    LDD  d1, Lc_qk_popy
+    mov  x3, x20
+    bl   _objc_msgSend
+    LEAVE 0
 
 // - qkRun:(id)sender — Shortcuts › a shortcut: run it (its lines appear in Home)
 .globl _qk_menu_run
@@ -2083,6 +2133,9 @@ Ls_chess_text:         .asciz "\342\231\236"
 Ls_chess_tip:          .asciz "Play Chess"
 Ls_m_playFivefold:     .asciz "playFivefold:"
 Ls_m_qkRun:            .asciz "qkRun:"
+Ls_m_qkPop:            .asciz "qkPop:"
+Ls_qk_popUp:           .asciz "popUpMenuPositioningItem:atLocation:inView:"
+Ls_qk_btn_title:       .asciz "\342\232\241 Shortcuts"
 Ls_m_qkNew:            .asciz "qkNew:"
 Ls_m_qkDelete:         .asciz "qkDelete:"
 Ls_qk_menu:            .asciz "Shortcuts"
@@ -2194,6 +2247,7 @@ Ls_ninefold_tip:       .asciz "Play Ninefold"
 Ls_setContentTintColor: .asciz "setContentTintColor:"
 Ls_invite_title:       .asciz "Invite to Chat"
 Ls_scanner_title:      .asciz "Mesh Scanner"
+Ls_scanner_short:      .asciz "Scanner"
 Ls_send_title:         .asciz "Send"
 Ls_talk_tip:           .asciz "Talk (\342\214\230T)"
 Ls_y_send:             .asciz "arrow.up"

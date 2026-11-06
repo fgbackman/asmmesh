@@ -86,7 +86,8 @@ _qk_load:
     mov  x2, #0                       // (not saved again while reading)
     bl   Lqk_put
     b    1b
-9:  LEAVE 0
+9:  bl   _qk_ui_changed               // the menus (Mac) and Nearby (iPhone) were made before
+    LEAVE 0
 
 // long _qk_save(const char *name, const char *commands) -> 0 saved; -1 no room for more,
 //   -2 the name won't do (empty, too long, or has : or ;), -3 no commands
