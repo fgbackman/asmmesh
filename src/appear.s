@@ -229,11 +229,15 @@ _appear_apply:
     mov  x20, x0
     mov  x2, x19
     MSG1 Ls_setAppearance
-    mov  x0, x20                      // colours turned into layers' CGColors now use it too
+    CLS  Ls_NSAppearance              // colours turned into layers' CGColors now use it too
+    mov  x21, x0                      //   (the class first: CLS is a call, it wipes x2)
+    mov  x0, x20
     MSG0 Ls_effectiveAppearance
+    cbz  x0, 4f
     mov  x2, x0
-    CLS  Ls_NSAppearance
+    mov  x0, x21
     MSG1 Ls_setCurrentAppearance
+4:
     LEAVE 0
 
 // void _appear_dark(id window) — this window stays dark (a game board, the scanner)
