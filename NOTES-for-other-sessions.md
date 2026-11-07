@@ -289,3 +289,8 @@ For where the bitchat work stands and what comes next, start with `docs/bitchat_
   256-byte entries). K_HUE_BLE and K_BLES are never kept; D_OBJ zeroed, state -1, CAP_LINKED off.
 - `tools/qemu/run.sh quick` (tests 227-229, stand-ins for Home and the defaults).
 - Not tried on a Mac or iPhone yet.
+
+## MeshCore (LoRa) — planned, not built (Nov 7)
+- Plan: `docs/meshcore/PLAN.md`. Files to come: `src/mc_core.s` (pure), `src/mc_ble.s`,
+  `tools/meshcore/mc.py`, `tools/qemu/mcsim.c`; self-tests from 230; service `SVC_MESHCORE`
+  (the Settings grid needs room first: 5 x 5, full).
