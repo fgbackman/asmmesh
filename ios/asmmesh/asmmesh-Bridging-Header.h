@@ -56,6 +56,13 @@ char *am_node_fp(long i, char *buf);        // i = -1: this phone
 const char *am_nick(void);
 
 // bitchat people (bc_ble.s): walled off, a name and a line to show, nothing to act on
+// MeshCore (mc_ble.s): the radio, and its contacts
+long am_mc_state(void);                      // 0 off, 1 connecting, 2 starting, 3 ready
+const char *am_mc_radio(void);
+long am_mc_contacts(void);
+const char *am_mc_contact_name(long i);
+long am_mc_contact_seen(long i);             // unix time of their last advert
+
 long am_bc_count(void);
 const char *am_bc_nick(long k);
 char *am_bc_line(long k, char *buf);       // buf: 128 bytes

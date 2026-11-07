@@ -11,7 +11,10 @@ without Wi-Fi or phone signal. Two uses:
 Everything is off until switched on. It is tested without a radio first, and the radio can only be
 asked to do a short list of harmless things.
 
-Status (Nov 7, 2026): plan only. Nothing is built yet.
+Status (Nov 7, 2026): milestones 0 to 3 built and tested without a radio (self-tests 230-236,
+`run.sh mcdiff`, `run.sh mcsim`). Next: Meshtastic (below), then asmmesh over LoRa, then real radios.
+Your choices: the LoRa channel key comes from the mesh passphrase; chat with MeshCore users first;
+both MeshCore and Meshtastic.
 
 ## Facts checked in MeshCore's source
 
@@ -151,3 +154,29 @@ Milestones 1 to 4 are built and tested here. Milestone 5 needs you and the radio
 - **On your Mac**: `make selftest`, `make install`, the iPhone installer, and the radios.
 - **Other sessions**: check `NOTES-for-other-sessions.md` before starting, and add a section
   there when work lands.
+
+## Meshtastic too (decided Nov 7)
+
+Meshtastic and MeshCore run on the same radios but can't hear each other, so asmmesh gets a
+second connector, `src/mt_core.s` and `src/mt_ble.s`, built the same way:
+
+- **Shape:** pure code (protobuf encode and decode for the few messages used) with a Python copy
+  and diff tests. A simulated radio. A **Meshtastic** room and switch, off by default.
+- **Wall, allowlist and tests:** the same as MeshCore's. Only these may be sent: start-up (want
+  config), text on the primary channel, and direct text messages. Never: admin messages, radio or
+  module config, reboot, factory reset, keys.
+- **The Bluetooth link:** Meshtastic's own service and its toRadio, fromRadio and fromNum
+  characteristics. Read and check them in Meshtastic's source when this phase starts, as was done
+  for MeshCore's above.
+
+## What's built (milestones 0-3)
+
+| Piece                  | Where                                                                       |
+|------------------------|-----------------------------------------------------------------------------|
+| Settings: 6th row, the MeshCore switch | `src/services.s` (window 572 high), `SVC_MESHCORE` 25, `NSVC` 26 |
+| Frames, allowlist, text, channel key | `src/mc_core.s`, `src/mc_defs.inc`; `tools/meshcore/mc.py`, `mcdiff.py` |
+| The radio link and chat | `src/mc_ble.s`: hooks in `src/ble.s` beside the SPIN remote's            |
+| The room               | `MESHCORE_ID` 13 (`LOCAL_ROOMS` 14); typed text → `_mc_say` (`src/mesh.s`)  |
+| People                 | radio contacts after bitchat's (`src/ui.s`, `src/cards.s`; iPhone `PeopleView`) |
+| Blocking               | `block Name` finds MeshCore contacts too (`src/safety.s`), by their key     |
+| Tests                  | self-tests 230-233 (`mc_core`), `run.sh mcdiff` (vs `mc.py`), `run.sh mcsim` 234-236 |

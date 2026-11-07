@@ -290,7 +290,10 @@ For where the bitchat work stands and what comes next, start with `docs/bitchat_
 - `tools/qemu/run.sh quick` (tests 227-229, stand-ins for Home and the defaults).
 - Not tried on a Mac or iPhone yet.
 
-## MeshCore (LoRa) — planned, not built (Nov 7)
-- Plan: `docs/meshcore/PLAN.md`. Files to come: `src/mc_core.s` (pure), `src/mc_ble.s`,
-  `tools/meshcore/mc.py`, `tools/qemu/mcsim.c`; self-tests from 230; service `SVC_MESHCORE`
-  (the Settings grid needs room first: 5 x 5, full).
+## MeshCore (LoRa) — chat built (Nov 7); Meshtastic next
+- `docs/meshcore/PLAN.md` (status table at its end). `src/mc_core.s` (pure, self-tests 230-233),
+  `src/mc_ble.s` (hooks in ble.s next to spin's), `tools/meshcore/mc.py` + `mcdiff.py`
+  (`run.sh mcdiff`), `tools/qemu/mcsim.c` (`run.sh mcsim`, 234-236).
+- Numbers taken: SVC_MESHCORE 25, NSVC 26 (Settings 5 x 6, room for 30), MESHCORE_ID 13,
+  LOCAL_ROOMS 14. Next self-test numbers: 237+. Meshtastic will be `mt_*` files.
+- Not tried with a real radio yet.

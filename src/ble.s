@@ -421,6 +421,11 @@ Lcd_rssi:
     mov  x2, x21
     bl   _spin_seen
     cbnz x0, Lcd_done
+    mov  x0, x20                      // a MeshCore radio? (mc_ble.s, behind its switch)
+    mov  x1, x24
+    mov  x2, x21
+    bl   _mc_seen
+    cbnz x0, Lcd_done
     cbz  x23, Lcd_done
     bl   _hueble_adv
     mov  x2, x0
@@ -475,6 +480,9 @@ Lcc_unknown:
     mov  x0, x20                      // our SPIN remote?
     bl   _spin_connected
     cbnz x0, Lcc_done
+    mov  x0, x20                      // our MeshCore radio?
+    bl   _mc_connected
+    cbnz x0, Lcc_done
     mov  x0, x20                      // Connect & Pair from the scanner?
     bl   _near_connected
     cbnz x0, Lcc_done
@@ -522,6 +530,8 @@ Lcl_rescan:
     LEAVE 0
 Lcl_other:
     mov  x0, x21
+    bl   _mc_lost
+    mov  x0, x21
     bl   _spin_lost
     mov  x0, x21
     bl   _near_lost
@@ -541,6 +551,10 @@ _ble_p_services:
     mov  x0, x19                      // our SPIN remote?
     mov  x1, x21
     bl   _spin_services
+    cbnz x0, Lsv_done
+    mov  x0, x19                      // our MeshCore radio?
+    mov  x1, x21
+    bl   _mc_services
     cbnz x0, Lsv_done
     mov  x0, x19                      // being inspected from the scanner?
     mov  x1, x21
@@ -587,6 +601,11 @@ _ble_p_chars:
     mov  x1, x20
     mov  x2, x21
     bl   _spin_chars
+    cbnz x0, Lch_ret
+    mov  x0, x19                      // our MeshCore radio?
+    mov  x1, x20
+    mov  x2, x21
+    bl   _mc_chars
     cbnz x0, Lch_ret
     mov  x0, x19                      // being inspected from the scanner?
     mov  x1, x20
@@ -680,6 +699,11 @@ _ble_p_value:
     mov  x1, x20
     mov  x2, x21
     bl   _spin_value
+    cbnz x0, Lpv_done
+    mov  x0, x19                      // our MeshCore radio? (a frame from it)
+    mov  x1, x20
+    mov  x2, x21
+    bl   _mc_value
     cbnz x0, Lpv_done
     mov  x0, x19                      // being inspected from the scanner?
     mov  x1, x20

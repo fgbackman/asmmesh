@@ -19,7 +19,7 @@
 
 // window geometry
 .set SW_W,      1440
-.set SW_H,      498                   // five columns, five rows of cards
+.set SW_H,      572                   // five columns, six rows of cards (room for 30)
 .set SW_TOP,    (SW_H - 118 - 64)     // y of the first row of cards
 
 .data
@@ -63,6 +63,7 @@ Lsvc:
     .quad Lk_files, Lt_files, Ld_files, Lsy_files, 0x64D2FF, 0
     .quad Lk_sens,  Lt_sens,  Ld_sens,  Lsy_sens,  0x30D158, 0x40000
     .quad Lk_bc,    Lt_bc,    Ld_bc,    Lsy_bc,    0xFF9500, 0
+    .quad Lk_mc,    Lt_mc,    Ld_mc,    Lsy_mc,    0x00C7BE, 0
 
 .section __TEXT,__const
 .p2align 3
@@ -70,7 +71,7 @@ Lc0:        .double 0.0
 Lc1:        .double 1.0
 Lc255:      .double 255.0
 Lc_W:       .double 1440.0
-Lc_H:       .double 498.0
+Lc_H:       .double 572.0
 Lc_cw:      .double 272.0
 Lc_ch:      .double 64.0
 Lc_r16:     .double 16.0
@@ -80,8 +81,8 @@ Lc_s14:     .double 14.0
 Lc_s13:     .double 13.0
 Lc_s11:     .double 11.0
 // frames inside the window / a card: x, y, w, h
-Lf_title:   .double 24.0, 424.0, 420.0, 34.0
-Lf_sub:     .double 24.0, 400.0, 900.0, 18.0
+Lf_title:   .double 24.0, 498.0, 420.0, 34.0
+Lf_sub:     .double 24.0, 474.0, 900.0, 18.0
 Lf_icon:    .double 14.0, 14.0, 36.0, 36.0
 Lf_glyph:   .double 8.0, 8.0, 20.0, 20.0
 Lf_name:    .double 62.0, 33.0, 142.0, 18.0
@@ -292,9 +293,14 @@ _svc_start:
     b.eq Lss_files
     cmp  x19, #SVC_BITCHAT
     b.eq Lss_bitchat
+    cmp  x19, #SVC_MESHCORE
+    b.eq Lss_meshcore
     b    Lss_done
 Lss_bitchat:
     bl   _bc_ble_start
+    b    Lss_done
+Lss_meshcore:
+    bl   _mc_start
     b    Lss_done
 Lss_files:
     bl   _files_start
@@ -498,6 +504,15 @@ Lsv_notalerts:
     str  x9, [x8]
     b    Lsv_done
 Lsv_notbc:
+    cmp  x19, #SVC_MESHCORE           // MeshCore off: the radio let go; it may start again later
+    b.ne Lsv_notmc
+    bl   _mc_stop
+    ADRL x8, _g_svc_started
+    ldr  x9, [x8]
+    bic  x9, x9, #(1 << SVC_MESHCORE)
+    str  x9, [x8]
+    b    Lsv_done
+Lsv_notmc:
     cmp  x19, #SVC_FM                 // FM off: stop the radio; it may start again later
     b.ne Lsv_done
     bl   _fm_stop
@@ -619,13 +634,17 @@ Lhw_find:
     add  x21, x21, #1
     b    Lhw_find
 Lhw_hit:
-    cmp  x21, #SVC_BITCHAT            // bitchat: only by name, only on this Mac
+    cmp  x21, #SVC_BITCHAT            // bitchat, MeshCore: only by name, only on this device
+    ccmp x21, #SVC_MESHCORE, #4, ne
     b.ne 1f
     ADRL x8, _g_remote_active
     ldr  x9, [x8]
     cbz  x9, 1f
     ADRL x0, Ls_bc_here
-    bl   _home_say0
+    cmp  x21, #SVC_MESHCORE
+    b.ne 2f
+    ADRL x0, Ls_mc_here
+2:  bl   _home_say0
     LEAVE 0
 1:  mov  x0, x21
     mov  x1, x19
@@ -636,8 +655,9 @@ Lhw_all:
 Lhw_all_loop:
     cmp  x21, #NSVC
     b.hs Lhw_done
-    cmp  x21, #SVC_BITCHAT            // "enable all" leaves bitchat off; "disable all"
-    ccmp x19, #0, #4, eq              //   switches it off too: off means off
+    cmp  x21, #SVC_BITCHAT            // "enable all" leaves bitchat and MeshCore off;
+    ccmp x21, #SVC_MESHCORE, #4, ne   //   "disable all" switches them off too: off means off
+    ccmp x19, #0, #4, eq
     b.ne 1f
     mov  x0, x21
     mov  x1, x19
@@ -971,6 +991,7 @@ Lk_hook:    .asciz "webhook"
 Lk_files:   .asciz "files"
 Lk_sens:    .asciz "sensors"
 Lk_bc:      .asciz "bitchat"
+Lk_mc:      .asciz "meshcore"
 Lt_hue:     .asciz "Philips Hue"
 Lt_st:      .asciz "SmartThings"
 Lt_home:    .asciz "Apple Home"
@@ -996,6 +1017,7 @@ Lt_hook:    .asciz "Webhook"
 Lt_files:   .asciz "Files on Wi-Fi"
 Lt_sens:    .asciz "Bluetooth Sensors"
 Lt_bc:      .asciz "bitchat"
+Lt_mc:      .asciz "MeshCore"
 Ld_hue:     .asciz "Bridge and Bluetooth bulbs"
 Ld_st:      .asciz "Lutron, Samsung and more"
 Ld_home:    .asciz "Scenes and devices via Shortcuts"
@@ -1021,6 +1043,7 @@ Ld_hook:    .asciz "Shortcuts and IFTTT post in"
 Ld_files:   .asciz "Your phone browses and uploads"
 Ld_sens:    .asciz "Thermometers, buttons, batteries"
 Ld_bc:      .asciz "Link to bitchat phones, walled off"
+Ld_mc:      .asciz "LoRa radio chat, walled off"
 Lsy_hue:    .asciz "lightbulb.fill"
 Lsy_st:     .asciz "square.grid.2x2.fill"
 Lsy_home:   .asciz "house.fill"
@@ -1046,6 +1069,7 @@ Lsy_hook:   .asciz "link"
 Lsy_files:  .asciz "folder.fill"
 Lsy_sens:   .asciz "thermometer"
 Lsy_bc:     .asciz "bubble.left.and.bubble.right"
+Lsy_mc:     .asciz "antenna.radiowaves.left.and.right.circle"
 
 Lf_key:        .asciz "svc_%s"
 Ls_one:        .asciz "1"
@@ -1059,6 +1083,7 @@ Lf_now_off:    .asciz "\302\267 \342\217\270 %s is off \342\200\224 asmmesh won\
 Ls_all_off:    .asciz "\302\267 \342\217\270 Every service is switched off. Open Settings (\342\214\230,) or the Services button to turn on the ones you use."
 Lf_some_on:    .asciz "\302\267 Services on: %s. Everything else is off (Settings: \342\214\230,)."
 Ls_sw_usage:   .asciz "\302\267 Say \342\200\234enable\342\200\235 or \342\200\234disable\342\200\235 and a service: hue, smartthings, home, wifi, tv, lifx, govee, homeassistant, spin, weather, mesh, rules, find, web, voice, fm, gateway, location, ntfy, pushover, alerts, webhook, files, sensors, bitchat \342\200\224 or \342\200\234all\342\200\235 (everything but bitchat)."
+Ls_mc_here:    .asciz "\302\267 MeshCore can only be switched on or off on this device, not from the mesh."
 Ls_bc_here:    .asciz "\302\267 bitchat can only be switched on or off on this Mac, not from the mesh."
 Ls_win_title:  .asciz "Services"
 Ls_win_sub:    .asciz "Everything starts off. Switch on only what you use \342\200\224 each one is independent."

@@ -1320,6 +1320,8 @@ _selftest:
     add  x19, x19, x0
     bl   _ff_play_selftest            // Fivefold: solo, a duel and its cheats (ff_play.s)
     add  x19, x19, x0
+    bl   _mc_core_selftest            // MeshCore: frames, the allowlist, text (mc_core.s)
+    add  x19, x19, x0
     bl   _t_hard                      // fuzzing, flood limits, full tables (last: it fills them)
     add  x19, x19, x0
 

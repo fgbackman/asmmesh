@@ -43,6 +43,27 @@ extern long cf_core_selftest(void) F(cf_core_selftest) __attribute__((weak));
 extern long dbl_core_selftest(void) F(dbl_core_selftest) __attribute__((weak));
 extern long ff_core_selftest(void) F(ff_core_selftest) __attribute__((weak));
 extern long ff_play_selftest(void) F(ff_play_selftest) __attribute__((weak));
+extern long mc_core_selftest(void) F(mc_core_selftest);
+long mc_parse(const unsigned char *f, long n, long *mf) F(mc_parse);
+long mc_allowed(const unsigned char *f, long n, long slot) F(mc_allowed);
+long mc_show_text(const unsigned char *s, long n, unsigned char *d, long cap) F(mc_show_text);
+void mc_chan_secret(const unsigned char *p, long n, unsigned char *out) F(mc_chan_secret);
+static void hex(const unsigned char *p, long n);
+static const char *mc_fields[] = { "val", "val2", "chan", "path", "tt", "ts", "snr", "key", "name", "text", "secret" };
+static void mc_show(long kind, long *mf) {            /* as tools/meshcore/mc.py show() */
+    if (kind < 0) { printf("bad"); return; }
+    printf("%02lx", kind);
+    long has = mf[0];
+    for (int b = 0; b < 11; b++) {
+        if (!(has >> b & 1)) continue;
+        printf(" %s=", mc_fields[b]);
+        if (b < 7) printf("%ld", mf[1 + b]);
+        else if (b == 7) hex((unsigned char *)mf[8], mf[9]);
+        else if (b == 8) hex((unsigned char *)mf[10], mf[11]);
+        else if (b == 9) hex((unsigned char *)mf[12], mf[13]);
+        else hex((unsigned char *)mf[14], 16);
+    }
+}
 extern long dbl_verify(const void *, long, const void *) F(dbl_verify);
 extern long cf_filter(char *) F(cf_filter);
 extern long ch_fen_in(void *, const char *) F(ch_fen_in);
@@ -218,7 +239,7 @@ static long unhex(const char *s, unsigned char *p) {
 int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IONBF, 0);   /* a crash shows right after the last test that ran */
     if (argc > 1 && !strcmp(argv[1], "selftest")) {
-        long f = bc_selftest() + bc_link_selftest() + bc_packet_selftest() + bc_peer_selftest() + term_selftest() + hue_core_selftest() + bc_noise_selftest() + nf_core_selftest() + nf_play_selftest() + ch_core_selftest() + ch_play_selftest() + cf_core_selftest() + dbl_core_selftest() + ff_core_selftest() + ff_play_selftest();
+        long f = bc_selftest() + bc_link_selftest() + bc_packet_selftest() + bc_peer_selftest() + term_selftest() + hue_core_selftest() + bc_noise_selftest() + nf_core_selftest() + nf_play_selftest() + ch_core_selftest() + ch_play_selftest() + cf_core_selftest() + dbl_core_selftest() + ff_core_selftest() + ff_play_selftest() + mc_core_selftest();
         printf("%ld failed\n", f);
         return f != 0;
     }
@@ -248,6 +269,10 @@ int main(int argc, char **argv) {
             if (big) { bc_sha512_final(ctx, out); hex(out, 64); }
             else { bc_sha256_final(ctx, out); hex(out, 32); }
         }
+        else if (!strcmp(cmd, "mcparse")) { long mf[15]; mc_show(mc_parse(A[0], N[0], mf), mf); }
+        else if (!strcmp(cmd, "mcallow")) printf("%ld", mc_allowed(A[0], N[0], A[1][0]));
+        else if (!strcmp(cmd, "mctext")) { long k = mc_show_text(A[0], N[0], out, A[1][0]); hex(out, k); }
+        else if (!strcmp(cmd, "mcsecret")) { mc_chan_secret(A[0], N[0], out); hex(out, 16); }
         else if (!strcmp(cmd, "hmac")) { bc_hmac256(A[0], N[0], A[1], N[1], out); hex(out, 32); }
         else if (!strcmp(cmd, "hkdf")) {
             long L = A[3][0] | (A[3][1] << 8);

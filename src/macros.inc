@@ -153,7 +153,8 @@
                              //   only while bitchat is on (bc_ble.s adds and removes it)
 .set BCPM_FIRST,    5        // private bitchat chats (bc_ble.s): ids 5..12, local like the rest
 .set PM_CHATS,      8
-.set LOCAL_ROOMS,   13       // ids 1..12 are local rooms, never sent on the mesh, never saved
+.set MESHCORE_ID,   13       // the local MeshCore room (mc_ble.s): there only while MeshCore is on
+.set LOCAL_ROOMS,   14       // ids 1..13 are local rooms, never sent on the mesh, never saved
 .set T_NEWS,        7        // +12 zero[8] +20 sender[8] +28 nlen +29 nick, mode, headline
 .set T_WEBREQ,      8        // +12 gateway[8] (0 any) +20 sender[8] +28 nlen +29 nick, then web.s body
 .set T_WEBPART,     9        // +12 requester[8] +20 gateway[8] +28 nlen (0), then web.s body
@@ -317,7 +318,7 @@
 // ---------------------------------------------------------------------------
 // Services (services.s): every integration has its own switch; all start off
 // ---------------------------------------------------------------------------
-.set NSVC,          25
+.set NSVC,          26
 .set SVC_HUE,       0
 .set SVC_ST,        1        // SmartThings (Lutron and friends ride on it)
 .set SVC_HOME,      2        // Apple Home via Shortcuts
@@ -343,6 +344,7 @@
 .set SVC_FILES,     22       // the files page for your phone, port 8788 (files.s)
 .set SVC_SENSORS,   23       // Bluetooth sensors and the battery board (sensors.s)
 .set SVC_BITCHAT,   24       // the walled-off link to bitchat's mesh (bc_ble.s); never on with "enable all"
+.set SVC_MESHCORE,  25       // a MeshCore LoRa radio (mc_ble.s), walled off like bitchat; never with "enable all"
 
 // one reading from a sensor's advertisement (sens_decode.s); values in hundredths
 .set RD_HAVE,       0        // H_* bits: which numbers came

@@ -93,6 +93,13 @@ struct BitchatPerson: Identifiable, Equatable {
     let hexID: String        // their peer id, 16 hex digits
 }
 
+/// A MeshCore radio contact (mc_ble.s): someone on LoRa, through your radio. Walled off:
+/// a direct message is typed in the MeshCore room as "@Name text".
+struct LoraPerson: Identifiable, Equatable {
+    let id: Int
+    let name: String
+}
+
 struct Person: Identifiable, Equatable {
     let id: Int          // index on the core's list
     let name: String
@@ -211,6 +218,7 @@ final class Mesh: ObservableObject {
     @Published var lines: [UInt64: [Line]] = [:]
     @Published var people: [Person] = []
     @Published var bitchatPeople: [BitchatPerson] = []
+    @Published var loraPeople: [LoraPerson] = []
     @Published var status = ""
     @Published var nick = ""
     @Published var myFingerprint = ""
@@ -344,6 +352,8 @@ final class Mesh: ObservableObject {
                                    hexID: String(cString: am_bc_hexid(k))))
         }
         if b != bitchatPeople { bitchatPeople = b }
+        let lp = (0..<am_mc_contacts()).map { LoraPerson(id: $0, name: cstr(am_mc_contact_name($0))) }
+        if lp != loraPeople { loraPeople = lp }
         var s: [Sensor] = []
         for i in 0..<am_sensor_count() {
             let label = cstr(am_sensor_info(i, 0))

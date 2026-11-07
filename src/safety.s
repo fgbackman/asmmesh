@@ -864,7 +864,7 @@ _h_safety:
 2:  ADRL x8, _g_node_count
     ldr  x9, [x8]
     cmp  x22, x9
-    b.hs Lhs_nobody
+    b.hs Lhs_mc
     ADRL x8, _g_nodes
     add  x23, x8, x22, lsl #NODE_SHIFT
     add  x0, x23, #N_NICK
@@ -875,6 +875,7 @@ _h_safety:
     b    2b
 3:  ldr  x0, [x23, #N_ID]
     add  x1, x23, #N_NICK
+Lhs_who:                                  // x0 their id, x1 their name
     cmp  x19, #4
     b.eq Lhs_report
     mov  x24, x1
@@ -891,6 +892,23 @@ _h_safety:
 Lhs_report:
     bl   _sf_report
     b    Lhs_done
+Lhs_mc:                                   // not on the mesh: one of the MeshCore radio's contacts?
+    mov  x22, #0
+1:  bl   _am_mc_contacts
+    cmp  x22, x0
+    b.hs Lhs_nobody
+    mov  x0, x22
+    bl   _am_mc_contact_name
+    mov  x23, x0
+    mov  x1, x21
+    bl   _strcasecmp
+    cbz  w0, 2f
+    add  x22, x22, #1
+    b    1b
+2:  mov  x0, x22                          // blocked by their key (mc_ble.s), shown by name
+    bl   _am_mc_contact_id
+    mov  x1, x23
+    b    Lhs_who
 Lhs_list:
     bl   Lblk_load
     ADRL x8, _g_blk_n

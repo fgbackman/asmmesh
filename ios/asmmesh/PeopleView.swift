@@ -77,6 +77,21 @@ struct PeopleView: View {
                             }
                         }
                     }
+                    if !mesh.loraPeople.isEmpty {
+                        SectionTitle(text: "On MeshCore (LoRa)")
+                        ForEach(mesh.loraPeople) { p in
+                            Card {
+                                HStack(spacing: 14) {
+                                    IconBadge(symbol: "antenna.radiowaves.left.and.right", color: Color(red: 0, green: 0.78, blue: 0.75), size: 40)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(p.name.isEmpty ? "MeshCore user" : p.name).font(.headline)
+                                        Text("MeshCore \u{00B7} LoRa, through your radio").font(.footnote).foregroundStyle(Theme.dim)
+                                    }
+                                    Spacer()
+                                }
+                            }
+                        }
+                    }
                     if !mesh.bitchatPeople.isEmpty {
                         SectionTitle(text: "On bitchat")
                         ForEach(mesh.bitchatPeople) { b in

@@ -54,6 +54,7 @@ Lk_home:     .quad Ls_y_house, 0xFF9E0A, Ls_k_home
 Lk_web:      .quad Ls_y_safari, 0x99999E, Ls_k_web
 Lk_news:     .quad Ls_y_news, 0xFFD60A, Ls_k_news
 Lk_bitchat:  .quad Ls_y_bitchat, 0xFF9500, Ls_k_bitchat
+Lk_meshcore: .quad Ls_y_meshcore, 0x00C7BE, Ls_k_meshcore
 Lk_private:  .quad Ls_y_lock, 0xBF59F2, Ls_k_private
 
 Lcd_methods:
@@ -221,6 +222,9 @@ Lcv_room:
     ADRL x8, Lk_bitchat
     cmp  x9, #BITCHAT_ID
     csel x22, x8, x22, eq
+    ADRL x8, Lk_meshcore
+    cmp  x9, #MESHCORE_ID
+    csel x22, x8, x22, eq
     ADRL x8, Lk_main
     cmp  x20, #0
     csel x22, x8, x22, eq
@@ -363,7 +367,11 @@ Lcv_pfmt:
     LEAVE 160
 
 Lcv_bitchat:                          // someone on bitchat (bc_ble.s): orange, walled off,
-    sub  x0, x20, x9                  //   nothing to click
+    sub  x20, x20, x9                 //   nothing to click
+    bl   _bc_people_n
+    cmp  x20, x0
+    b.hs Lcv_mc
+    mov  x0, x20
     bl   _bc_person
     cbz  x0, Lcv_nil
     mov  x21, x0
@@ -377,6 +385,27 @@ Lcv_bitchat:                          // someone on bitchat (bc_ble.s): orange, 
     ADRL x0, Ls_y_bitchat
     mov  x1, #0x9500                  // bitchat's switch colour
     movk x1, #0xFF, lsl #16
+    mov  x3, x23
+    mov  x4, #0
+    mov  x5, #0
+    ldr  d0, [sp, #96]
+    bl   _cd_card
+    LEAVE 160
+
+Lcv_mc:                               // a MeshCore radio contact (mc_ble.s): teal, LoRa, walled
+    sub  x20, x20, x0                 //   off, nothing to click
+    bl   _am_mc_contacts
+    cmp  x20, x0
+    b.hs Lcv_nil
+    ADRL x0, Ls_mc_second
+    bl   _nsstr
+    mov  x23, x0
+    mov  x0, x20
+    bl   _am_mc_contact_name
+    mov  x2, x0
+    ADRL x0, Ls_y_meshcore
+    mov  x1, #0xC7BE                  // MeshCore's switch colour
+    movk x1, #0x00, lsl #16
     mov  x3, x23
     mov  x4, #0
     mov  x5, #0
@@ -697,6 +726,9 @@ _cd_round:
 
 .section __TEXT,__cstring,cstring_literals
 Ls_y_bolt:           .asciz "bolt.fill"
+Ls_y_meshcore:       .asciz "antenna.radiowaves.left.and.right"
+Ls_mc_second:        .asciz "MeshCore \302\267 LoRa, through your radio"
+Ls_k_meshcore:       .asciz "LoRa chat through your MeshCore radio"
 Ls_cls:              .asciz "AMeshCards"
 Ls_NSObject:         .asciz "NSObject"
 Ls_NSView:           .asciz "NSView"
