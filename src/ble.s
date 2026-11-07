@@ -101,6 +101,7 @@ _ble_start:
     LEAVE 0
 
 // id _array1(id obj) — [NSArray arrayWithObject:obj]
+.globl _array1
 _array1:
     ENTER 0
     mov  x19, x0
@@ -122,6 +123,7 @@ _array2:
 // void _ble_scan(void) — (re)start scanning for the asmmesh service.
 // Restarting clears CoreBluetooth's duplicate filter, so a Mac we lost is
 // reported again as soon as it is advertising in range.
+.globl _ble_scan
 _ble_scan:
     ENTER 0
     ADRL x8, _g_cm

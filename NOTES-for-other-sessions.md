@@ -297,3 +297,8 @@ For where the bitchat work stands and what comes next, start with `docs/bitchat_
 - Numbers taken: SVC_MESHCORE 25, NSVC 26 (Settings 5 x 6, room for 30), MESHCORE_ID 13,
   LOCAL_ROOMS 14. Next self-test numbers: 237+. Meshtastic will be `mt_*` files.
 - Not tried with a real radio yet.
+
+## Before pushing assembly: `python3 tools/linkcheck.py` (Nov 7)
+- Assembles every Mac (Makefile) and iPhone (make_project.py CORE + ios_ui.s) file and lists any
+  symbol used but defined nowhere or not `.globl`. A filtered nm check missed `_array1` and
+  `_ble_scan` (private to ble.s, used by mc_ble.s) and the Mac link failed; this would have caught it.
