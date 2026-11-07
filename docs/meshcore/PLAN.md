@@ -11,8 +11,9 @@ without Wi-Fi or phone signal. Two uses:
 Everything is off until switched on. It is tested without a radio first, and the radio can only be
 asked to do a short list of harmless things.
 
-Status (Nov 7, 2026): milestones 0 to 3 built and tested without a radio (self-tests 230-236,
-`run.sh mcdiff`, `run.sh mcsim`). Next: Meshtastic (below), then asmmesh over LoRa, then real radios.
+Status (Nov 7, 2026): MeshCore chat (milestones 0-3) and Meshtastic chat built and tested without
+a radio (self-tests 230-241; `run.sh mcdiff`, `mcsim`, `mtdiff`, `mtsim`). Next: asmmesh over
+LoRa, then real radios.
 Your choices: the LoRa channel key comes from the mesh passphrase; chat with MeshCore users first;
 both MeshCore and Meshtastic.
 
@@ -180,3 +181,26 @@ second connector, `src/mt_core.s` and `src/mt_ble.s`, built the same way:
 | People                 | radio contacts after bitchat's (`src/ui.s`, `src/cards.s`; iPhone `PeopleView`) |
 | Blocking               | `block Name` finds MeshCore contacts too (`src/safety.s`), by their key     |
 | Tests                  | self-tests 230-233 (`mc_core`), `run.sh mcdiff` (vs `mc.py`), `run.sh mcsim` 234-236 |
+
+## Meshtastic: what's built (Nov 7)
+
+Checked in Meshtastic's source (meshtastic/protobufs 85f3f43, meshtastic/firmware 11e3b28):
+service `6ba1b218-15a8-461f-9fa8-5dcae273eafd`, ToRadio `f75c76d2-…` (write), FromRadio
+`2c55e69e-…` (read until empty), FromNum `ed9da18c-…` (notify); messages at most 512 bytes;
+`ToRadio{want_config_id=3, packet=1, heartbeat=7}`, `FromRadio{id=1, packet=2, my_info=3,
+node_info=4, config_complete_id=7, channel=10}`, `MeshPacket{from=1, to=2, channel=3,
+decoded=4, encrypted=5, id=6, want_ack=10}`, `Data{portnum=1, payload=2}`, TEXT_MESSAGE_APP 1.
+Meshtastic's protobuf files are GPL-3: none are included; the format is written by hand.
+
+| Piece                  | Where                                                                       |
+|------------------------|-----------------------------------------------------------------------------|
+| Protobufs, allowlist   | `src/mt_core.s`, `src/mt_defs.inc`; `tools/meshcore/mt.py`, `mtdiff.py`     |
+| The radio link and chat | `src/mt_ble.s`: hooks in `src/ble.s` after MeshCore's                     |
+| Switch, room           | `SVC_MESHTASTIC` 26 (`NSVC` 27), `MESHTASTIC_ID` 14 (`LOCAL_ROOMS` 15)       |
+| People, blocking       | nodes after MeshCore's contacts; `block Name` finds them (by node number)   |
+| Tests                  | self-tests 237-238, `run.sh mtdiff`, `run.sh mtsim` 239-241                  |
+
+The allowlist opens every ToRadio: exactly one of want_config_id, an empty heartbeat, or a packet
+holding only to, channel 0-7, id, want_ack and decoded {TEXT_MESSAGE_APP, payload <= 233}, each
+once. Anything else (admin port 6, any other port, encrypted or keyed packets, hop limits, XModem,
+MQTT, disconnect) is refused and counted.

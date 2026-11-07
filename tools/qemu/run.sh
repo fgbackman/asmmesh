@@ -6,8 +6,10 @@
 #   tools/qemu/run.sh ffmesh     Fivefold's glue (ff_mesh.s) with stand-ins: today, race, duel
 #   tools/qemu/run.sh quick      your shortcuts and the devices kept between launches (quick.s)
 #   tools/qemu/run.sh chperft    chess perft, deeper than the self-tests, against published counts
+#   tools/qemu/run.sh mtdiff [N] N random Meshtastic protobufs, both ways: mt_core.s against mt.py
 #   tools/qemu/run.sh mcdiff [N] N random MeshCore frames, commands and texts: mc_core.s against mc.py
 #   tools/qemu/run.sh mcsim      the MeshCore radio link and chat (mc_ble.s) against a simulated radio
+#   tools/qemu/run.sh mtsim      the Meshtastic radio link and chat (mt_ble.s) against a simulated radio
 #   tools/qemu/run.sh nfdiff [N] N random seeds: Ninefold's puzzles against tools/ninefold/nf.py
 #   tools/qemu/run.sh diff [N]   N random cases each, checked against Python's `cryptography`,
 #                                zlib and tools/qemu/bcwire.py (bitchat's rules)
@@ -19,7 +21,7 @@ out="${TMPDIR:-/tmp}/asmmesh-qemu"
 mkdir -p "$out"
 python3 "$here/lint.py" >/dev/null || { python3 "$here/lint.py"; exit 1; }   # ENTER/LEAVE, LINK
 # Mach-O -> ELF: the macros file, section names and libc's leading underscore
-for f in bc_crypto bc_link bc_packet bc_peer bc_noise term_core hue_core nf_core nf_play nf_text ch_core ch_play cf_core dbl_core ff_core ff_play mc_core; do
+for f in bc_crypto bc_link bc_packet bc_peer bc_noise term_core hue_core nf_core nf_play nf_text ch_core ch_play cf_core dbl_core ff_core ff_play mc_core mt_core; do
     sed -e 's/^\.include "macros\.inc"/.include "elf.inc"/' \
         -e 's/^\.section __TEXT,__const/.section .rodata/' \
         -e 's/^\.section __TEXT,__cstring,cstring_literals/.section .rodata/' \
@@ -27,7 +29,7 @@ for f in bc_crypto bc_link bc_packet bc_peer bc_noise term_core hue_core nf_core
         -e 's/bl   _\(memcpy\|calloc\|free\)$/bl   \1/' \
         "$src/$f.s" > "$out/$f.s"
 done
-aarch64-linux-gnu-gcc -O1 -static -I "$here" -I "$src" -o "$out/harness" "$here/harness.c" "$here/inflate.c" "$out/bc_crypto.s" "$out/bc_link.s" "$out/bc_packet.s" "$out/bc_peer.s" "$out/bc_noise.s" "$out/term_core.s" "$out/hue_core.s" "$out/nf_core.s" "$out/nf_play.s" "$out/nf_text.s" "$out/ch_core.s" "$out/ch_play.s" "$out/cf_core.s" "$out/dbl_core.s" "$out/ff_core.s" "$out/ff_play.s" "$out/mc_core.s"
+aarch64-linux-gnu-gcc -O1 -static -I "$here" -I "$src" -o "$out/harness" "$here/harness.c" "$here/inflate.c" "$out/bc_crypto.s" "$out/bc_link.s" "$out/bc_packet.s" "$out/bc_peer.s" "$out/bc_noise.s" "$out/term_core.s" "$out/hue_core.s" "$out/nf_core.s" "$out/nf_play.s" "$out/nf_text.s" "$out/ch_core.s" "$out/ch_play.s" "$out/cf_core.s" "$out/dbl_core.s" "$out/ff_core.s" "$out/ff_play.s" "$out/mc_core.s" "$out/mt_core.s"
 case "$1" in
     diff) python3 "$here/diff.py" "$out/harness" "${2:-200}" ;;
     chperft) qemu-aarch64 "$out/harness" chperft ;;
@@ -63,8 +65,18 @@ case "$1" in
             "$src/mc_ble.s" > "$out/mc_ble.s"
         printf '.text\nLsnprintf_apple:\n    ldr x3, [sp]\n    ldr x4, [sp, #8]\n    ldr x5, [sp, #16]\n    b snprintf\n' >> "$out/mc_ble.s"
         aarch64-linux-gnu-gcc -O1 -static -I "$here" -I "$src" -o "$out/mcsim" "$here/mcsim.c" "$here/inflate.c" "$out/bc_crypto.s" "$out/bc_link.s" "$out/bc_packet.s" "$out/bc_peer.s" "$out/mc_core.s" "$out/mc_ble.s" && qemu-aarch64 "$out/mcsim" ;;
+    mtsim)                     # the Meshtastic radio link (mt_ble.s) against a simulated radio
+        sed -e 's/^\.include "macros\.inc"/.include "elf.inc"\n.include "mtsim.inc"/' \
+            -e 's/^\.section __TEXT,__cstring,cstring_literals/.section .rodata/' \
+            -e 's/^\.section __TEXT,__const/.section .rodata/' \
+            -e 's/^\.zerofill __DATA,__bss,\([_a-z]*\),\(.*\),4.*/.comm \1,\2,16/' \
+            -e 's/bl   _snprintf$/bl   Lsnprintf_apple/' \
+            "$src/mt_ble.s" > "$out/mt_ble.s"
+        printf '.text\nLsnprintf_apple:\n    ldr x3, [sp]\n    ldr x4, [sp, #8]\n    ldr x5, [sp, #16]\n    b snprintf\n' >> "$out/mt_ble.s"
+        aarch64-linux-gnu-gcc -O1 -static -I "$here" -I "$src" -o "$out/mtsim" "$here/mtsim.c" "$here/inflate.c" "$out/bc_crypto.s" "$out/bc_link.s" "$out/bc_packet.s" "$out/bc_peer.s" "$out/mc_core.s" "$out/mt_core.s" "$out/mt_ble.s" && qemu-aarch64 "$out/mtsim" ;;
     nfdemo) qemu-aarch64 "$out/harness" nfdemo ;;
     nfdiff) python3 "$here/nfdiff.py" "$out/harness" "${2:-200}" ;;
+    mtdiff) python3 "$here/../meshcore/mtdiff.py" "$out/harness" "${2:-500}" ;;
     mcdiff) python3 "$here/../meshcore/mcdiff.py" "$out/harness" "${2:-300}" ;;
     *)    qemu-aarch64 "$out/harness" selftest ;;
 esac

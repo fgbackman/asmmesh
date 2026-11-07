@@ -34,6 +34,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## MeshCore and Meshtastic
+
+asmmesh talks to MeshCore companion radios (MeshCore by Scott Powell and contributors, MIT,
+github.com/meshcore-dev/MeshCore) and Meshtastic radios (github.com/meshtastic, GPL-3) using their
+published protocols. No code from either is included: the frames and protobufs are written by
+hand in `src/mc_core.s` and `src/mt_core.s` from their documentation and field numbers.
+"MeshCore" and "Meshtastic" are their projects' names, used only to say what asmmesh works with.
+
 ## Word lists (Ninefold, Fivefold, the chat filter)
 
 ENABLE (public domain), SCOWL, wordfreq, WordNet, LDNOOBW (CC BY 4.0) and Wiktionary

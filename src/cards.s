@@ -55,6 +55,7 @@ Lk_web:      .quad Ls_y_safari, 0x99999E, Ls_k_web
 Lk_news:     .quad Ls_y_news, 0xFFD60A, Ls_k_news
 Lk_bitchat:  .quad Ls_y_bitchat, 0xFF9500, Ls_k_bitchat
 Lk_meshcore: .quad Ls_y_meshcore, 0x00C7BE, Ls_k_meshcore
+Lk_meshtastic: .quad Ls_y_meshtastic, 0x30B060, Ls_k_meshtastic
 Lk_private:  .quad Ls_y_lock, 0xBF59F2, Ls_k_private
 
 Lcd_methods:
@@ -224,6 +225,9 @@ Lcv_room:
     csel x22, x8, x22, eq
     ADRL x8, Lk_meshcore
     cmp  x9, #MESHCORE_ID
+    csel x22, x8, x22, eq
+    ADRL x8, Lk_meshtastic
+    cmp  x9, #MESHTASTIC_ID
     csel x22, x8, x22, eq
     ADRL x8, Lk_main
     cmp  x20, #0
@@ -396,7 +400,7 @@ Lcv_mc:                               // a MeshCore radio contact (mc_ble.s): te
     sub  x20, x20, x0                 //   off, nothing to click
     bl   _am_mc_contacts
     cmp  x20, x0
-    b.hs Lcv_nil
+    b.hs Lcv_mt
     ADRL x0, Ls_mc_second
     bl   _nsstr
     mov  x23, x0
@@ -406,6 +410,27 @@ Lcv_mc:                               // a MeshCore radio contact (mc_ble.s): te
     ADRL x0, Ls_y_meshcore
     mov  x1, #0xC7BE                  // MeshCore's switch colour
     movk x1, #0x00, lsl #16
+    mov  x3, x23
+    mov  x4, #0
+    mov  x5, #0
+    ldr  d0, [sp, #96]
+    bl   _cd_card
+    LEAVE 160
+
+Lcv_mt:                               // a Meshtastic node (mt_ble.s): green, LoRa, walled off
+    sub  x20, x20, x0
+    bl   _am_mt_nodes
+    cmp  x20, x0
+    b.hs Lcv_nil
+    ADRL x0, Ls_mt_second
+    bl   _nsstr
+    mov  x23, x0
+    mov  x0, x20
+    bl   _am_mt_node_name
+    mov  x2, x0
+    ADRL x0, Ls_y_meshtastic
+    mov  x1, #0xB060
+    movk x1, #0x30, lsl #16
     mov  x3, x23
     mov  x4, #0
     mov  x5, #0
@@ -727,6 +752,9 @@ _cd_round:
 .section __TEXT,__cstring,cstring_literals
 Ls_y_bolt:           .asciz "bolt.fill"
 Ls_y_meshcore:       .asciz "antenna.radiowaves.left.and.right"
+Ls_mt_second:        .asciz "Meshtastic \302\267 LoRa, through your radio"
+Ls_y_meshtastic:     .asciz "dot.radiowaves.left.and.right"
+Ls_k_meshtastic:     .asciz "LoRa chat through your Meshtastic radio"
 Ls_mc_second:        .asciz "MeshCore \302\267 LoRa, through your radio"
 Ls_k_meshcore:       .asciz "LoRa chat through your MeshCore radio"
 Ls_cls:              .asciz "AMeshCards"

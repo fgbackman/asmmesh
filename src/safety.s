@@ -896,7 +896,7 @@ Lhs_mc:                                   // not on the mesh: one of the MeshCor
     mov  x22, #0
 1:  bl   _am_mc_contacts
     cmp  x22, x0
-    b.hs Lhs_nobody
+    b.hs Lhs_mt
     mov  x0, x22
     bl   _am_mc_contact_name
     mov  x23, x0
@@ -907,6 +907,23 @@ Lhs_mc:                                   // not on the mesh: one of the MeshCor
     b    1b
 2:  mov  x0, x22                          // blocked by their key (mc_ble.s), shown by name
     bl   _am_mc_contact_id
+    mov  x1, x23
+    b    Lhs_who
+Lhs_mt:                                   // one of the Meshtastic radio's nodes?
+    mov  x22, #0
+1:  bl   _am_mt_nodes
+    cmp  x22, x0
+    b.hs Lhs_nobody
+    mov  x0, x22
+    bl   _am_mt_node_name
+    mov  x23, x0
+    mov  x1, x21
+    bl   _strcasecmp
+    cbz  w0, 2f
+    add  x22, x22, #1
+    b    1b
+2:  mov  x0, x22                          // blocked by their node number (mt_ble.s)
+    bl   _am_mt_node_id
     mov  x1, x23
     b    Lhs_who
 Lhs_list:

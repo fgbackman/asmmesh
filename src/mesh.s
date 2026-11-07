@@ -617,6 +617,8 @@ _mesh_send_text:
     b.eq Lst_bitchat
     cmp  x9, #MESHCORE_ID
     b.eq Lst_meshcore
+    cmp  x9, #MESHTASTIC_ID
+    b.eq Lst_meshtastic
     sub  x10, x9, #BCPM_FIRST             // a private bitchat chat
     cmp  x10, #(PM_CHATS - 1)
     b.ls Lst_bcpm
@@ -641,6 +643,10 @@ Lst_bitchat:
 Lst_meshcore:
     mov  x0, x20                      // MeshCore: chat text only, never a command (mc_ble.s)
     bl   _mc_say
+    LEAVE 0
+Lst_meshtastic:
+    mov  x0, x20                      // Meshtastic: chat text only, never a command (mt_ble.s)
+    bl   _mt_say
     LEAVE 0
 Lst_bcpm:
     mov  x0, x19                      // block / unblock / report this person (safety.s)

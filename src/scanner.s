@@ -179,6 +179,7 @@ Ltk_second:
     bl   _ffm_tick                    // Fivefold: words and guesses sent again
     bl   _dv_tick                     // the devices found: saved when they change (quick.s)
     bl   _mc_tick                     // MeshCore: a reply that never came, the message poll
+    bl   _mt_tick                     // Meshtastic: the read poll, the heartbeat
     bl   _dbl_tick                    // the developer's blocklist, fetched daily
 Ltk_hello:
     mov  x9, #150

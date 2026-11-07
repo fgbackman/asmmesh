@@ -63,6 +63,12 @@ long am_mc_contacts(void);
 const char *am_mc_contact_name(long i);
 long am_mc_contact_seen(long i);             // unix time of their last advert
 
+// Meshtastic (mt_ble.s): the radio, and the nodes it knows
+long am_mt_state(void);                      // 0 off, 1 connecting, 2 starting, 3 ready
+long am_mt_nodes(void);
+const char *am_mt_node_name(long i);
+long am_mt_node_seen(long i);                // unix time they were last heard
+
 long am_bc_count(void);
 const char *am_bc_nick(long k);
 char *am_bc_line(long k, char *buf);       // buf: 128 bytes

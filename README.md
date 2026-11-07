@@ -134,7 +134,12 @@ Nine letters in a 3×3 grid; make words of 4 to 9 letters that use the centre le
 
 - A **MeshCore companion radio** (a small LoRa device, such as a Heltec V3 or SenseCAP T1000-E, flashed with MeshCore's Companion Bluetooth firmware) reaches people miles away with no Wi-Fi or phone signal. Switch **MeshCore** on in Settings: asmmesh links to a radio named "MeshCore-…" (your Mac or iPhone may ask for its PIN once).
 - The **MeshCore** room is MeshCore's Public channel. Type to send; `@Anna hi` sends a direct message to one of the radio's contacts, and direct messages to you show as "Anna → you". The radio's contacts are listed in People. `block Anna` works for them too.
-- **Walled off**, like bitchat: what comes over LoRa is shown in that room only, cleaned and filtered, and never runs as a command or reaches other rooms. asmmesh can only ask the radio to start up, read contacts and messages, and send your messages: never to change its settings, reboot, reset or give up its keys. Plan and details: `docs/meshcore/PLAN.md`. Meshtastic radios are next.
+- **Walled off**, like bitchat: what comes over LoRa is shown in that room only, cleaned and filtered, and never runs as a command or reaches other rooms. asmmesh can only ask the radio to start up, read contacts and messages, and send your messages: never to change its settings, reboot, reset or give up its keys. Plan and details: `docs/meshcore/PLAN.md`.
+
+## Meshtastic: LoRa chat through a radio (Settings › Meshtastic, off by default)
+
+- A **Meshtastic radio** (the same kinds of boards, running Meshtastic firmware instead: the two can't hear each other) works the same way. Switch **Meshtastic** on: asmmesh links to a radio advertising Meshtastic's Bluetooth service (it asks for the PIN shown on the radio, or 123456, once). The **Meshtastic** room is its primary channel (other channels' messages say which), `@Anna hi` sends a direct message (acknowledged), its nodes are in People, and `block Anna` works for them.
+- **Walled off** the same way: only plain text is shown, never other kinds (admin, telemetry and the rest are ignored), and asmmesh can only ask the radio to start up, keep the link alive and send your text: never admin or configuration messages, keys or raw packets.
 
 ## Light and dark mode (Mac)
 
@@ -203,6 +208,8 @@ Copy this folder to a second Mac, run `make run` there too, and keep the two wit
     src/appear.s   light and dark mode on the Mac: colours that follow it, the appearance setting
     src/mc_core.s  MeshCore radio frames, pure: built, read, the allowlist, text cleaned, the channel key
     src/mc_ble.s   a MeshCore radio over Bluetooth: link, one command at a time, the MeshCore room, contacts
+    src/mt_core.s  Meshtastic protobufs by hand, pure: built, read, the allowlist (start-up, heartbeat, plain text)
+    src/mt_ble.s   a Meshtastic radio over Bluetooth: link, reads, the Meshtastic room, its nodes
     src/quick.s    your shortcuts (saved Home commands) and the devices kept between launches
     src/cf_core.s  the chat filter, pure (its words: cf_words.inc, made by tools/ninefold/make_chat_filter.py)
     src/safety.s   block, report, the filter's setting, the developer blocklist's loading and fetching, Home's words

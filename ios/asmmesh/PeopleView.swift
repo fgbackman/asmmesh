@@ -78,14 +78,16 @@ struct PeopleView: View {
                         }
                     }
                     if !mesh.loraPeople.isEmpty {
-                        SectionTitle(text: "On MeshCore (LoRa)")
+                        SectionTitle(text: "On LoRa (MeshCore, Meshtastic)")
                         ForEach(mesh.loraPeople) { p in
                             Card {
                                 HStack(spacing: 14) {
-                                    IconBadge(symbol: "antenna.radiowaves.left.and.right", color: Color(red: 0, green: 0.78, blue: 0.75), size: 40)
+                                    IconBadge(symbol: p.meshtastic ? "dot.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right",
+                                              color: p.meshtastic ? Color(red: 0.19, green: 0.69, blue: 0.38) : Color(red: 0, green: 0.78, blue: 0.75), size: 40)
                                     VStack(alignment: .leading, spacing: 3) {
-                                        Text(p.name.isEmpty ? "MeshCore user" : p.name).font(.headline)
-                                        Text("MeshCore \u{00B7} LoRa, through your radio").font(.footnote).foregroundStyle(Theme.dim)
+                                        Text(p.name.isEmpty ? "LoRa user" : p.name).font(.headline)
+                                        Text(p.meshtastic ? "Meshtastic \u{00B7} LoRa, through your radio" : "MeshCore \u{00B7} LoRa, through your radio")
+                                            .font(.footnote).foregroundStyle(Theme.dim)
                                     }
                                     Spacer()
                                 }

@@ -98,6 +98,7 @@ struct BitchatPerson: Identifiable, Equatable {
 struct LoraPerson: Identifiable, Equatable {
     let id: Int
     let name: String
+    var meshtastic = false   // a Meshtastic node (mt_ble.s), not a MeshCore contact
 }
 
 struct Person: Identifiable, Equatable {
@@ -352,7 +353,9 @@ final class Mesh: ObservableObject {
                                    hexID: String(cString: am_bc_hexid(k))))
         }
         if b != bitchatPeople { bitchatPeople = b }
-        let lp = (0..<am_mc_contacts()).map { LoraPerson(id: $0, name: cstr(am_mc_contact_name($0))) }
+        let mcn = am_mc_contacts()
+        let lp = (0..<mcn).map { LoraPerson(id: $0, name: cstr(am_mc_contact_name($0))) }
+            + (0..<am_mt_nodes()).map { LoraPerson(id: mcn + $0, name: cstr(am_mt_node_name($0)), meshtastic: true) }
         if lp != loraPeople { loraPeople = lp }
         var s: [Sensor] = []
         for i in 0..<am_sensor_count() {

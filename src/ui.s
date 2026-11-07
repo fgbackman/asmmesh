@@ -257,6 +257,9 @@ Lsr_labels:
     ADRL x8, Ls_hdr_meshcore
     cmp  x9, #MESHCORE_ID
     csel x2, x8, x2, eq
+    ADRL x8, Ls_hdr_meshtastic
+    cmp  x9, #MESHTASTIC_ID
+    csel x2, x8, x2, eq
     ADRL x8, Ls_hdr_bcpm
     sub  x10, x9, #BCPM_FIRST
     cmp  x10, #(PM_CHATS - 1)
@@ -287,6 +290,9 @@ Lsr_labels:
     csel x2, x8, x2, eq
     ADRL x8, Ls_ph_meshcore
     cmp  x9, #MESHCORE_ID
+    csel x2, x8, x2, eq
+    ADRL x8, Ls_ph_meshtastic
+    cmp  x9, #MESHTASTIC_ID
     csel x2, x8, x2, eq
     ADRL x8, Ls_ph_bcpm
     sub  x10, x9, #BCPM_FIRST
@@ -573,6 +579,8 @@ _people_rows:
     bl   _bc_people_n
     mov  x19, x0
     bl   _am_mc_contacts                  // then the MeshCore radio's contacts (mc_ble.s)
+    add  x19, x19, x0
+    bl   _am_mt_nodes                     // then the Meshtastic radio's nodes (mt_ble.s)
     add  x19, x19, x0
     ADRL x8, _g_node_count
     ldr  x9, [x8]
@@ -1789,6 +1797,8 @@ Ls_hdr_news:          .asciz "# %s \342\200\224 headlines from Macs with interne
 Ls_ph_web:            .asciz "A web address or search words; a number follows a link%.0s"
 Ls_hdr_bitchat:       .asciz "# %s \342\200\224 public chat with bitchat phones nearby (walled off: just chat)"
 Ls_ph_bitchat:        .asciz "Message bitchat phones nearby%.0s"
+Ls_hdr_meshtastic:    .asciz "# %s \342\200\224 LoRa chat through your Meshtastic radio (walled off: just chat)"
+Ls_ph_meshtastic:     .asciz "Message the primary channel, or @Name to one person%.0s"
 Ls_hdr_meshcore:      .asciz "# %s \342\200\224 LoRa chat through your MeshCore radio (walled off: just chat)"
 Ls_ph_meshcore:       .asciz "Message MeshCore\342\200\231s Public channel, or @Name to one person%.0s"
 Ls_hdr_bcpm:          .asciz "%s \342\200\224 private bitchat chat, end-to-end encrypted (Noise); walled off: just chat"
